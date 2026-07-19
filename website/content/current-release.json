@@ -1,0 +1,23 @@
+{
+  "version": "0.5.6",
+  "build": "28",
+  "date": "2026.07.16",
+  "zh": {
+    "label": "最新版本",
+    "title": "托盘界面视觉修复",
+    "changes": [
+      "底部徽标固定采用深色石墨铭牌，不再随系统浅色外观变成浅色底",
+      "保留金色图标、文字和描边层级，并移除会干扰阅读的扫光效果",
+      "托盘其余区域仍会正常跟随 macOS 的浅色或深色外观"
+    ]
+  },
+  "en": {
+    "label": "Latest",
+    "title": "Tray interface visual polish",
+    "changes": [
+      "The bottom badge now keeps a dark graphite plaque in both light and dark system appearances.",
+      "The gold icon, typography, and border hierarchy remain, while the distracting shimmer has been removed.",
+      "The rest of the tray continues to follow the macOS light or dark appearance normally."
+    ]
+  }
+}

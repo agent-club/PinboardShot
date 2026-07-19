@@ -1,0 +1,35 @@
+.build/
+.swiftpm/
+dist/
+DerivedData/
+*.xcarchive
+*.dSYM/
+*.xcuserstate
+.vscode/
+audit/rollback/
+AGENTS.md
+.DS_Store
+
+# Local configuration and logs
+.env
+.env.*
+!.env.example
+*.log
+
+# Signing credentials and private keys
+*.p12
+*.pfx
+*.pem
+*.key
+*.mobileprovision
+
+# Temporary public-repository boundary. Until the native application source is
+# ready to publish, only the public documentation surfaces below may enter the
+# root Git repository. The website keeps its own more specific ignore rules.
+/*
+!/.gitignore
+!/README.md
+!/website/
+!/website/**
+!/docs/
+!/docs/**
