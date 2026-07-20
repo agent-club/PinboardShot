@@ -28,6 +28,8 @@ AGENTS.md
 # root Git repository. The website keeps its own more specific ignore rules.
 /*
 !/.gitignore
+!/.github/
+!/.github/**
 !/README.md
 !/website/
 !/website/**

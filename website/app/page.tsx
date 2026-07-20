@@ -5,26 +5,42 @@ import currentRelease from "@/content/current-release.json";
 
 type Language = "zh" | "en";
 
+const releaseUrl = currentRelease.releaseUrl;
+const primaryDownloadUrl = currentRelease.downloads.dmg.url;
+const githubUrl = "https://github.com/agent-club/PinboardShot";
+
+function GitHubIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M12 2C6.48 2 2 6.59 2 12.25c0 4.53 2.87 8.37 6.84 9.73.5.09.68-.22.68-.49 0-.24-.01-1.05-.01-1.9-2.78.62-3.37-1.21-3.37-1.21-.45-1.19-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.89 1.56 2.34 1.11 2.91.85.09-.66.35-1.11.63-1.37-2.22-.26-4.56-1.14-4.56-5.06 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.3.1-2.71 0 0 .84-.28 2.75 1.05A9.33 9.33 0 0 1 12 6.97c.85 0 1.7.12 2.5.35 1.9-1.33 2.74-1.05 2.74-1.05.55 1.41.2 2.45.1 2.71.64.72 1.03 1.63 1.03 2.75 0 3.93-2.34 4.79-4.57 5.05.36.32.68.94.68 1.9 0 1.37-.01 2.47-.01 2.81 0 .27.18.59.69.49A10.18 10.18 0 0 0 22 12.25C22 6.59 17.52 2 12 2Z"
+      />
+    </svg>
+  );
+}
+
 const copy = {
   zh: {
     nav: { features: "功能", workflow: "使用方式", privacy: "隐私", changelog: "更新日志", download: "下载" },
     eyebrow: "为 macOS 精心打造",
     title: "截图，然后\n留在眼前",
     intro: "原生 macOS 截图、标注与贴图工具，从框选到马赛克、文字和贴屏，全程只在本机完成",
-    download: "下载 Universal 预览版",
+    download: "下载 DMG",
     learn: "看看它能做什么",
-    requirement: "macOS 14+ · Universal · Apple Silicon 与 Intel · 未经 Apple 公证",
-    distributionEyebrow: "无需 Apple Developer 账号的预览分发",
-    distributionTitle: "先验证来源，\n再决定是否打开",
-    distributionBody: "当前预览包采用本地 ad-hoc 签名，未经 Apple 公证，macOS 会显示未知开发者警告；请先核对 SHA-256，并只在确认下载来源可信后继续",
+    requirement: "macOS 14+ · Universal · Apple Silicon 与 Intel · Developer ID 签名 · Apple 公证",
+    distributionEyebrow: "正式公开分发",
+    distributionTitle: "已签名，\n也已通过 Apple 公证",
+    distributionBody: "PinboardShot 0.5.7 是首个 Developer ID 签名并通过 Apple 公证的公开版本；新用户可下载 DMG 手动安装，已安装用户可继续使用应用内更新",
     distributionSteps: [
-      "下载 ZIP，解压后将 PinboardShot 拖入“应用程序”",
-      "首次尝试打开；若被阻止，前往“系统设置 → 隐私与安全性”",
-      "在安全性区域选择“仍要打开”，再次确认后启动",
+      "下载 DMG 并打开安装窗口",
+      "将 PinboardShot 拖入“应用程序”文件夹",
+      "首次启动后按提示授予屏幕与系统音频录制权限",
     ],
     checksum: "查看 SHA-256",
-    source: "查看 GitHub 发布记录",
-    previewBadge: "社区预览 · 未公证",
+    source: "查看 GitHub Release",
+    repo: "GitHub 仓库",
+    previewBadge: "Developer ID · Apple 公证",
     pinned: "已贴到桌面",
     selection: "区域截图",
     toolbar: "标注 · 复制 · 贴屏",
@@ -104,20 +120,21 @@ const copy = {
     eyebrow: "Crafted for macOS",
     title: "Capture it.\nKeep it in sight.",
     intro: "A native capture, annotation, and pinboard tool for macOS. From selection to markup and pinning, everything stays on your Mac.",
-    download: "Download Universal Preview",
+    download: "Download DMG",
     learn: "See what it can do",
-    requirement: "macOS 14+ · Universal · Apple Silicon & Intel · Not notarized by Apple",
-    distributionEyebrow: "Preview distribution without Apple Developer credentials",
-    distributionTitle: "Verify the source\nbefore you open it.",
-    distributionBody: "This preview uses a local ad-hoc signature and is not notarized by Apple. macOS will show an unidentified-developer warning. Verify the SHA-256 checksum and continue only if you trust the download source.",
+    requirement: "macOS 14+ · Universal · Apple Silicon & Intel · Developer ID signed · Apple notarized",
+    distributionEyebrow: "Public distribution",
+    distributionTitle: "Signed,\nand notarized by Apple.",
+    distributionBody: "PinboardShot 0.5.7 is the first public build signed with Developer ID and notarized by Apple. New users can install with the DMG, while existing users can continue to use the in-app updater.",
     distributionSteps: [
-      "Download the ZIP, extract it, and move PinboardShot to Applications.",
-      "Try to open it once. If macOS blocks it, open System Settings → Privacy & Security.",
-      "Choose Open Anyway in the Security section, then confirm the launch.",
+      "Download the DMG and open the installer window.",
+      "Drag PinboardShot into the Applications folder.",
+      "On first launch, grant Screen & System Audio Recording permission when prompted.",
     ],
     checksum: "View SHA-256",
-    source: "View GitHub releases",
-    previewBadge: "Community preview · Not notarized",
+    source: "View GitHub Release",
+    repo: "GitHub repository",
+    previewBadge: "Developer ID · Apple notarized",
     pinned: "Pinned to desktop",
     selection: "Area capture",
     toolbar: "Annotate · Copy · Pin",
@@ -244,7 +261,10 @@ export default function Home() {
             <span aria-hidden="true">/</span>
             <button className={language === "en" ? "active" : ""} onClick={() => selectLanguage("en")} aria-pressed={language === "en"}>EN</button>
           </div>
-          <a className="small-download" href="/PinboardShot.zip" download>{content.nav.download}</a>
+          <a className="icon-link" href={githubUrl} target="_blank" rel="noreferrer" aria-label={content.repo}>
+            <GitHubIcon />
+          </a>
+          <a className="small-download" href={primaryDownloadUrl}>{content.nav.download}</a>
         </div>
       </header>
 
@@ -254,7 +274,7 @@ export default function Home() {
           <h1>{content.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1>
           <p className="intro">{content.intro}</p>
           <div className="hero-actions">
-            <a className="button button-primary" href="/PinboardShot.zip" download>{content.download}<span aria-hidden="true">↓</span></a>
+            <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
             <a className="button button-secondary" href="#features">{content.learn}<span aria-hidden="true">↘</span></a>
           </div>
           <p className="requirement">{content.requirement}</p>
@@ -285,14 +305,14 @@ export default function Home() {
           <h2 id="distribution-title">{content.distributionTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
           <p>{content.distributionBody}</p>
           <div className="distribution-links">
-            <a href="/PinboardShot.zip.sha256">{content.checksum}</a>
-            <a href="https://github.com/agent-club/PinboardShot/releases" target="_blank" rel="noreferrer">{content.source}</a>
+            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.checksum}</a>
+            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.source}</a>
           </div>
         </div>
         <div className="install-card">
           <strong>{content.previewBadge}</strong>
           <ol>{content.distributionSteps.map((step) => <li key={step}>{step}</li>)}</ol>
-          <a className="button button-primary" href="/PinboardShot.zip" download>{content.download}<span aria-hidden="true">↓</span></a>
+          <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
         </div>
       </section>
 
@@ -417,12 +437,16 @@ export default function Home() {
 
       <section className="download-section">
         <div><p className="eyebrow"><span />PINBOARDSHOT FOR MAC</p><h2>{content.ctaTitle}</h2><p>{content.ctaBody}</p></div>
-        <a className="button button-primary" href="/PinboardShot.zip" download>{content.download}<span aria-hidden="true">↓</span></a>
+        <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
       </section>
 
       <footer>
         <div className="footer-brand"><span className="brand-mark" aria-hidden="true"><i /><i /></span><div><strong>PinboardShot</strong><p>{content.footer}</p></div></div>
-        <div className="footer-meta"><span>macOS 14+</span><span>{content.copyright}</span></div>
+        <div className="footer-meta">
+          <a href={githubUrl} target="_blank" rel="noreferrer">{content.repo}</a>
+          <span>macOS 14+</span>
+          <span>{content.copyright}</span>
+        </div>
       </footer>
     </main>
   );

@@ -1,6 +1,6 @@
 # PinboardShot Website
 
-PinboardShot 的中英双语产品页与预览版下载入口。网站基于
+PinboardShot 的中英双语产品页与公开下载入口。网站基于
 [vinext](https://github.com/cloudflare/vinext)，部署目标为 Cloudflare
 Workers + Static Assets。
 
@@ -33,6 +33,20 @@ npm run deploy:dry-run
 ```bash
 npm run deploy
 ```
+
+## GitHub Actions 自动部署
+
+仓库包含 `.github/workflows/deploy-website.yml`。当 `main` 分支上的
+`website/**` 或 workflow 自身更新时，会自动安装依赖、执行 lint、测试、
+Cloudflare 兼容检查、部署 dry-run，并在成功后部署到 Cloudflare Workers。
+
+GitHub 仓库需要配置以下 Actions secrets：
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_API_TOKEN`
+
+不要把这些值写入仓库。`website/scripts/check-app-version.mjs` 依赖未公开的
+应用 `Resources/Info.plist`，因此它只适合本地发布前检查，不在公开仓库 CI 中运行。
 
 ## Workspace Auth Headers
 

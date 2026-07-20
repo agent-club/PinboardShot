@@ -32,6 +32,9 @@ nav a:hover, .language-switch button:hover { color: var(--blue); }
 .language-switch { display: flex; gap: 7px; align-items: center; font-size: 13px; color: #989ba8; }
 .language-switch button { border: 0; background: transparent; padding: 5px 2px; cursor: pointer; }
 .language-switch button.active { color: var(--ink); font-weight: 700; }
+.icon-link { display: grid; place-items: center; width: 38px; height: 38px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255,255,255,.7); color: var(--ink); transition: transform .18s ease, border-color .18s ease, color .18s ease, background .18s ease; }
+.icon-link:hover { transform: translateY(-1px); border-color: #b8bfd2; color: var(--blue); background: white; }
+.icon-link svg { display: block; width: 19px; height: 19px; }
 .small-download { padding: 10px 16px; background: var(--ink); color: white; border-radius: 999px; font-size: 13px; font-weight: 650; transition: transform .18s ease, background .18s ease; }
 .small-download:hover { transform: translateY(-1px); background: var(--blue); }
 
@@ -227,6 +230,8 @@ footer { width: min(1480px, calc(100% - 32px)); margin: 0 auto 16px; padding: 38
 .footer-brand strong { display: block; margin-bottom: 4px; font-size: 14px; }
 .footer-brand p { margin: 0; color: var(--muted); font-size: 12px; }
 .footer-meta { display: flex; gap: 28px; color: #8a8e9d; font-size: 11px; }
+.footer-meta a { color: var(--ink); font-weight: 700; }
+.footer-meta a:hover { color: var(--blue); }
 
 @keyframes settle { from { opacity: 0; transform: translateY(18px) rotate(1.2deg); } to { opacity: 1; transform: translateY(0) rotate(1.2deg); } }
 @keyframes demoProgress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
@@ -260,7 +265,8 @@ footer { width: min(1480px, calc(100% - 32px)); margin: 0 auto 16px; padding: 38
   .brand { font-size: 14px; }
   .brand-mark { width: 26px; height: 26px; }
   .small-download { display: none; }
-  .header-actions { gap: 0; }
+  .header-actions { gap: 14px; }
+  .icon-link { width: 36px; height: 36px; border-radius: 11px; }
   .hero { min-height: auto; padding: 55px 0 70px; gap: 44px; }
   h1 { font-size: clamp(50px, 15vw, 70px); }
   .intro { font-size: 16px; }
