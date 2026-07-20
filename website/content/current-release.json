@@ -1,23 +1,41 @@
 {
-  "version": "0.5.6",
-  "build": "28",
-  "date": "2026.07.16",
+  "version": "0.5.7",
+  "build": "29",
+  "date": "2026.07.20",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.7",
+  "downloads": {
+    "dmg": {
+      "name": "PinboardShot-0.5.7-29.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.7/PinboardShot-0.5.7-29.dmg",
+      "sha256": "90a9ba67004db6d903cc4e856349449d6bad296072a9d29f5b28f99eb53896b7"
+    },
+    "zip": {
+      "name": "PinboardShot-0.5.7-29.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.7/PinboardShot-0.5.7-29.zip",
+      "sha256": "097b8fe75cdfa481ae90fbfda39c8329f0003e0ba9029618319b38ea7200305b"
+    },
+    "appcast": {
+      "name": "appcast.xml",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.7/appcast.xml",
+      "sha256": "8be8456211ad519a26fef3c700936aebc5083613bac8b330c8e760fa12318b9e"
+    }
+  },
   "zh": {
     "label": "最新版本",
-    "title": "托盘界面视觉修复",
+    "title": "Developer ID 签名与 Apple 公证",
     "changes": [
-      "底部徽标固定采用深色石墨铭牌，不再随系统浅色外观变成浅色底",
-      "保留金色图标、文字和描边层级，并移除会干扰阅读的扫光效果",
-      "托盘其余区域仍会正常跟随 macOS 的浅色或深色外观"
+      "应用及其 Sparkle 嵌套组件使用 Developer ID Application 签名",
+      "应用、Sparkle 更新 ZIP 和手动安装 DMG 均已通过 Apple 公证",
+      "新增 DMG 手动安装包，同时保留应用内更新所需的 ZIP 和 appcast"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Tray interface visual polish",
+    "title": "Developer ID signing and Apple notarization",
     "changes": [
-      "The bottom badge now keeps a dark graphite plaque in both light and dark system appearances.",
-      "The gold icon, typography, and border hierarchy remain, while the distracting shimmer has been removed.",
-      "The rest of the tray continues to follow the macOS light or dark appearance normally."
+      "The app and its nested Sparkle components are signed with Developer ID Application.",
+      "The app, Sparkle update ZIP, and manual-install DMG have passed Apple notarization.",
+      "A DMG is now available for manual installation, while the ZIP and appcast remain available for in-app updates."
     ]
   }
 }

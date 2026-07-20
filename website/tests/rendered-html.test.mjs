@@ -30,8 +30,10 @@ test("server-renders the PinboardShot download page", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>PinboardShot — Capture it\. Keep it in sight\.<\/title>/i);
-  assert.match(html, /href="\/PinboardShot\.zip"/i);
-  assert.match(html, /href="\/PinboardShot\.zip\.sha256"/i);
+  assert.match(html, new RegExp(`href="${currentRelease.downloads.dmg.url.replaceAll(".", "\\.")}"`, "i"));
+  assert.match(html, new RegExp(`href="${currentRelease.releaseUrl.replaceAll(".", "\\.")}"`, "i"));
+  assert.match(html, /href="https:\/\/github\.com\/agent-club\/PinboardShot"/i);
+  assert.doesNotMatch(html, /Not notarized|未经 Apple 公证/i);
   assert.ok(html.includes(currentRelease.version));
   assert.match(html, /Your screenshots stay|你的截图/);
 });
