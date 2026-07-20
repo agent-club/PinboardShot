@@ -22,7 +22,7 @@ function GitHubIcon() {
 
 const copy = {
   zh: {
-    nav: { features: "功能", workflow: "使用方式", privacy: "隐私", changelog: "更新日志", download: "下载" },
+    nav: { features: "功能", workflow: "使用方式", compare: "差异", privacy: "隐私", changelog: "更新日志", download: "下载" },
     eyebrow: "为 macOS 精心打造",
     title: "截图，然后\n留在眼前",
     intro: "原生 macOS 截图、标注与贴图工具，从框选到马赛克、文字和贴屏，全程只在本机完成",
@@ -71,6 +71,30 @@ const copy = {
     pinBody: "多张贴图可以同时悬浮在所有桌面空间，移动、等比缩放、调节透明度或开启鼠标穿透，参考始终在场，操作始终顺手",
     pinStats: [["贴图数量", "不限"], ["透明度", "20—100%"], ["桌面空间", "全部"]],
     pinStatus: ["正在框选", "正在标注", "已贴到桌面", "鼠标穿透已开启"],
+    comparisonEyebrow: "DIFFERENT BY CHOICE",
+    comparisonTitle: "不是更多按钮，\n而是更清楚的取舍",
+    comparisonBody: "Snipaste 和 ShareX 都很强，但它们解决的问题不同。PinboardShot 选择更窄的 Mac 工作流：截图、标注、贴住参考，并把外部网络和数据流转保持到最低。",
+    comparisonCards: [
+      {
+        name: "Snipaste",
+        label: "跨平台截图贴图",
+        strength: "成熟、快捷、贴图操作丰富，适合熟悉 F1/F3 工作流的多平台用户。",
+        difference: "PinboardShot 更聚焦 macOS 原生体验、无账号无激活链路、无遥测，以及截图分发后的离线隐形水印。",
+      },
+      {
+        name: "ShareX",
+        label: "Windows 自动化分享",
+        strength: "面向高级用户，覆盖录屏、OCR、上传目的地、短链和自定义工作流。",
+        difference: "PinboardShot 不做上传中枢，默认只在本机处理截图，更适合敏感资料和持续参考场景。",
+      },
+      {
+        name: "PinboardShot",
+        label: "Mac 本地参考流",
+        strength: "原生 macOS、截图后即贴屏、跨桌面空间、透明度、鼠标穿透、Retina 到 8K 输出。",
+        difference: "Developer ID 签名和 Apple 公证是可信分发基础；真正的差异是本地优先、贴屏参考和可选离线水印。",
+      },
+    ],
+    comparisonSummary: ["Mac 原生", "无账号无遥测", "截图留在本机", "可选离线水印"],
     privacyEyebrow: "PRIVATE BY DESIGN",
     privacyTitle: "你的截图，\n只留在你的 Mac",
     privacyBody: "不需要账号，没有云同步，也没有遥测，截图、标注、最近 50 张历史和偏好设置都只在设备本地处理；网络仅用于软件更新，异常空白帧会被拒绝，不会覆盖上一份剪贴板内容",
@@ -116,7 +140,7 @@ const copy = {
     copyright: "本地优先，由设计开始",
   },
   en: {
-    nav: { features: "Features", workflow: "How it works", privacy: "Privacy", changelog: "Changelog", download: "Download" },
+    nav: { features: "Features", workflow: "How it works", compare: "Compare", privacy: "Privacy", changelog: "Changelog", download: "Download" },
     eyebrow: "Crafted for macOS",
     title: "Capture it.\nKeep it in sight.",
     intro: "A native capture, annotation, and pinboard tool for macOS. From selection to markup and pinning, everything stays on your Mac.",
@@ -165,6 +189,30 @@ const copy = {
     pinBody: "Keep as many pins as you need across every desktop space. Move, resize proportionally, tune opacity, or pass clicks through while the reference stays exactly where you need it.",
     pinStats: [["Pinned images", "Unlimited"], ["Opacity", "20—100%"], ["Desktop spaces", "All"]],
     pinStatus: ["Selecting area", "Annotating", "Pinned to desktop", "Click-through enabled"],
+    comparisonEyebrow: "DIFFERENT BY CHOICE",
+    comparisonTitle: "Not more buttons.\nClearer tradeoffs.",
+    comparisonBody: "Snipaste and ShareX are both strong, but they solve different problems. PinboardShot chooses a narrower Mac workflow: capture, annotate, keep references visible, and keep network and data movement minimal.",
+    comparisonCards: [
+      {
+        name: "Snipaste",
+        label: "Cross-platform snip and pin",
+        strength: "Mature, fast, and rich in pin controls for people who already rely on the F1/F3 workflow across platforms.",
+        difference: "PinboardShot focuses on native macOS behavior, no account or license-activation flow, no telemetry, and offline invisible watermarking after screenshots leave your desk.",
+      },
+      {
+        name: "ShareX",
+        label: "Windows sharing automation",
+        strength: "Built for power users with recording, OCR, upload destinations, short links, and custom workflows.",
+        difference: "PinboardShot is not an upload hub. Screenshots stay local by default, which fits sensitive material and persistent reference work.",
+      },
+      {
+        name: "PinboardShot",
+        label: "Local Mac reference flow",
+        strength: "Native macOS, instant pinning, every desktop space, opacity, click-through, and Native Retina to 8K output.",
+        difference: "Developer ID signing and Apple notarization are trust basics; the real difference is local-first pinning, controlled output, and optional offline watermarking.",
+      },
+    ],
+    comparisonSummary: ["Native Mac", "No account or telemetry", "Screenshots stay local", "Optional offline watermark"],
     privacyEyebrow: "PRIVATE BY DESIGN",
     privacyTitle: "Your screenshots stay\non your Mac.",
     privacyBody: "No account, cloud sync, or telemetry. Captures, annotations, the latest 50 history items, and preferences stay on-device; network access is used only for software updates. Empty or abnormal frames are rejected without replacing your clipboard.",
@@ -252,6 +300,7 @@ export default function Home() {
         <nav aria-label={language === "zh" ? "主导航" : "Main navigation"}>
           <a href="#features">{content.nav.features}</a>
           <a href="#workflow">{content.nav.workflow}</a>
+          <a href="#compare">{content.nav.compare}</a>
           <a href="#privacy">{content.nav.privacy}</a>
           <a href="#changelog">{content.nav.changelog}</a>
         </nav>
@@ -392,6 +441,35 @@ export default function Home() {
           <div className="opacity-control"><span>{language === "zh" ? "透明度" : "Opacity"}</span><div><i /></div><strong>64%</strong></div>
           <div className="passthrough-badge"><i>↗</i><span>{language === "zh" ? "鼠标穿透" : "Click-through"}</span><strong>{language === "zh" ? "已开启" : "On"}</strong></div>
           <div className="playground-cursor">↖</div>
+        </div>
+      </section>
+
+      <section className="comparison section" id="compare" aria-labelledby="comparison-title">
+        <div className="comparison-heading">
+          <div>
+            <p className="eyebrow"><span />{content.comparisonEyebrow}</p>
+            <h2 id="comparison-title">{content.comparisonTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
+          </div>
+          <p>{content.comparisonBody}</p>
+        </div>
+        <div className="comparison-grid">
+          {content.comparisonCards.map((card, index) => (
+            <article className={card.name === "PinboardShot" ? "comparison-card featured" : "comparison-card"} key={card.name}>
+              <div className="comparison-card-top">
+                <span>0{index + 1}</span>
+                <strong>{card.name}</strong>
+              </div>
+              <h3>{card.label}</h3>
+              <p>{card.strength}</p>
+              <div className="comparison-difference">
+                <small>{language === "zh" ? "PinboardShot 的取舍" : "PinboardShot's choice"}</small>
+                <p>{card.difference}</p>
+              </div>
+            </article>
+          ))}
+        </div>
+        <div className="comparison-summary">
+          {content.comparisonSummary.map((item) => <span key={item}>{item}</span>)}
         </div>
       </section>
 
