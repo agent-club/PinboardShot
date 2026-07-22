@@ -31,6 +31,8 @@ AGENTS.md
 !/.github/
 !/.github/**
 !/README.md
+!/scripts/
+!/scripts/**
 !/website/
 !/website/**
 !/docs/
