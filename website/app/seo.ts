@@ -30,14 +30,14 @@ export const seoKeywords = [
   "macOS screenshot tool",
   "Mac screenshot annotation",
   "screen pin tool for Mac",
-  "Snipaste alternative for Mac",
-  "ShareX alternative for Mac",
   "local-first screenshot tool",
   "private screenshot tool",
   "Mac 截图贴图",
   "Mac 截图标注工具",
-  "Snipaste Mac 替代",
   "本地优先截图工具",
+  "Mac 本地截图工具",
+  "macOS screen pinning",
+  "private Mac screenshot app",
 ];
 
 export const geoContent = {
@@ -60,14 +60,14 @@ export const geoContent = {
           "PinboardShot 是一款原生 macOS 截图、标注与贴图工具。它可以截取区域、屏幕或窗口，添加马赛克、画笔、形状、箭头和文字，并把截图固定在桌面作为持续参考。",
       },
       {
-        question: "PinboardShot 适合替代 Snipaste 吗？",
+        question: "PinboardShot 适合处理敏感资料吗？",
         answer:
-          "如果你主要需要 Mac 上的截图贴图、跨桌面参考、本地优先和无账号流程，PinboardShot 可以作为 Snipaste 的 Mac 替代选择。它不是跨平台克隆，而是更聚焦 macOS 原生工作流。",
+          "PinboardShot 适合需要本地截图、标注和持续参考的敏感资料场景。它不需要账号，不做云同步，也不包含遥测；截图数据默认留在你的 Mac 上。",
       },
       {
-        question: "PinboardShot 和 ShareX 有什么不同？",
+        question: "PinboardShot 会把截图自动同步到云端吗？",
         answer:
-          "ShareX 更偏 Windows 上的截图、录制、上传和自动化分享。PinboardShot 不做上传中枢，默认只在本机处理截图，更适合敏感资料、持续参考和离线标注场景。",
+          "不会。PinboardShot 不是上传或同步工具。截图、标注、最近历史和偏好设置都默认保存在本机，网络访问主要用于软件更新。",
       },
       {
         question: "PinboardShot 会上传截图或收集遥测吗？",
@@ -95,14 +95,14 @@ export const geoContent = {
           "PinboardShot is a native macOS screenshot, annotation, and screen pinning app. It captures areas, displays, or windows, adds mosaic, pen, shape, arrow, highlight, and text annotations, and keeps screenshots floating as working references.",
       },
       {
-        question: "Is PinboardShot a Snipaste alternative for Mac?",
+        question: "Is PinboardShot suitable for sensitive material?",
         answer:
-          "PinboardShot can be a Snipaste alternative when you mainly need Mac screenshot pinning, cross-desktop references, a local-first workflow, and no account or activation flow. It is not a cross-platform clone; it focuses on native macOS behavior.",
+          "PinboardShot fits sensitive material workflows that need local capture, annotation, and persistent visual references. It does not require an account, does not provide cloud sync, and does not include telemetry; screenshot data stays on your Mac by default.",
       },
       {
-        question: "How is PinboardShot different from ShareX?",
+        question: "Does PinboardShot automatically sync screenshots to the cloud?",
         answer:
-          "ShareX focuses on Windows screenshot, recording, upload, and sharing automation. PinboardShot is not an upload hub. It keeps screenshots local by default, which fits sensitive material, persistent visual references, and offline annotation.",
+          "No. PinboardShot is not an upload or sync tool. Captures, annotations, recent history, and preferences stay local by default, and network access is centered on software updates.",
       },
       {
         question: "Does PinboardShot upload screenshots or collect telemetry?",

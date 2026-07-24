@@ -12,6 +12,9 @@ done
 
 swift build $build_args
 bin_path="$(swift build $build_args --show-bin-path)"
+if [[ -d .build/app/PinboardShot.app ]]; then
+  /usr/bin/find .build/app/PinboardShot.app -depth -delete
+fi
 mkdir -p \
   .build/app/PinboardShot.app/Contents/MacOS \
   .build/app/PinboardShot.app/Contents/Resources \
@@ -40,6 +43,9 @@ fi
 for localization in Resources/*.lproj; do
   cp -R "$localization" .build/app/PinboardShot.app/Contents/Resources/
 done
+mkdir -p .build/app/PinboardShot.app/Contents/Resources/Legal
+cp LICENSE .build/app/PinboardShot.app/Contents/Resources/Legal/LICENSE.txt
+cp NOTICE.md .build/app/PinboardShot.app/Contents/Resources/Legal/NOTICE.md
 
 sign_sparkle() {
   local signing_identity="$1"

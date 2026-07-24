@@ -9,6 +9,7 @@ type Language = SeoLanguage;
 const releaseUrl = currentRelease.releaseUrl;
 const primaryDownloadUrl = currentRelease.downloads.dmg.url;
 const githubUrl = "https://github.com/agent-club/PinboardShot";
+const privacyConsentStorageKey = "pinboardshot-privacy-consent-v1";
 
 function GitHubIcon() {
   return (
@@ -23,7 +24,7 @@ function GitHubIcon() {
 
 const copy = {
   zh: {
-    nav: { features: "功能", workflow: "使用方式", compare: "差异", privacy: "隐私", faq: "问答", changelog: "更新日志", download: "下载" },
+    nav: { features: "功能", workflow: "使用方式", compare: "原则", privacy: "隐私", faq: "问答", changelog: "更新日志", download: "下载" },
     eyebrow: "为 macOS 精心打造",
     title: "截图，然后\n留在眼前",
     intro: "原生 macOS 截图、标注与贴图工具，从框选到马赛克、文字和贴屏，全程只在本机完成",
@@ -72,21 +73,21 @@ const copy = {
     pinBody: "多张贴图可以同时悬浮在所有桌面空间，移动、等比缩放、调节透明度或开启鼠标穿透，参考始终在场，操作始终顺手",
     pinStats: [["贴图数量", "不限"], ["透明度", "20—100%"], ["桌面空间", "全部"]],
     pinStatus: ["正在框选", "正在标注", "已贴到桌面", "鼠标穿透已开启"],
-    comparisonEyebrow: "DIFFERENT BY CHOICE",
+    comparisonEyebrow: "PRODUCT PRINCIPLES",
     comparisonTitle: "不是更多按钮，\n而是更清楚的取舍",
-    comparisonBody: "Snipaste 和 ShareX 都很强，但它们解决的问题不同。PinboardShot 选择更窄的 Mac 工作流：截图、标注、贴住参考，并把外部网络和数据流转保持到最低。",
+    comparisonBody: "PinboardShot 选择更窄的 Mac 工作流：截图、标注、贴住参考，并把外部网络和数据流转保持到最低。页面不借其他产品做对照营销，只说明自己的边界。",
     comparisonCards: [
       {
-        name: "Snipaste",
-        label: "跨平台截图贴图",
-        strength: "成熟、快捷、贴图操作丰富，适合熟悉 F1/F3 工作流的多平台用户。",
-        difference: "PinboardShot 更聚焦 macOS 原生体验、无账号无激活链路、无遥测，以及截图分发后的离线隐形水印。",
+        name: "Local-first",
+        label: "默认留在设备",
+        strength: "截图、标注、最近历史和偏好设置默认只在本机处理，不要求账号或云同步。",
+        difference: "PinboardShot 不把截图工具做成上传中枢；网络主要用于软件更新和公开下载。",
       },
       {
-        name: "ShareX",
-        label: "Windows 自动化分享",
-        strength: "面向高级用户，覆盖录屏、OCR、上传目的地、短链和自定义工作流。",
-        difference: "PinboardShot 不做上传中枢，默认只在本机处理截图，更适合敏感资料和持续参考场景。",
+        name: "Mac-native",
+        label: "贴近 macOS 行为",
+        strength: "原生界面、系统权限、快捷键、Retina 输出和跨桌面空间贴图都围绕 Mac 日常工作流设计。",
+        difference: "PinboardShot 不追求跨平台功能堆叠，而是把 Mac 上的捕捉、标注和持续参考做清楚。",
       },
       {
         name: "PinboardShot",
@@ -139,9 +140,21 @@ const copy = {
     ctaBody: "轻量、原生、专注，现在下载 PinboardShot",
     footer: "一个纯原生的 macOS 截图与贴图工具",
     copyright: "本地优先，由设计开始",
+    privacyLink: "隐私条款",
+    noticeLink: "许可与声明",
+    assetNotice: "网站与产品展示图片均为 AI 生成的示意图，用于展示 PinboardShot 的功能和界面氛围。",
+    trademarkNotice:
+      "Mac、macOS、Retina、Apple、Apple Silicon、Developer ID 和 Apple 公证为 Apple Inc. 在美国及其他国家和地区的商标或服务标记。PinboardShot 与 Apple Inc. 无隶属、赞助或背书关系。GitHub 名称与标识归 GitHub, Inc. 所有，本站仅用于链接项目仓库。",
+    privacyConsent: {
+      title: "隐私选择",
+      body: "本站不使用广告追踪 Cookie。我们只保存语言偏好和这次选择；托管、更新与下载服务可能处理必要访问日志。",
+      privacy: "查看隐私条款",
+      essential: "仅必要",
+      accept: "知道了",
+    },
   },
   en: {
-    nav: { features: "Features", workflow: "How it works", compare: "Compare", privacy: "Privacy", faq: "FAQ", changelog: "Changelog", download: "Download" },
+    nav: { features: "Features", workflow: "How it works", compare: "Principles", privacy: "Privacy", faq: "FAQ", changelog: "Changelog", download: "Download" },
     eyebrow: "Crafted for macOS",
     title: "Capture it.\nKeep it in sight.",
     intro: "A native capture, annotation, and pinboard tool for macOS. From selection to markup and pinning, everything stays on your Mac.",
@@ -190,21 +203,21 @@ const copy = {
     pinBody: "Keep as many pins as you need across every desktop space. Move, resize proportionally, tune opacity, or pass clicks through while the reference stays exactly where you need it.",
     pinStats: [["Pinned images", "Unlimited"], ["Opacity", "20—100%"], ["Desktop spaces", "All"]],
     pinStatus: ["Selecting area", "Annotating", "Pinned to desktop", "Click-through enabled"],
-    comparisonEyebrow: "DIFFERENT BY CHOICE",
+    comparisonEyebrow: "PRODUCT PRINCIPLES",
     comparisonTitle: "Not more buttons.\nClearer tradeoffs.",
-    comparisonBody: "Snipaste and ShareX are both strong, but they solve different problems. PinboardShot chooses a narrower Mac workflow: capture, annotate, keep references visible, and keep network and data movement minimal.",
+    comparisonBody: "PinboardShot chooses a narrower Mac workflow: capture, annotate, keep references visible, and keep network and data movement minimal. This page avoids positioning the app as another product's replacement and describes its own boundaries instead.",
     comparisonCards: [
       {
-        name: "Snipaste",
-        label: "Cross-platform snip and pin",
-        strength: "Mature, fast, and rich in pin controls for people who already rely on the F1/F3 workflow across platforms.",
-        difference: "PinboardShot focuses on native macOS behavior, no account or license-activation flow, no telemetry, and offline invisible watermarking after screenshots leave your desk.",
+        name: "Local-first",
+        label: "Stays on the device by default",
+        strength: "Captures, annotations, recent history, and preferences are handled locally without requiring an account or cloud sync.",
+        difference: "PinboardShot is not an upload hub. Network access is centered on software updates and public downloads.",
       },
       {
-        name: "ShareX",
-        label: "Windows sharing automation",
-        strength: "Built for power users with recording, OCR, upload destinations, short links, and custom workflows.",
-        difference: "PinboardShot is not an upload hub. Screenshots stay local by default, which fits sensitive material and persistent reference work.",
+        name: "Mac-native",
+        label: "Designed around macOS behavior",
+        strength: "Native interface patterns, permissions, shortcuts, Retina output, and cross-space pinning are tuned for everyday Mac work.",
+        difference: "PinboardShot does not chase broad cross-platform feature volume; it keeps capture, annotation, and persistent visual reference work clear on Mac.",
       },
       {
         name: "PinboardShot",
@@ -257,6 +270,18 @@ const copy = {
     ctaBody: "Lightweight, native, and focused. Download PinboardShot today.",
     footer: "A fully native screenshot and pinboard tool for macOS.",
     copyright: "Local-first by design.",
+    privacyLink: "Privacy Policy",
+    noticeLink: "License & notices",
+    assetNotice: "Website and product showcase images are AI-generated illustrative assets created to demonstrate PinboardShot features and interface mood.",
+    trademarkNotice:
+      "Mac, macOS, Retina, Apple, Apple Silicon, Developer ID, and Apple notarization are trademarks or service marks of Apple Inc., registered in the U.S. and other countries and regions. PinboardShot is not affiliated with, sponsored by, or endorsed by Apple Inc. The GitHub name and mark belong to GitHub, Inc. and are used only to link to the project repository.",
+    privacyConsent: {
+      title: "Privacy choices",
+      body: "This site does not use advertising or analytics cookies. We only store your language preference and this choice; hosting, update, and download services may process necessary access logs.",
+      privacy: "Read the privacy policy",
+      essential: "Essential only",
+      accept: "Got it",
+    },
   },
 } as const;
 
@@ -270,6 +295,7 @@ export function PinboardShotHome({
   const [language, setLanguage] = useState<Language>(initialLanguage);
   const [demoStep, setDemoStep] = useState(0);
   const [demoPaused, setDemoPaused] = useState(false);
+  const [showPrivacyConsent, setShowPrivacyConsent] = useState(true);
   const content = copy[language];
   const geo = geoContent[language];
   const jsonLd = structuredData(language);
@@ -295,11 +321,25 @@ export function PinboardShotHome({
     return () => window.clearInterval(timer);
   }, [demoPaused]);
 
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      const saved = window.localStorage.getItem(privacyConsentStorageKey);
+      setShowPrivacyConsent(saved !== "accepted" && saved !== "essential");
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
   /** Keep explicit language choices stable across return visits. */
   const selectLanguage = (next: Language) => {
     setLanguage(next);
     window.localStorage.setItem("pinboardshot-language", next);
     document.documentElement.lang = next === "zh" ? "zh-CN" : "en";
+  };
+
+  const savePrivacyConsent = (choice: "accepted" | "essential") => {
+    window.localStorage.setItem(privacyConsentStorageKey, choice);
+    setShowPrivacyConsent(false);
   };
 
   return (
@@ -568,10 +608,34 @@ export function PinboardShotHome({
         <div className="footer-brand"><span className="brand-mark" aria-hidden="true"><i /><i /></span><div><strong>PinboardShot</strong><p>{content.footer}</p></div></div>
         <div className="footer-meta">
           <a href={githubUrl} target="_blank" rel="noreferrer">{content.repo}</a>
+          <a href="/privacy">{content.privacyLink}</a>
+          <a href={`${githubUrl}/blob/main/NOTICE.md`} target="_blank" rel="noreferrer">{content.noticeLink}</a>
           <span>macOS 14+</span>
           <span>{content.copyright}</span>
         </div>
+        <div className="footer-legal">
+          <p>{content.assetNotice}</p>
+          <p>{content.trademarkNotice}</p>
+        </div>
       </footer>
+
+      {showPrivacyConsent && (
+        <aside className="privacy-consent" aria-labelledby="privacy-consent-title">
+          <div>
+            <strong id="privacy-consent-title">{content.privacyConsent.title}</strong>
+            <p>{content.privacyConsent.body}</p>
+            <a href="/privacy">{content.privacyConsent.privacy}</a>
+          </div>
+          <div className="privacy-consent-actions">
+            <button type="button" className="button button-secondary" onClick={() => savePrivacyConsent("essential")}>
+              {content.privacyConsent.essential}
+            </button>
+            <button type="button" className="button button-primary" onClick={() => savePrivacyConsent("accepted")}>
+              {content.privacyConsent.accept}
+            </button>
+          </div>
+        </aside>
+      )}
     </main>
   );
 }
