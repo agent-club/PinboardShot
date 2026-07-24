@@ -7,7 +7,7 @@ This checklist tracks free or community-based trust signals for PinboardShot. It
 - Public privacy policy: https://pinboardshot.agentclub.dev/privacy
 - Security policy: `SECURITY.md`
 - OpenSSF Scorecard workflow: `.github/workflows/scorecard.yml`
-- README links to the privacy policy, security policy, and Scorecard viewer.
+- README links to the privacy policy, security policy, and Scorecard status.
 - Website trust-signal section that distinguishes public evidence from formal certification.
 
 ## OpenSSF Best Practices Badge
@@ -28,6 +28,14 @@ Recommended path:
    - GitHub Releases for public release notes and artifacts.
    - `.github/workflows/scorecard.yml` for automated security posture scanning.
 5. Add the official badge to `README.md` and the website only after the project receives a passing badge.
+
+## OpenSSF Scorecard
+
+Official viewer: https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot
+
+Status: workflow configured; public badge pending first published result on the default branch.
+
+The Scorecard badge is intentionally not shown in `README.md` yet. The badge image is served through Shields and returns `invalid repo path` until Scorecard has public data for the repository. Add it only after the default branch workflow publishes a result successfully.
 
 ## Website Checks
 
