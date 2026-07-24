@@ -40,6 +40,9 @@ fi
 for localization in Resources/*.lproj; do
   cp -R "$localization" .build/app/PinboardShot.app/Contents/Resources/
 done
+mkdir -p .build/app/PinboardShot.app/Contents/Resources/Legal
+cp LICENSE .build/app/PinboardShot.app/Contents/Resources/Legal/LICENSE.txt
+cp NOTICE.md .build/app/PinboardShot.app/Contents/Resources/Legal/NOTICE.md
 
 sign_sparkle() {
   local signing_identity="$1"

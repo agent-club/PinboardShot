@@ -39,10 +39,13 @@ test("server-renders the PinboardShot download page", async () => {
   assert.doesNotMatch(html, /Not notarized|未经 Apple 公证/i);
   assert.ok(html.includes(currentRelease.version));
   assert.match(html, /Your screenshots stay|你的截图/);
+  assert.match(html, /href="\/privacy"/i);
+  assert.match(html, /AI 生成的示意图|AI-generated illustrative assets/i);
+  assert.match(html, /Apple Inc\./i);
   assert.match(html, /application\/ld\+json/i);
   assert.match(html, /SoftwareApplication/i);
   assert.match(html, /FAQPage/i);
-  assert.match(html, /Snipaste Mac 替代/i);
+  assert.doesNotMatch(html, /Snipaste|ShareX/i);
 });
 
 test("server-renders the localized English page", async () => {
@@ -54,8 +57,22 @@ test("server-renders the localized English page", async () => {
   assert.match(html, /<title>PinboardShot - Native Screenshot, Annotation, and Screen Pinning for Mac<\/title>/i);
   assert.match(html, /<main lang="en">/i);
   assert.match(html, /Frequently Asked Questions/);
-  assert.match(html, /Snipaste alternative for Mac/);
+  assert.match(html, /Privacy choices/);
+  assert.doesNotMatch(html, /Snipaste|ShareX/i);
   assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/en"/i);
+});
+
+test("server-renders the privacy policy", async () => {
+  const response = await render("/privacy");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /<title>Privacy Policy - PinboardShot<\/title>/i);
+  assert.match(html, /Last updated:<\/strong>\s*(?:<!-- -->)?July 24, 2026/i);
+  assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 7 月 24 日/i);
+  assert.match(html, /does not include analytics or advertising SDKs/i);
+  assert.match(html, /AI-generated illustrative assets/i);
 });
 
 test("serves robots and sitemap for search crawlers", async () => {
@@ -74,5 +91,6 @@ test("serves robots and sitemap for search crawlers", async () => {
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/<\/loc>/i);
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/zh<\/loc>/i);
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/en<\/loc>/i);
+  assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/privacy<\/loc>/i);
   assert.doesNotMatch(sitemapXml, /github\.com\/agent-club\/PinboardShot\/releases/i);
 });

@@ -30,6 +30,8 @@ AGENTS.md
 !/.gitignore
 !/.github/
 !/.github/**
+!/LICENSE
+!/NOTICE.md
 !/README.md
 !/scripts/
 !/scripts/**
