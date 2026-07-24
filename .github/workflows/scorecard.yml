@@ -9,10 +9,7 @@ on:
       - main
   workflow_dispatch:
 
-permissions:
-  contents: read
-  security-events: write
-  id-token: write
+permissions: read-all
 
 concurrency:
   group: scorecard-${{ github.ref }}
@@ -23,6 +20,10 @@ jobs:
     name: Analyze repository security posture
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
+      security-events: write
+      id-token: write
 
     steps:
       - name: Check out repository
