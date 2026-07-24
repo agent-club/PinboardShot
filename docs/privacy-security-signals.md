@@ -33,9 +33,9 @@ Recommended path:
 
 Official viewer: https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot
 
-Status: workflow configured; public badge pending first published result on the default branch.
+Status: workflow configured; public badge available after the default branch published its first result.
 
-The Scorecard badge is intentionally not shown in `README.md` yet. The badge image is served through Shields and returns `invalid repo path` until Scorecard has public data for the repository. Add it only after the default branch workflow publishes a result successfully.
+The Scorecard badge is shown in `README.md`. If it ever renders `invalid repo path`, verify that the default branch workflow completed successfully and that Scorecard/Shields cache has refreshed.
 
 ## Website Checks
 
