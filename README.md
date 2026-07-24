@@ -2,6 +2,8 @@
 
 [中文](#中文) | [English](#english)
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/agent-club/PinboardShot/badge)](https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot)
+
 ![PinboardShot 产品介绍图：截图、标注与贴屏](website/public/og.png)
 
 ## 中文
@@ -173,6 +175,16 @@ xcrun notarytool store-credentials "PinboardShot-notary"
 ```
 
 PinboardShot 仅为检查和下载软件更新访问网络，不上传截图，也不包含遥测或分析服务。历史可以在设置中手动清空，或配置为退出应用时自动清理。
+
+### 隐私与安全背书
+
+- 隐私政策：<https://pinboardshot.agentclub.dev/privacy>
+- 安全策略：[`SECURITY.md`](SECURITY.md)
+- OpenSSF Scorecard：<https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot>
+- OpenSSF Best Practices Badge：待完成官方自认证后添加徽章；认证前不展示未取得的标识。
+- 官网检查建议：发布前用 Mozilla HTTP Observatory、SSL Labs 和 Blacklight 检查安全响应头、TLS 配置和第三方追踪情况；这些扫描结果是公开佐证，不等同于正式隐私认证。
+- 社区评审候选：PrivacySpy 和 Privacy Guides 可作为后续提交目标；是否收录取决于各社区审核。
+- 维护清单：[`docs/privacy-security-signals.md`](docs/privacy-security-signals.md)
 
 ### 可选的软件更新渠道
 
@@ -366,6 +378,16 @@ Capture history is stored at:
 ```
 
 PinboardShot accesses the network only to check for and download software updates. It does not upload captures and contains no telemetry or analytics services. History can be cleared manually in Settings or configured to clear automatically when the app quits.
+
+### Privacy and Security Signals
+
+- Privacy policy: <https://pinboardshot.agentclub.dev/privacy>
+- Security policy: [`SECURITY.md`](SECURITY.md)
+- OpenSSF Scorecard: <https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot>
+- OpenSSF Best Practices Badge: pending official self-certification; no badge is displayed before it is earned.
+- Website checks: before publishing, use Mozilla HTTP Observatory, SSL Labs, and Blacklight to check security headers, TLS configuration, and third-party tracking. These results are public trust signals, not formal privacy certifications.
+- Community review candidates: PrivacySpy and Privacy Guides can be considered for future submission, subject to each community's review process.
+- Maintenance checklist: [`docs/privacy-security-signals.md`](docs/privacy-security-signals.md)
 
 ### Optional software-update channel
 

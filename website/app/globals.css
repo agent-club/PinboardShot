@@ -224,6 +224,17 @@ h2 { margin-bottom: 0; font-size: clamp(42px, 4.4vw, 66px); line-height: 1.03; l
 .privacy-orbit { position: absolute; width: 420px; height: 420px; right: -60px; top: -80px; border: 54px solid rgba(73,111,246,.08); border-radius: 50%; }
 .privacy-orbit i { position: absolute; inset: 48px; border: 1px solid rgba(73,111,246,.17); border-radius: 50%; }
 
+.trust-signals { padding: 80px 0 24px; }
+.trust-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 540px); gap: 72px; align-items: end; margin-bottom: 38px; }
+.trust-heading .eyebrow { margin-bottom: 20px; }
+.trust-heading > p { margin: 0 0 7px; color: var(--muted); font-size: 15px; line-height: 1.85; }
+.trust-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.trust-card { min-width: 0; min-height: 218px; display: flex; flex-direction: column; padding: 23px; border: 1px solid rgba(45,49,69,.09); border-radius: 22px; background: rgba(255,255,255,.76); box-shadow: 0 18px 48px rgba(49,55,82,.06); transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.trust-card:hover { transform: translateY(-2px); border-color: rgba(73,111,246,.26); box-shadow: 0 24px 58px rgba(49,55,82,.1); }
+.trust-card span { display: block; margin-bottom: 28px; color: var(--blue); font-family: var(--font-geist-mono), monospace; font-size: 10px; font-weight: 700; }
+.trust-card h3 { margin-bottom: 12px; font-size: 19px; line-height: 1.2; letter-spacing: -.025em; }
+.trust-card p { margin: 0; color: #555b70; font-size: 13px; line-height: 1.7; }
+
 .geo-facts { padding: 118px 0 8px; }
 .geo-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 540px); gap: 72px; align-items: end; margin-bottom: 38px; }
 .geo-heading .eyebrow { margin-bottom: 20px; }
@@ -315,6 +326,8 @@ footer { width: min(1480px, calc(100% - 32px)); margin: 0 auto 16px; padding: 38
   .comparison-heading { grid-template-columns: 1fr; gap: 24px; }
   .comparison-grid { grid-template-columns: 1fr; }
   .privacy { grid-template-columns: 1fr; gap: 40px; }
+  .trust-heading { grid-template-columns: 1fr; gap: 24px; }
+  .trust-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .geo-heading { grid-template-columns: 1fr; gap: 24px; }
   .fact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .faq-list { grid-template-columns: 1fr; }
@@ -377,6 +390,11 @@ footer { width: min(1480px, calc(100% - 32px)); margin: 0 auto 16px; padding: 38
   .comparison-card h3 { font-size: 21px; }
   .privacy { width: calc(100% - 16px); padding: 62px 28px; border-radius: 26px; }
   .privacy-detail ul { flex-direction: column; }
+  .trust-signals { padding: 72px 0 0; }
+  .trust-heading { margin-bottom: 30px; }
+  .trust-grid { grid-template-columns: 1fr; }
+  .trust-card { min-height: 0; padding: 22px; border-radius: 20px; }
+  .trust-card span { margin-bottom: 18px; }
   .geo-facts { padding: 86px 0 0; }
   .geo-heading { margin-bottom: 30px; }
   .fact-grid { grid-template-columns: 1fr; }
