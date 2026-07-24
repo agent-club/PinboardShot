@@ -224,6 +224,21 @@ h2 { margin-bottom: 0; font-size: clamp(42px, 4.4vw, 66px); line-height: 1.03; l
 .privacy-orbit { position: absolute; width: 420px; height: 420px; right: -60px; top: -80px; border: 54px solid rgba(73,111,246,.08); border-radius: 50%; }
 .privacy-orbit i { position: absolute; inset: 48px; border: 1px solid rgba(73,111,246,.17); border-radius: 50%; }
 
+.geo-facts { padding: 118px 0 8px; }
+.geo-heading { display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 540px); gap: 72px; align-items: end; margin-bottom: 38px; }
+.geo-heading .eyebrow { margin-bottom: 20px; }
+.geo-heading > p { margin: 0 0 7px; color: var(--muted); font-size: 15px; line-height: 1.85; }
+.fact-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.fact-card { min-width: 0; padding: 22px; border: 1px solid rgba(45,49,69,.09); border-radius: 22px; background: rgba(255,255,255,.76); box-shadow: 0 18px 48px rgba(49,55,82,.06); }
+.fact-card span { display: block; margin-bottom: 20px; color: var(--blue); font-family: var(--font-geist-mono), monospace; font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.fact-card p { margin: 0; color: #474d60; font-size: 13px; line-height: 1.7; }
+.faq-block { margin-top: 42px; padding-top: 34px; border-top: 1px solid var(--line); }
+.faq-block h3 { margin-bottom: 26px; font-size: 30px; line-height: 1.1; letter-spacing: -.04em; }
+.faq-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.faq-item { min-width: 0; padding: 24px 26px; border: 1px solid rgba(45,49,69,.09); border-radius: 22px; background: rgba(255,255,255,.7); }
+.faq-item h4 { margin: 0 0 13px; font-size: 18px; line-height: 1.25; letter-spacing: -.025em; }
+.faq-item p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.75; }
+
 .changelog { padding: 118px 0 36px; }
 .changelog-heading { display: grid; grid-template-columns: 1fr minmax(300px, 470px); gap: 72px; align-items: end; margin-bottom: 58px; }
 .changelog-heading .eyebrow { margin-bottom: 20px; }
@@ -278,6 +293,9 @@ footer { width: min(1480px, calc(100% - 32px)); margin: 0 auto 16px; padding: 38
   .comparison-heading { grid-template-columns: 1fr; gap: 24px; }
   .comparison-grid { grid-template-columns: 1fr; }
   .privacy { grid-template-columns: 1fr; gap: 40px; }
+  .geo-heading { grid-template-columns: 1fr; gap: 24px; }
+  .fact-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .faq-list { grid-template-columns: 1fr; }
   .changelog-heading { grid-template-columns: 1fr; gap: 24px; }
   .release { grid-template-columns: 90px 1fr auto; }
   .release ul { grid-column: 2 / 4; }
@@ -334,6 +352,12 @@ footer { width: min(1480px, calc(100% - 32px)); margin: 0 auto 16px; padding: 38
   .comparison-card h3 { font-size: 21px; }
   .privacy { width: calc(100% - 16px); padding: 62px 28px; border-radius: 26px; }
   .privacy-detail ul { flex-direction: column; }
+  .geo-facts { padding: 86px 0 0; }
+  .geo-heading { margin-bottom: 30px; }
+  .fact-grid { grid-template-columns: 1fr; }
+  .fact-card, .faq-item { padding: 22px; border-radius: 20px; }
+  .faq-block { margin-top: 32px; padding-top: 28px; }
+  .faq-block h3 { font-size: 25px; }
   .changelog { padding: 86px 0 20px; }
   .changelog-heading { margin-bottom: 36px; }
   .release { grid-template-columns: 1fr; gap: 18px; padding: 28px 0; }

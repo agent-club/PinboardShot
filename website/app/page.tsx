@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from "react";
 import currentRelease from "@/content/current-release.json";
+import { geoContent, structuredData, type SeoLanguage } from "./seo";
 
-type Language = "zh" | "en";
+type Language = SeoLanguage;
 
 const releaseUrl = currentRelease.releaseUrl;
 const primaryDownloadUrl = currentRelease.downloads.dmg.url;
@@ -22,7 +23,7 @@ function GitHubIcon() {
 
 const copy = {
   zh: {
-    nav: { features: "功能", workflow: "使用方式", compare: "差异", privacy: "隐私", changelog: "更新日志", download: "下载" },
+    nav: { features: "功能", workflow: "使用方式", compare: "差异", privacy: "隐私", faq: "问答", changelog: "更新日志", download: "下载" },
     eyebrow: "为 macOS 精心打造",
     title: "截图，然后\n留在眼前",
     intro: "原生 macOS 截图、标注与贴图工具，从框选到马赛克、文字和贴屏，全程只在本机完成",
@@ -140,7 +141,7 @@ const copy = {
     copyright: "本地优先，由设计开始",
   },
   en: {
-    nav: { features: "Features", workflow: "How it works", compare: "Compare", privacy: "Privacy", changelog: "Changelog", download: "Download" },
+    nav: { features: "Features", workflow: "How it works", compare: "Compare", privacy: "Privacy", faq: "FAQ", changelog: "Changelog", download: "Download" },
     eyebrow: "Crafted for macOS",
     title: "Capture it.\nKeep it in sight.",
     intro: "A native capture, annotation, and pinboard tool for macOS. From selection to markup and pinning, everything stays on your Mac.",
@@ -259,14 +260,25 @@ const copy = {
   },
 } as const;
 
-export default function Home() {
-  const [language, setLanguage] = useState<Language>("zh");
+export function PinboardShotHome({
+  initialLanguage = "zh",
+  lockInitialLanguage = false,
+}: {
+  initialLanguage?: Language;
+  lockInitialLanguage?: boolean;
+}) {
+  const [language, setLanguage] = useState<Language>(initialLanguage);
   const [demoStep, setDemoStep] = useState(0);
   const [demoPaused, setDemoPaused] = useState(false);
   const content = copy[language];
+  const geo = geoContent[language];
+  const jsonLd = structuredData(language);
 
   /** Hydrate the visitor's local language preference after the server-rendered Chinese default. */
   useEffect(() => {
+    document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
+    if (lockInitialLanguage) return;
+
     const frame = window.requestAnimationFrame(() => {
       const saved = window.localStorage.getItem("pinboardshot-language") as Language | null;
       const detected: Language = navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
@@ -274,7 +286,7 @@ export default function Home() {
     });
 
     return () => window.cancelAnimationFrame(frame);
-  }, []);
+  }, [language, lockInitialLanguage]);
 
   /** Advance the product story unless the visitor is interacting or prefers reduced motion. */
   useEffect(() => {
@@ -291,7 +303,11 @@ export default function Home() {
   };
 
   return (
-    <main>
+    <main lang={language === "zh" ? "zh-CN" : "en"}>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replaceAll("<", "\\u003c") }}
+      />
       <header className="site-header">
         <a className="brand" href="#top" aria-label="PinboardShot home">
           <span className="brand-mark" aria-hidden="true"><i /><i /></span>
@@ -302,6 +318,7 @@ export default function Home() {
           <a href="#workflow">{content.nav.workflow}</a>
           <a href="#compare">{content.nav.compare}</a>
           <a href="#privacy">{content.nav.privacy}</a>
+          <a href="#faq">{content.nav.faq}</a>
           <a href="#changelog">{content.nav.changelog}</a>
         </nav>
         <div className="header-actions">
@@ -482,6 +499,35 @@ export default function Home() {
         <div className="privacy-detail"><p>{content.privacyBody}</p><ul>{content.privacyPoints.map((point) => <li key={point}><span aria-hidden="true">✓</span>{point}</li>)}</ul></div>
       </section>
 
+      <section className="geo-facts section" id="faq" aria-labelledby="geo-title">
+        <div className="geo-heading">
+          <div>
+            <p className="eyebrow"><span />{geo.factsEyebrow}</p>
+            <h2 id="geo-title">{geo.factsTitle}</h2>
+          </div>
+          <p>{geo.factsIntro}</p>
+        </div>
+        <div className="fact-grid">
+          {geo.facts.map(([label, value]) => (
+            <article className="fact-card" key={label}>
+              <span>{label}</span>
+              <p>{value}</p>
+            </article>
+          ))}
+        </div>
+        <div className="faq-block" aria-labelledby="faq-title">
+          <h3 id="faq-title">{geo.faqTitle}</h3>
+          <div className="faq-list">
+            {geo.faqs.map((faq) => (
+              <article className="faq-item" key={faq.question}>
+                <h4>{faq.question}</h4>
+                <p>{faq.answer}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="changelog section" id="changelog" aria-labelledby="changelog-title">
         <div className="changelog-heading">
           <div>
@@ -528,4 +574,8 @@ export default function Home() {
       </footer>
     </main>
   );
+}
+
+export default function Home() {
+  return <PinboardShotHome />;
 }
