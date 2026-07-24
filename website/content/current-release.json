@@ -1,42 +1,42 @@
 {
-  "version": "0.5.9",
-  "build": "31",
+  "version": "0.5.10",
+  "build": "32",
   "date": "2026.07.24",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.9",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.10",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.5.9-31.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.9/PinboardShot-0.5.9-31.dmg",
-      "sha256": "26e5cb0639a09c3f31c71ee070683f3b14bbb871de3cc77fef61ad2ef39d3c77"
+      "name": "PinboardShot-0.5.10-32.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.10/PinboardShot-0.5.10-32.dmg",
+      "sha256": "2ac4122f14e8f32f1a9fc3e19afa6a26b3ae739374901d6c39b07bf3d3db09fb"
     },
     "zip": {
-      "name": "PinboardShot-0.5.9-31.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.9/PinboardShot-0.5.9-31.zip",
-      "sha256": "95f54eaf4cbd7aa97d5720fd7da2aba7a59fd327ab413a844258f000490cb2c0"
+      "name": "PinboardShot-0.5.10-32.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.10/PinboardShot-0.5.10-32.zip",
+      "sha256": "828b25091f3bccd2a21042a3f39065427e4daf54edccbb7fb15081345c565e1e"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.9/appcast.xml",
-      "sha256": "546967a332a2bb70e99f1dde39466af8545dd27fc89ddd1e62736be4df770b39"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.10/appcast.xml",
+      "sha256": "f3c8aff48f7366d5e88f9c2afdb20b8ba503902570c8cea60f7fd379199880e9"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "发布与安装可靠性更新",
+    "title": "应用内更新安装修复",
     "changes": [
-      "新增标准化发布流程，覆盖签名、公证、Sparkle 更新 ZIP、appcast 和 DMG",
-      "提供手动安装 DMG，新用户可直接拖入 Applications，已安装用户可继续使用应用内更新",
-      "托盘菜单列表更紧凑，普通状态下更容易在较小屏幕高度内完整展示",
+      "将 Sparkle 更新框架升级到 2.9.4，修复安装器启动超时导致的更新错误",
+      "修复应用内更新可能停在 Installer never started archive extraction 后失败的问题",
+      "如果 0.5.9 的应用内更新仍报错，可下载 DMG 手动覆盖安装本版本",
       "应用、Sparkle 更新 ZIP 和手动安装 DMG 均已签名并通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Release and installation reliability update",
+    "title": "In-app update installation fix",
     "changes": [
-      "Added a standardized release flow covering signing, notarization, the Sparkle update ZIP, appcast, and DMG.",
-      "Added a manual-install DMG so new users can drag PinboardShot into Applications while existing users keep using in-app updates.",
-      "Made the tray menu list more compact so the normal state fits more comfortably on shorter screen heights.",
+      "Updated Sparkle to 2.9.4 to fix an updater installer launch timeout.",
+      "Fixed a case where in-app updates could stop after Installer never started archive extraction.",
+      "If 0.5.9 still shows the old updater error, download the DMG and manually replace the app once.",
       "The app, Sparkle update ZIP, and manual-install DMG are signed and notarized by Apple."
     ]
   }
