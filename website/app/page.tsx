@@ -101,6 +101,15 @@ const copy = {
     privacyTitle: "你的截图，\n只留在你的 Mac",
     privacyBody: "不需要账号，没有云同步，也没有遥测，截图、标注、最近 50 张历史和偏好设置都只在设备本地处理；网络仅用于软件更新，异常空白帧会被拒绝，不会覆盖上一份剪贴板内容",
     privacyPoints: ["仅更新访问网络", "零分析服务", "异常帧保护", "原生系统框架"],
+    trustEyebrow: "TRUST SIGNALS",
+    trustTitle: "可公开核验，\n也不夸大成认证",
+    trustBody: "PinboardShot 用开源仓库、隐私政策、安全策略和公开扫描结果建立信任；正式隐私认证或社区收录只有在实际通过后才展示。",
+    trustSignals: [
+      ["隐私政策", "说明应用、官网、下载和更新链路如何处理数据。", "/privacy"],
+      ["安全策略", "提供漏洞报告方式、支持范围和披露节奏。", "https://github.com/agent-club/PinboardShot/blob/main/SECURITY.md"],
+      ["OpenSSF Scorecard", "自动评估开源仓库安全健康度。", "https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot"],
+      ["网站隐私检查", "用 Observatory、SSL Labs 和 Blacklight 作为发布前公开佐证。", "https://themarkup.org/blacklight"],
+    ],
     changelogEyebrow: "CHANGELOG",
     changelogTitle: "每次更新，\n都有迹可循",
     changelogBody: "这里展示 GitHub Release 中的版本要点，完整说明、兼容性和安装方式以对应 Release 记录为准",
@@ -231,6 +240,15 @@ const copy = {
     privacyTitle: "Your screenshots stay\non your Mac.",
     privacyBody: "No account, cloud sync, or telemetry. Captures, annotations, the latest 50 history items, and preferences stay on-device; network access is used only for software updates. Empty or abnormal frames are rejected without replacing your clipboard.",
     privacyPoints: ["Updates-only network access", "No analytics", "Abnormal-frame protection", "Native system frameworks"],
+    trustEyebrow: "TRUST SIGNALS",
+    trustTitle: "Publicly checkable,\nwithout overclaiming.",
+    trustBody: "PinboardShot builds trust through its open repository, privacy policy, security policy, and public scan results. Formal privacy certifications or community listings are shown only after they are actually earned.",
+    trustSignals: [
+      ["Privacy policy", "Explains how the app, website, downloads, and update flow handle data.", "/privacy"],
+      ["Security policy", "Defines vulnerability reporting, support scope, and disclosure expectations.", "https://github.com/agent-club/PinboardShot/blob/main/SECURITY.md"],
+      ["OpenSSF Scorecard", "Automatically evaluates open source security posture.", "https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot"],
+      ["Website privacy checks", "Use Observatory, SSL Labs, and Blacklight as public pre-release evidence.", "https://themarkup.org/blacklight"],
+    ],
     changelogEyebrow: "CHANGELOG",
     changelogTitle: "Every update,\nclearly documented.",
     changelogBody: "These highlights mirror the GitHub Releases. Open the matching release for complete notes, compatibility details, and installation instructions.",
@@ -537,6 +555,25 @@ export function PinboardShotHome({
           <h2>{content.privacyTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
         </div>
         <div className="privacy-detail"><p>{content.privacyBody}</p><ul>{content.privacyPoints.map((point) => <li key={point}><span aria-hidden="true">✓</span>{point}</li>)}</ul></div>
+      </section>
+
+      <section className="trust-signals section" aria-labelledby="trust-title">
+        <div className="trust-heading">
+          <div>
+            <p className="eyebrow"><span />{content.trustEyebrow}</p>
+            <h2 id="trust-title">{content.trustTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
+          </div>
+          <p>{content.trustBody}</p>
+        </div>
+        <div className="trust-grid">
+          {content.trustSignals.map(([title, body, href], index) => (
+            <a className="trust-card" href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined} key={title}>
+              <span>0{index + 1}</span>
+              <h3>{title}</h3>
+              <p>{body}</p>
+            </a>
+          ))}
+        </div>
       </section>
 
       <section className="geo-facts section" id="faq" aria-labelledby="geo-title">
