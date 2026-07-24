@@ -12,6 +12,9 @@ done
 
 swift build $build_args
 bin_path="$(swift build $build_args --show-bin-path)"
+if [[ -d .build/app/PinboardShot.app ]]; then
+  /usr/bin/find .build/app/PinboardShot.app -depth -delete
+fi
 mkdir -p \
   .build/app/PinboardShot.app/Contents/MacOS \
   .build/app/PinboardShot.app/Contents/Resources \
