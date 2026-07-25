@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from "react";
 import currentRelease from "@/content/current-release.json";
-import { geoContent, structuredData, type SeoLanguage } from "./seo";
+import { DOWNLOAD_PATH, geoContent, structuredData, type SeoLanguage } from "./seo";
 
 type Language = SeoLanguage;
 
 const releaseUrl = currentRelease.releaseUrl;
-const primaryDownloadUrl = currentRelease.downloads.dmg.url;
+const primaryDownloadUrl = DOWNLOAD_PATH;
 const githubUrl = "https://github.com/agent-club/PinboardShot";
 const privacyConsentStorageKey = "pinboardshot-privacy-consent-v1";
 

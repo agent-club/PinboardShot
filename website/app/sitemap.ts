@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { absoluteUrl, releaseIsoDate } from "./seo";
+import { DOWNLOAD_PATH, LLMS_PATH, absoluteUrl, releaseIsoDate } from "./seo";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date(releaseIsoDate());
@@ -28,6 +28,18 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: "monthly",
       priority: 0.6,
+    },
+    {
+      url: absoluteUrl(DOWNLOAD_PATH),
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.7,
+    },
+    {
+      url: absoluteUrl(LLMS_PATH),
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.4,
     },
   ];
 }
