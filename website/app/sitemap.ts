@@ -1,5 +1,13 @@
 import type { MetadataRoute } from "next";
-import { DOWNLOAD_PATH, LLMS_PATH, absoluteUrl, releaseIsoDate } from "./seo";
+import { absoluteUrl, localeSeo, releaseIsoDate } from "./seo";
+
+const languageAlternates = {
+  languages: {
+    "zh-CN": absoluteUrl(localeSeo.zh.path),
+    en: absoluteUrl(localeSeo.en.path),
+    "x-default": absoluteUrl("/"),
+  },
+};
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date(releaseIsoDate());
@@ -10,36 +18,27 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified,
       changeFrequency: "weekly",
       priority: 1,
+      alternates: languageAlternates,
     },
     {
       url: absoluteUrl("/zh"),
       lastModified,
       changeFrequency: "weekly",
       priority: 0.9,
+      alternates: languageAlternates,
     },
     {
       url: absoluteUrl("/en"),
       lastModified,
       changeFrequency: "weekly",
       priority: 0.9,
+      alternates: languageAlternates,
     },
     {
       url: absoluteUrl("/privacy"),
       lastModified,
       changeFrequency: "monthly",
       priority: 0.6,
-    },
-    {
-      url: absoluteUrl(DOWNLOAD_PATH),
-      lastModified,
-      changeFrequency: "weekly",
-      priority: 0.7,
-    },
-    {
-      url: absoluteUrl(LLMS_PATH),
-      lastModified,
-      changeFrequency: "weekly",
-      priority: 0.4,
     },
   ];
 }

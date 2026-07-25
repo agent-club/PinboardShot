@@ -1,12 +1,21 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { OPENGRAPH_IMAGE_PATH, SITE_URL, TWITTER_IMAGE_PATH, absoluteUrl, localeSeo, seoKeywords } from "./seo";
+import {
+  GOOGLE_TAG_ID,
+  OPENGRAPH_IMAGE_PATH,
+  SITE_URL,
+  TWITTER_IMAGE_PATH,
+  absoluteUrl,
+  localeSeo,
+  seoKeywords,
+} from "./seo";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 const socialImage = absoluteUrl(OPENGRAPH_IMAGE_PATH);
 const twitterImage = absoluteUrl(TWITTER_IMAGE_PATH);
+const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim();
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -45,6 +54,13 @@ export const metadata: Metadata = {
       "max-snippet": -1,
     },
   },
+  ...(googleSiteVerification
+    ? {
+        verification: {
+          google: googleSiteVerification,
+        },
+      }
+    : {}),
   openGraph: {
     title: "PinboardShot - Mac 截图、标注与贴图工具",
     description: localeSeo.zh.description,
@@ -66,6 +82,29 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
+      <head>
+        <script async src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+window.dataLayer = window.dataLayer || [];
+function gtag(){dataLayer.push(arguments);}
+var pinboardshotAnalyticsConsent = "denied";
+try {
+  pinboardshotAnalyticsConsent = localStorage.getItem("pinboardshot-privacy-consent-v1") === "accepted" ? "granted" : "denied";
+} catch (_) {}
+gtag("consent", "default", {
+  ad_storage: "denied",
+  ad_user_data: "denied",
+  ad_personalization: "denied",
+  analytics_storage: pinboardshotAnalyticsConsent
+});
+gtag("js", new Date());
+gtag("config", "${GOOGLE_TAG_ID}");
+`.trim(),
+          }}
+        />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>{children}</body>
     </html>
   );

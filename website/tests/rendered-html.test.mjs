@@ -53,9 +53,15 @@ test("server-renders the PinboardShot download page", async () => {
   assert.match(html, /<title>PinboardShot - Mac 截图、标注与贴图工具<\/title>/i);
   assert.ok(html.length > 10000);
   assert.match(html, /<meta name="robots" content="index, follow"\/>/i);
+  assert.match(html, /<meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1"\/>/i);
   assert.match(html, /<link rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev"\/>/i);
   assert.match(html, /<link rel="alternate" hrefLang="zh-CN" href="https:\/\/pinboardshot\.agentclub\.dev\/zh"\/>/i);
   assert.match(html, /<link rel="alternate" hrefLang="en" href="https:\/\/pinboardshot\.agentclub\.dev\/en"\/>/i);
+  assert.match(html, /<link rel="alternate" hrefLang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev"\/>/i);
+  assert.match(html, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-WDBY7TDB0R/i);
+  assert.match(html, /gtag\("config", "G-WDBY7TDB0R"\)/i);
+  assert.match(html, /analytics_storage: pinboardshotAnalyticsConsent/i);
+  assert.match(html, /ad_personalization: "denied"/i);
   assert.match(html, /property="og:image" content="https:\/\/pinboardshot\.agentclub\.dev\/opengraph-image\.png"/i);
   assert.match(html, /name="twitter:image" content="https:\/\/pinboardshot\.agentclub\.dev\/twitter-image\.png"/i);
   assert.match(html, /href="\/download"/i);
@@ -139,9 +145,11 @@ test("server-renders the privacy policy", async () => {
   assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/privacy"/i);
   assert.match(html, /property="og:url" content="https:\/\/pinboardshot\.agentclub\.dev\/privacy"/i);
   assert.match(html, /property="og:locale" content="en_US"/i);
-  assert.match(html, /Last updated:<\/strong>\s*(?:<!-- -->)?July 24, 2026/i);
-  assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 7 月 24 日/i);
+  assert.match(html, /Last updated:<\/strong>\s*(?:<!-- -->)?July 25, 2026/i);
+  assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 7 月 25 日/i);
   assert.match(html, /does not include analytics or advertising SDKs/i);
+  assert.match(html, /The website uses Google tag for basic visit measurement/i);
+  assert.match(html, /do not\s+(?:<!-- -->)?enable ad personalization/i);
   assert.match(html, /AI-generated illustrative assets/i);
 });
 
@@ -162,8 +170,11 @@ test("serves robots and sitemap for search crawlers", async () => {
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/zh<\/loc>/i);
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/en<\/loc>/i);
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/privacy<\/loc>/i);
-  assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/download<\/loc>/i);
-  assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/llms\.txt<\/loc>/i);
+  assert.match(sitemapXml, /<xhtml:link rel="alternate" hreflang="zh-CN" href="https:\/\/pinboardshot\.agentclub\.dev\/zh"\s*\/>/i);
+  assert.match(sitemapXml, /<xhtml:link rel="alternate" hreflang="en" href="https:\/\/pinboardshot\.agentclub\.dev\/en"\s*\/>/i);
+  assert.match(sitemapXml, /<xhtml:link rel="alternate" hreflang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev\/"\s*\/>/i);
+  assert.doesNotMatch(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/download<\/loc>/i);
+  assert.doesNotMatch(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/llms\.txt<\/loc>/i);
   assert.doesNotMatch(sitemapXml, /github\.com\/agent-club\/PinboardShot\/releases/i);
 });
 
@@ -179,7 +190,8 @@ test("serves llms.txt for AI readers", async () => {
   assert.match(text, /## System Requirements/i);
   assert.match(text, /## Download/i);
   assert.match(text, /## Privacy Commitments/i);
-  assert.match(text, /No account, no cloud sync, and no telemetry/i);
+  assert.match(text, /The Mac app has no account, no cloud sync, and no telemetry/i);
+  assert.match(text, /Website access may be measured with Google tag/i);
   assert.match(text, /macOS 14 or later/i);
   assert.match(text, /GitHub Release/i);
   assert.match(text, new RegExp(currentRelease.version.replaceAll(".", "\\.")));

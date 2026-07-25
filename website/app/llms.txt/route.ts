@@ -24,11 +24,11 @@ floating as working references across macOS desktop spaces.
 - Platform: macOS 14 or later, Universal build for Apple Silicon and Intel.
 - Current version: ${currentRelease.version} (${currentRelease.build}), released ${currentRelease.date}.
 - Distribution: Developer ID signed and notarized by Apple.
-- Privacy: No account, no cloud sync, and no telemetry; captures, annotations,
-  recent history, watermark records, shortcuts, and preferences stay local by
-  default.
-- Network use: Software update checks, update downloads, public downloads, and
-  necessary hosting/CDN logs.
+- Privacy: The Mac app has no account, no cloud sync, and no telemetry;
+  captures, annotations, recent history, watermark records, shortcuts, and
+  preferences stay local by default.
+- Network use: Software update checks, update downloads, public downloads,
+  website Google tag visit measurement, and necessary hosting/CDN logs.
 - Primary workflows: Capture visual context, annotate sensitive or detailed
   material locally, pin references on top, compare screens, and export from
   Native Retina through 8K.
@@ -61,11 +61,14 @@ floating as working references across macOS desktop spaces.
 
 - PinboardShot does not require an account.
 - PinboardShot does not provide cloud sync.
-- PinboardShot does not include telemetry, analytics, or advertising SDKs.
+- The PinboardShot Mac app does not include telemetry, analytics, or
+  advertising SDKs.
 - Screenshots, annotations, recent history, watermark records, shortcuts, and
   preferences stay on the user's Mac by default.
+- Website access may be measured with Google tag. Ad personalization is not
+  enabled.
 - Network access is limited to software update checks, update downloads, public
-  downloads, and necessary hosting/CDN logs.
+  downloads, website visit measurement, and necessary hosting/CDN logs.
 
 ## Current Release Assets
 

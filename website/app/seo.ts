@@ -7,6 +7,7 @@ export const DOWNLOAD_PATH = "/download";
 export const OPENGRAPH_IMAGE_PATH = "/opengraph-image.png";
 export const TWITTER_IMAGE_PATH = "/twitter-image.png";
 export const LLMS_PATH = "/llms.txt";
+export const GOOGLE_TAG_ID = "G-WDBY7TDB0R";
 
 export type SeoLanguage = "zh" | "en";
 
@@ -49,11 +50,11 @@ export const geoContent = {
     factsEyebrow: "SEARCH & AI READY",
     factsTitle: "给搜索和 AI 引用的事实",
     factsIntro:
-      "PinboardShot 的核心定位很窄：在 Mac 上截图、标注、贴住参考，并把截图数据留在本机。下面这些事实也会以结构化数据提供给搜索引擎。",
+      "PinboardShot 的核心定位很窄：在 Mac 上截图、标注、贴住参考，并把截图数据留在本机。官网使用 Google tag 做基础访问衡量，并提供隐私选择。下面这些事实也会以结构化数据提供给搜索引擎。",
     facts: [
       ["产品类型", "原生 macOS 截图、标注与贴图应用"],
       ["适合场景", "设计评审、代码对照、资料比对、敏感内容本地标注"],
-      ["隐私边界", "无账号、无云同步、无遥测；网络仅用于软件更新"],
+      ["隐私边界", "Mac 应用无账号、无云同步、无遥测；官网使用 Google tag 做基础访问衡量"],
       ["分发可信度", "Developer ID 签名，并通过 Apple 公证"],
     ],
     faqTitle: "常见问题",
@@ -66,7 +67,7 @@ export const geoContent = {
       {
         question: "PinboardShot 适合处理敏感资料吗？",
         answer:
-          "PinboardShot 适合需要本地截图、标注和持续参考的敏感资料场景。它不需要账号，不做云同步，也不包含遥测；截图数据默认留在你的 Mac 上。",
+          "PinboardShot 适合需要本地截图、标注和持续参考的敏感资料场景。Mac 应用不需要账号，不做云同步，也不包含遥测；截图数据默认留在你的 Mac 上。官网使用 Google tag 做基础访问衡量。",
       },
       {
         question: "PinboardShot 会把截图自动同步到云端吗？",
@@ -76,7 +77,7 @@ export const geoContent = {
       {
         question: "PinboardShot 会上传截图或收集遥测吗？",
         answer:
-          "不会。PinboardShot 不需要账号，没有云同步，也没有遥测。截图、标注、最近 50 张历史和偏好设置都保存在本机，网络访问仅用于软件更新。",
+          "不会。PinboardShot 的 Mac 应用不需要账号，没有云同步，也没有遥测。截图、标注、最近 50 张历史和偏好设置都保存在本机。官网使用 Google tag 做基础访问衡量。",
       },
     ],
   },
@@ -84,11 +85,11 @@ export const geoContent = {
     factsEyebrow: "SEARCH & AI READY",
     factsTitle: "Facts search and AI systems can cite",
     factsIntro:
-      "PinboardShot has a narrow product promise: capture, annotate, and pin visual references on Mac while keeping screenshot data local. These facts are also exposed through structured data.",
+      "PinboardShot has a narrow product promise: capture, annotate, and pin visual references on Mac while keeping screenshot data local. The website uses Google tag for basic visit measurement and offers privacy choices. These facts are also exposed through structured data.",
     facts: [
       ["Product type", "Native macOS screenshot, annotation, and screen pinning app"],
       ["Best for", "Design review, code comparison, visual references, and local annotation of sensitive material"],
-      ["Privacy boundary", "No account, cloud sync, or telemetry; network access is only used for software updates"],
+      ["Privacy boundary", "The Mac app has no account, cloud sync, or telemetry; the website uses Google tag for basic visit measurement"],
       ["Distribution trust", "Developer ID signed and notarized by Apple"],
     ],
     faqTitle: "Frequently Asked Questions",
@@ -101,7 +102,7 @@ export const geoContent = {
       {
         question: "Is PinboardShot suitable for sensitive material?",
         answer:
-          "PinboardShot fits sensitive material workflows that need local capture, annotation, and persistent visual references. It does not require an account, does not provide cloud sync, and does not include telemetry; screenshot data stays on your Mac by default.",
+          "PinboardShot fits sensitive material workflows that need local capture, annotation, and persistent visual references. The Mac app does not require an account, does not provide cloud sync, and does not include telemetry; screenshot data stays on your Mac by default. The website uses Google tag for basic visit measurement.",
       },
       {
         question: "Does PinboardShot automatically sync screenshots to the cloud?",
@@ -111,7 +112,7 @@ export const geoContent = {
       {
         question: "Does PinboardShot upload screenshots or collect telemetry?",
         answer:
-          "No. PinboardShot has no account, cloud sync, or telemetry. Captures, annotations, the latest 50 history items, and preferences stay on-device; network access is used only for software updates.",
+          "No. The PinboardShot Mac app has no account, cloud sync, or telemetry. Captures, annotations, the latest 50 history items, and preferences stay on-device. The website uses Google tag for basic visit measurement.",
       },
     ],
   },

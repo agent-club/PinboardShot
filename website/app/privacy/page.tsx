@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   },
 };
 
-const lastUpdated = "July 24, 2026";
+const lastUpdated = "July 25, 2026";
 
 export default function PrivacyPolicyPage() {
   return (
@@ -102,10 +102,11 @@ export default function PrivacyPolicyPage() {
 
           <h3>5. Website Data</h3>
           <p>
-            The website does not use advertising or analytics cookies. It uses
-            local storage only to remember your language preference and your
-            privacy choice. Hosting providers may still keep necessary access,
-            security, and delivery logs.
+            The website uses Google tag for basic visit measurement. We do not
+            enable ad personalization. The site stores your language preference
+            and privacy choice in local storage, and uses that choice to update
+            Google consent settings for analytics storage. Hosting providers may
+            still keep necessary access, security, and delivery logs.
           </p>
 
           <h3>6. AI-Generated Images</h3>
@@ -119,10 +120,10 @@ export default function PrivacyPolicyPage() {
           <h3>7. Third-Party Services</h3>
           <p>
             Downloads, releases, source code hosting, software updates,
-            notarization, and operating system permissions may involve services
-            operated by GitHub, Apple, Cloudflare, or other infrastructure
-            providers. Their processing is governed by their own terms and
-            privacy policies.
+            website visit measurement, notarization, and operating system
+            permissions may involve services operated by GitHub, Google, Apple,
+            Cloudflare, or other infrastructure providers. Their processing is
+            governed by their own terms and privacy policies.
           </p>
 
           <h3>8. Your Choices</h3>
@@ -145,7 +146,7 @@ export default function PrivacyPolicyPage() {
       <section className="legal-section" aria-labelledby="chinese-policy">
         <h2 id="chinese-policy">中文</h2>
         <div>
-          <p><strong>最后更新：</strong>2026 年 7 月 24 日</p>
+          <p><strong>最后更新：</strong>2026 年 7 月 25 日</p>
 
           <h3>1. 我们是谁</h3>
           <p>
@@ -182,8 +183,9 @@ export default function PrivacyPolicyPage() {
 
           <h3>5. 网站数据</h3>
           <p>
-            本网站不使用广告或分析 Cookie。网站只使用本地存储记住你的语言偏好和隐私选择。
-            托管服务仍可能保留必要的访问、安全和内容分发日志。
+            本网站使用 Google tag 进行基础访问衡量，不启用广告个性化。网站会使用本地
+            存储记住你的语言偏好和隐私选择，并根据该选择更新 Google 的分析存储同意
+            设置。托管服务仍可能保留必要的访问、安全和内容分发日志。
           </p>
 
           <h3>6. AI 生成图片</h3>
@@ -194,8 +196,9 @@ export default function PrivacyPolicyPage() {
 
           <h3>7. 第三方服务</h3>
           <p>
-            下载、Release、源码托管、软件更新、公证和操作系统权限可能涉及 GitHub、Apple、
-            Cloudflare 或其他基础设施服务商。相关处理受这些服务商自己的条款和隐私政策约束。
+            下载、Release、源码托管、软件更新、网站访问衡量、公证和操作系统权限可能涉及
+            GitHub、Google、Apple、Cloudflare 或其他基础设施服务商。相关处理受这些服务商
+            自己的条款和隐私政策约束。
           </p>
 
           <h3>8. 你的选择</h3>
