@@ -48,6 +48,7 @@ test("server-renders the PinboardShot download page", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.headers.get("cache-control"), "no-transform");
 
   const html = await response.text();
   assert.match(html, /<title>PinboardShot - Mac 截图、标注与贴图工具<\/title>/i);
@@ -99,6 +100,7 @@ test("server-renders substantial localized Chinese HTML", async () => {
   const response = await render("/zh");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.headers.get("cache-control"), "no-transform");
 
   const html = await response.text();
   assert.match(html, /<main lang="zh-CN">/i);
@@ -117,6 +119,7 @@ test("server-renders the localized English page", async () => {
   const response = await render("/en");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.headers.get("cache-control"), "no-transform");
 
   const html = await response.text();
   assert.match(html, /<title>PinboardShot - Native Screenshot, Annotation, and Screen Pinning for Mac<\/title>/i);
@@ -138,6 +141,7 @@ test("server-renders the privacy policy", async () => {
   const response = await render("/privacy");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+  assert.equal(response.headers.get("cache-control"), "no-transform");
 
   const html = await response.text();
   assert.match(html, /<title>Privacy Policy - PinboardShot<\/title>/i);
