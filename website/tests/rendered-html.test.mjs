@@ -168,6 +168,7 @@ test("serves robots and sitemap for search crawlers", async () => {
   const sitemap = await render("/sitemap.xml", "application/xml");
   assert.equal(sitemap.status, 200);
   assert.match(sitemap.headers.get("content-type") ?? "", /^application\/xml\b/i);
+  assert.equal(sitemap.headers.get("cache-control"), "no-store");
   const sitemapXml = await sitemap.text();
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/<\/loc>/i);
   assert.match(sitemapXml, new RegExp(`<lastmod>${currentRelease.date.replaceAll(".", "-")}</lastmod>`, "i"));
@@ -177,6 +178,7 @@ test("serves robots and sitemap for search crawlers", async () => {
   assert.match(sitemapXml, /<xhtml:link rel="alternate" hreflang="zh-CN" href="https:\/\/pinboardshot\.agentclub\.dev\/zh"\s*\/>/i);
   assert.match(sitemapXml, /<xhtml:link rel="alternate" hreflang="en" href="https:\/\/pinboardshot\.agentclub\.dev\/en"\s*\/>/i);
   assert.match(sitemapXml, /<xhtml:link rel="alternate" hreflang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev\/"\s*\/>/i);
+  assert.doesNotMatch(sitemapXml, /<changefreq>|<priority>/i);
   assert.doesNotMatch(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/download<\/loc>/i);
   assert.doesNotMatch(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/llms\.txt<\/loc>/i);
   assert.doesNotMatch(sitemapXml, /github\.com\/agent-club\/PinboardShot\/releases/i);
