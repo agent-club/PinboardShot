@@ -96,6 +96,7 @@ test("server-renders substantial localized Chinese HTML", async () => {
 
   const html = await response.text();
   assert.match(html, /<main lang="zh-CN">/i);
+  assert.match(html, /<html lang="zh-CN">/i);
   assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/zh"/i);
 
   const text = visibleText(html);
@@ -113,6 +114,7 @@ test("server-renders the localized English page", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>PinboardShot - Native Screenshot, Annotation, and Screen Pinning for Mac<\/title>/i);
+  assert.match(html, /<html lang="en">/i);
   assert.match(html, /<main lang="en">/i);
   assert.match(html, /Frequently Asked Questions/);
   assert.match(html, /Privacy choices/);
@@ -133,6 +135,10 @@ test("server-renders the privacy policy", async () => {
 
   const html = await response.text();
   assert.match(html, /<title>Privacy Policy - PinboardShot<\/title>/i);
+  assert.match(html, /<html lang="en">/i);
+  assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/privacy"/i);
+  assert.match(html, /property="og:url" content="https:\/\/pinboardshot\.agentclub\.dev\/privacy"/i);
+  assert.match(html, /property="og:locale" content="en_US"/i);
   assert.match(html, /Last updated:<\/strong>\s*(?:<!-- -->)?July 24, 2026/i);
   assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 7 月 24 日/i);
   assert.match(html, /does not include analytics or advertising SDKs/i);

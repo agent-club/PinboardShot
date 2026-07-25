@@ -1,17 +1,39 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { absoluteUrl } from "../seo";
+import { OPENGRAPH_IMAGE_PATH, TWITTER_IMAGE_PATH, absoluteUrl } from "../seo";
+
+const title = "Privacy Policy - PinboardShot";
+const description =
+  "PinboardShot privacy policy covering the macOS app, website, downloads, updates, local screenshot data, and necessary service logs.";
+const canonical = absoluteUrl("/privacy");
+const socialImage = absoluteUrl(OPENGRAPH_IMAGE_PATH);
+const twitterImage = absoluteUrl(TWITTER_IMAGE_PATH);
 
 export const metadata: Metadata = {
-  title: "Privacy Policy - PinboardShot",
-  description:
-    "PinboardShot privacy policy covering the macOS app, website, downloads, updates, local screenshot data, and necessary service logs.",
+  title,
+  description,
   alternates: {
-    canonical: absoluteUrl("/privacy"),
+    canonical,
   },
   robots: {
     index: true,
     follow: true,
+  },
+  openGraph: {
+    title,
+    description,
+    url: canonical,
+    siteName: "PinboardShot",
+    type: "article",
+    locale: "en_US",
+    alternateLocale: ["zh_CN"],
+    images: [{ url: socialImage, width: 1792, height: 1024, alt: "PinboardShot for macOS" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title,
+    description,
+    images: [twitterImage],
   },
 };
 
