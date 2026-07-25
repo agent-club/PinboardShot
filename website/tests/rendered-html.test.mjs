@@ -59,10 +59,9 @@ test("server-renders the PinboardShot download page", async () => {
   assert.match(html, /<link rel="alternate" hrefLang="en" href="https:\/\/pinboardshot\.agentclub\.dev\/en"\/>/i);
   assert.match(html, /<link rel="alternate" hrefLang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev\/"\/>/i);
   assert.match(html, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-WDBY7TDB0R/i);
-  assert.match(html, /window\["ga-disable-G-WDBY7TDB0R"\] = localStorage\.getItem\("pinboardshot-privacy-consent-v1"\) === "essential"/i);
   assert.match(html, /gtag\('js', new Date\(\)\)/i);
-  assert.match(html, /gtag\('config', 'G-WDBY7TDB0R'/i);
-  assert.match(html, /allow_ad_personalization_signals: false/i);
+  assert.match(html, /gtag\('config', 'G-WDBY7TDB0R'\)/i);
+  assert.doesNotMatch(html, /ga-disable-G-WDBY7TDB0R|allow_ad_personalization_signals/i);
   assert.match(html, /property="og:image" content="https:\/\/pinboardshot\.agentclub\.dev\/opengraph-image\.png"/i);
   assert.match(html, /name="twitter:image" content="https:\/\/pinboardshot\.agentclub\.dev\/twitter-image\.png"/i);
   assert.match(html, /href="\/download"/i);

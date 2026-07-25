@@ -83,25 +83,16 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN">
       <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-try {
-  window["ga-disable-${GOOGLE_TAG_ID}"] = localStorage.getItem("pinboardshot-privacy-consent-v1") === "essential";
-} catch (_) {}
-`.trim(),
-          }}
-        />
         <script async src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} />
         <script
           dangerouslySetInnerHTML={{
             __html: `
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
+
 gtag('js', new Date());
-gtag('config', '${GOOGLE_TAG_ID}', {
-  allow_ad_personalization_signals: false
-});
+
+gtag('config', '${GOOGLE_TAG_ID}');
 `.trim(),
           }}
         />
