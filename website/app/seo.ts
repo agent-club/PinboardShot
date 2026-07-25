@@ -3,6 +3,10 @@ import currentRelease from "@/content/current-release.json";
 
 export const SITE_URL = "https://pinboardshot.agentclub.dev";
 export const GITHUB_URL = "https://github.com/agent-club/PinboardShot";
+export const DOWNLOAD_PATH = "/download";
+export const OPENGRAPH_IMAGE_PATH = "/opengraph-image.png";
+export const TWITTER_IMAGE_PATH = "/twitter-image.png";
+export const LLMS_PATH = "/llms.txt";
 
 export type SeoLanguage = "zh" | "en";
 
@@ -124,7 +128,8 @@ export function releaseIsoDate() {
 export function localizedMetadata(language: SeoLanguage): Metadata {
   const entry = localeSeo[language];
   const canonical = absoluteUrl(entry.path);
-  const socialImage = absoluteUrl("/og.png");
+  const socialImage = absoluteUrl(OPENGRAPH_IMAGE_PATH);
+  const twitterImage = absoluteUrl(TWITTER_IMAGE_PATH);
 
   return {
     title: entry.title,
@@ -152,7 +157,7 @@ export function localizedMetadata(language: SeoLanguage): Metadata {
       card: "summary_large_image",
       title: entry.title,
       description: entry.description,
-      images: [socialImage],
+      images: [twitterImage],
     },
   };
 }
@@ -160,6 +165,8 @@ export function localizedMetadata(language: SeoLanguage): Metadata {
 export function structuredData(language: SeoLanguage) {
   const entry = localeSeo[language];
   const pageUrl = absoluteUrl(entry.path);
+  const softwareId = absoluteUrl("/#software");
+  const productId = absoluteUrl("/#product");
   const faqs = geoContent[language].faqs;
 
   return [
@@ -182,18 +189,85 @@ export function structuredData(language: SeoLanguage) {
     {
       "@context": "https://schema.org",
       "@type": "SoftwareApplication",
-      "@id": absoluteUrl("/#software"),
+      "@id": softwareId,
       name: "PinboardShot",
       url: pageUrl,
-      image: absoluteUrl("/og.png"),
+      image: absoluteUrl(OPENGRAPH_IMAGE_PATH),
       description: entry.description,
       applicationCategory: "ProductivityApplication",
       operatingSystem: "macOS 14 or later",
       softwareVersion: currentRelease.version,
       dateModified: releaseIsoDate(),
-      downloadUrl: currentRelease.downloads.dmg.url,
+      downloadUrl: absoluteUrl(DOWNLOAD_PATH),
+      installUrl: absoluteUrl(DOWNLOAD_PATH),
       releaseNotes: currentRelease.releaseUrl,
+      softwareRequirements: "macOS 14 or later",
+      isAccessibleForFree: true,
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+        url: absoluteUrl(DOWNLOAD_PATH),
+      },
+      featureList: [
+        "Area, display, window, and delayed screenshot capture",
+        "Mosaic, pen, rectangle, highlight, arrow, and text annotation",
+        "Floating pinned screenshots across macOS desktop spaces",
+        "Opacity control, click-through, shadows, and bulk pin visibility",
+        "Native Retina, 720p, 1080p, 2K, 4K, and 8K export",
+        "Local screenshot history and preferences",
+      ],
       sameAs: [GITHUB_URL],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "Product",
+      "@id": productId,
+      name: "PinboardShot",
+      image: absoluteUrl(OPENGRAPH_IMAGE_PATH),
+      description: entry.description,
+      brand: {
+        "@type": "Brand",
+        name: "PinboardShot",
+      },
+      category: "macOS screenshot and annotation software",
+      url: pageUrl,
+      isRelatedTo: {
+        "@id": softwareId,
+      },
+      offers: {
+        "@type": "Offer",
+        price: "0",
+        priceCurrency: "USD",
+        availability: "https://schema.org/InStock",
+        url: absoluteUrl(DOWNLOAD_PATH),
+      },
+      additionalProperty: geoContent[language].facts.map(([name, value]) => ({
+        "@type": "PropertyValue",
+        name,
+        value,
+      })),
+      sameAs: [GITHUB_URL],
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "@id": `${pageUrl}#breadcrumb`,
+      itemListElement: [
+        {
+          "@type": "ListItem",
+          position: 1,
+          name: "PinboardShot",
+          item: SITE_URL,
+        },
+        {
+          "@type": "ListItem",
+          position: 2,
+          name: language === "zh" ? "中文" : "English",
+          item: pageUrl,
+        },
+      ],
     },
     {
       "@context": "https://schema.org",
