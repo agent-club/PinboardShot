@@ -60,6 +60,8 @@ test("server-renders the PinboardShot download page", async () => {
   assert.match(html, /<link rel="alternate" hrefLang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev"\/>/i);
   assert.match(html, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-WDBY7TDB0R/i);
   assert.match(html, /gtag\("config", "G-WDBY7TDB0R"\)/i);
+  assert.match(html, /var pinboardshotAnalyticsConsent = "granted"/i);
+  assert.match(html, /localStorage\.getItem\("pinboardshot-privacy-consent-v1"\) === "essential" \? "denied" : "granted"/i);
   assert.match(html, /analytics_storage: pinboardshotAnalyticsConsent/i);
   assert.match(html, /ad_personalization: "denied"/i);
   assert.match(html, /property="og:image" content="https:\/\/pinboardshot\.agentclub\.dev\/opengraph-image\.png"/i);
@@ -149,6 +151,7 @@ test("server-renders the privacy policy", async () => {
   assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 7 月 25 日/i);
   assert.match(html, /does not include analytics or advertising SDKs/i);
   assert.match(html, /The website uses Google tag for basic visit measurement/i);
+  assert.match(html, /Analytics storage is enabled by default/i);
   assert.match(html, /do not\s+(?:<!-- -->)?enable ad personalization/i);
   assert.match(html, /AI-generated illustrative assets/i);
 });

@@ -60,8 +60,8 @@ Cloudflare/GitHub Actions 环境中设置：
 - `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION`
 
 网站已添加 Google tag（`G-WDBY7TDB0R`）用于 Google 设置和基础访问衡量。
-脚本默认拒绝广告存储、广告个性化和分析存储；访客选择“同意分析”后才会
-把 analytics storage 更新为允许。
+脚本默认拒绝广告存储和广告个性化，分析存储默认开启；访客选择“关闭分析”
+后会把 analytics storage 更新为拒绝。
 
 部署后，在 Google Search Console 添加 `https://pinboardshot.agentclub.dev/`
 属性，并提交 `https://pinboardshot.agentclub.dev/sitemap.xml`。

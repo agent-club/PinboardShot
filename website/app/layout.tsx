@@ -89,9 +89,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             __html: `
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
-var pinboardshotAnalyticsConsent = "denied";
+var pinboardshotAnalyticsConsent = "granted";
 try {
-  pinboardshotAnalyticsConsent = localStorage.getItem("pinboardshot-privacy-consent-v1") === "accepted" ? "granted" : "denied";
+  pinboardshotAnalyticsConsent = localStorage.getItem("pinboardshot-privacy-consent-v1") === "essential" ? "denied" : "granted";
 } catch (_) {}
 gtag("consent", "default", {
   ad_storage: "denied",

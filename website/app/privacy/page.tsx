@@ -103,10 +103,12 @@ export default function PrivacyPolicyPage() {
           <h3>5. Website Data</h3>
           <p>
             The website uses Google tag for basic visit measurement. We do not
-            enable ad personalization. The site stores your language preference
-            and privacy choice in local storage, and uses that choice to update
-            Google consent settings for analytics storage. Hosting providers may
-            still keep necessary access, security, and delivery logs.
+            enable ad personalization. Analytics storage is enabled by default;
+            you can turn analytics off from the website privacy choices. The
+            site stores your language preference and privacy choice in local
+            storage, and uses that choice to update Google consent settings for
+            analytics storage. Hosting providers may still keep necessary
+            access, security, and delivery logs.
           </p>
 
           <h3>6. AI-Generated Images</h3>
@@ -183,9 +185,10 @@ export default function PrivacyPolicyPage() {
 
           <h3>5. 网站数据</h3>
           <p>
-            本网站使用 Google tag 进行基础访问衡量，不启用广告个性化。网站会使用本地
-            存储记住你的语言偏好和隐私选择，并根据该选择更新 Google 的分析存储同意
-            设置。托管服务仍可能保留必要的访问、安全和内容分发日志。
+            本网站使用 Google tag 进行基础访问衡量，不启用广告个性化。分析存储默认开启；
+            你可以在网站隐私选择中关闭分析。网站会使用本地存储记住你的语言偏好和隐私
+            选择，并根据该选择更新 Google 的分析存储同意设置。托管服务仍可能保留必要的
+            访问、安全和内容分发日志。
           </p>
 
           <h3>6. AI 生成图片</h3>

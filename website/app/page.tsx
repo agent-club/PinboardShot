@@ -156,10 +156,10 @@ const copy = {
       "Mac、macOS、Retina、Apple、Apple Silicon、Developer ID 和 Apple 公证为 Apple Inc. 在美国及其他国家和地区的商标或服务标记。PinboardShot 与 Apple Inc. 无隶属、赞助或背书关系。GitHub 名称与标识归 GitHub, Inc. 所有，本站仅用于链接项目仓库。",
     privacyConsent: {
       title: "隐私选择",
-      body: "本站使用 Google tag 做基础访问衡量，不启用广告个性化。我们会保存语言偏好和这次选择；托管、更新与下载服务可能处理必要访问日志。",
+      body: "本站默认使用 Google tag 做基础访问衡量，不启用广告个性化。你可以关闭分析；我们会保存语言偏好和这次选择，托管、更新与下载服务可能处理必要访问日志。",
       privacy: "查看隐私条款",
-      essential: "仅必要",
-      accept: "同意分析",
+      essential: "关闭分析",
+      accept: "保持开启",
     },
   },
   en: {
@@ -295,10 +295,10 @@ const copy = {
       "Mac, macOS, Retina, Apple, Apple Silicon, Developer ID, and Apple notarization are trademarks or service marks of Apple Inc., registered in the U.S. and other countries and regions. PinboardShot is not affiliated with, sponsored by, or endorsed by Apple Inc. The GitHub name and mark belong to GitHub, Inc. and are used only to link to the project repository.",
     privacyConsent: {
       title: "Privacy choices",
-      body: "This site uses Google tag for basic visit measurement and does not enable ad personalization. We store your language preference and this choice; hosting, update, and download services may process necessary access logs.",
+      body: "This site uses Google tag for basic visit measurement by default and does not enable ad personalization. You can turn analytics off; we store your language preference and this choice, and hosting, update, and download services may process necessary access logs.",
       privacy: "Read the privacy policy",
-      essential: "Essential only",
-      accept: "Allow analytics",
+      essential: "Turn analytics off",
+      accept: "Keep on",
     },
   },
 } as const;
