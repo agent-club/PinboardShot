@@ -23,6 +23,27 @@ async function render(path = "/", accept = "text/html") {
   );
 }
 
+function visibleText(html) {
+  return html
+    .replace(/<head[\s\S]*?<\/head>/gi, "")
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&#x27;/g, "'")
+    .replace(/<!-- -->/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function extractStructuredData(html) {
+  const blocks = [...html.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/gi)];
+  return blocks.flatMap(([, json]) => {
+    const data = JSON.parse(json);
+    return Array.isArray(data) ? data : [data];
+  });
+}
+
 test("server-renders the PinboardShot download page", async () => {
   const response = await render();
   assert.equal(response.status, 200);
@@ -52,6 +73,37 @@ test("server-renders the PinboardShot download page", async () => {
   assert.match(html, /FAQPage/i);
   assert.match(html, /BreadcrumbList/i);
   assert.doesNotMatch(html, /Snipaste|ShareX/i);
+
+  const text = visibleText(html);
+  assert.ok(text.length > 3000);
+  assert.match(text, /原生 macOS 截图、标注与贴图工具/);
+  assert.match(text, /下载 DMG/);
+
+  const structuredData = extractStructuredData(html);
+  const software = structuredData.find((entry) => entry["@type"] === "SoftwareApplication");
+  assert.equal(software.name, "PinboardShot");
+  assert.equal(software.description, "PinboardShot 是原生 macOS 截图、标注与贴图工具。截图、标注、最近历史和偏好设置默认只保存在本机，支持跨桌面贴屏、透明度、鼠标穿透、Retina 到 8K 输出和应用内更新。");
+  assert.equal(software.operatingSystem, "macOS 14 or later");
+  assert.equal(software.applicationCategory, "ProductivityApplication");
+  assert.equal(software.downloadUrl, "https://pinboardshot.agentclub.dev/download");
+  assert.equal(software.softwareVersion, currentRelease.version);
+});
+
+test("server-renders substantial localized Chinese HTML", async () => {
+  const response = await render("/zh");
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
+
+  const html = await response.text();
+  assert.match(html, /<main lang="zh-CN">/i);
+  assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/zh"/i);
+
+  const text = visibleText(html);
+  assert.ok(text.length > 3000);
+  assert.match(text, /截图，然后/);
+  assert.match(text, /原生 macOS 截图、标注与贴图工具/);
+  assert.match(text, /你的截图，\s*只留在你的 Mac/);
+  assert.match(text, /PinboardShot 是什么？/);
 });
 
 test("server-renders the localized English page", async () => {
@@ -66,6 +118,12 @@ test("server-renders the localized English page", async () => {
   assert.match(html, /Privacy choices/);
   assert.doesNotMatch(html, /Snipaste|ShareX/i);
   assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/en"/i);
+
+  const text = visibleText(html);
+  assert.ok(text.length > 3000);
+  assert.match(text, /Capture it\. Keep it in sight\./);
+  assert.match(text, /native capture, annotation, and pinboard tool for macOS/i);
+  assert.match(text, /Your screenshots stay on your Mac\./);
 });
 
 test("server-renders the privacy policy", async () => {
@@ -111,7 +169,13 @@ test("serves llms.txt for AI readers", async () => {
   const text = await response.text();
   assert.match(text, /^# PinboardShot/m);
   assert.match(text, /native macOS screenshot, annotation, and screen pinning app/i);
+  assert.match(text, /## Features/i);
+  assert.match(text, /## System Requirements/i);
+  assert.match(text, /## Download/i);
+  assert.match(text, /## Privacy Commitments/i);
   assert.match(text, /No account, no cloud sync, and no telemetry/i);
+  assert.match(text, /macOS 14 or later/i);
+  assert.match(text, /GitHub Release/i);
   assert.match(text, new RegExp(currentRelease.version.replaceAll(".", "\\.")));
   assert.match(text, /https:\/\/pinboardshot\.agentclub\.dev\/download/i);
   assert.doesNotMatch(text, /sha256|edSignature|private key/i);

@@ -33,6 +33,40 @@ floating as working references across macOS desktop spaces.
   material locally, pin references on top, compare screens, and export from
   Native Retina through 8K.
 
+## Features
+
+- Capture an area, display, pointer window, or delayed screenshot.
+- Refine a selected capture with resize handles before copying or pinning.
+- Annotate with mosaic, pen, rectangle, highlight, arrow, and editable text.
+- Pin screenshots above other windows across macOS desktop spaces.
+- Control pinned image size, opacity, shadow, and click-through behavior.
+- Export at Native Retina, 720p, 1080p, 2K, 4K, or 8K resolution.
+- Keep the latest 50 captures in local history.
+- Use Simplified Chinese, Traditional Chinese, or English.
+
+## System Requirements
+
+- macOS 14 or later.
+- Apple Silicon and Intel Macs are supported through a Universal build.
+- Screen & System Audio Recording permission may be requested by macOS for
+  screen capture features.
+
+## Download
+
+- Primary download page: ${absoluteUrl(DOWNLOAD_PATH)}
+- DMG asset: ${currentRelease.downloads.dmg.name}
+- GitHub Release: ${currentRelease.releaseUrl}
+
+## Privacy Commitments
+
+- PinboardShot does not require an account.
+- PinboardShot does not provide cloud sync.
+- PinboardShot does not include telemetry, analytics, or advertising SDKs.
+- Screenshots, annotations, recent history, watermark records, shortcuts, and
+  preferences stay on the user's Mac by default.
+- Network access is limited to software update checks, update downloads, public
+  downloads, and necessary hosting/CDN logs.
+
 ## Current Release Assets
 
 - DMG: ${currentRelease.downloads.dmg.name}
