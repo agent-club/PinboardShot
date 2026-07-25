@@ -96,11 +96,11 @@ const copy = {
         difference: "Developer ID 签名和 Apple 公证是可信分发基础；真正的差异是本地优先、贴屏参考和可选离线水印。",
       },
     ],
-    comparisonSummary: ["Mac 原生", "无账号无遥测", "截图留在本机", "可选离线水印"],
+    comparisonSummary: ["Mac 原生", "应用无账号", "截图留在本机", "可选离线水印"],
     privacyEyebrow: "PRIVATE BY DESIGN",
     privacyTitle: "你的截图，\n只留在你的 Mac",
-    privacyBody: "不需要账号，没有云同步，也没有遥测，截图、标注、最近 50 张历史和偏好设置都只在设备本地处理；网络仅用于软件更新，异常空白帧会被拒绝，不会覆盖上一份剪贴板内容",
-    privacyPoints: ["仅更新访问网络", "零分析服务", "异常帧保护", "原生系统框架"],
+    privacyBody: "Mac 应用不需要账号，没有云同步，也没有遥测，截图、标注、最近 50 张历史和偏好设置都只在设备本地处理；官网使用 Google tag 做基础访问衡量，异常空白帧会被拒绝，不会覆盖上一份剪贴板内容",
+    privacyPoints: ["应用仅更新访问网络", "官网基础访问衡量", "异常帧保护", "原生系统框架"],
     trustEyebrow: "TRUST SIGNALS",
     trustTitle: "可公开核验，\n也不夸大成认证",
     trustBody: "PinboardShot 用开源仓库、隐私政策、安全策略和公开扫描结果建立信任；正式隐私认证或社区收录只有在实际通过后才展示。",
@@ -156,10 +156,10 @@ const copy = {
       "Mac、macOS、Retina、Apple、Apple Silicon、Developer ID 和 Apple 公证为 Apple Inc. 在美国及其他国家和地区的商标或服务标记。PinboardShot 与 Apple Inc. 无隶属、赞助或背书关系。GitHub 名称与标识归 GitHub, Inc. 所有，本站仅用于链接项目仓库。",
     privacyConsent: {
       title: "隐私选择",
-      body: "本站不使用广告追踪 Cookie。我们只保存语言偏好和这次选择；托管、更新与下载服务可能处理必要访问日志。",
+      body: "本站使用 Google tag 做基础访问衡量，不启用广告个性化。我们会保存语言偏好和这次选择；托管、更新与下载服务可能处理必要访问日志。",
       privacy: "查看隐私条款",
       essential: "仅必要",
-      accept: "知道了",
+      accept: "同意分析",
     },
   },
   en: {
@@ -235,11 +235,11 @@ const copy = {
         difference: "Developer ID signing and Apple notarization are trust basics; the real difference is local-first pinning, controlled output, and optional offline watermarking.",
       },
     ],
-    comparisonSummary: ["Native Mac", "No account or telemetry", "Screenshots stay local", "Optional offline watermark"],
+    comparisonSummary: ["Native Mac", "No account in the app", "Screenshots stay local", "Optional offline watermark"],
     privacyEyebrow: "PRIVATE BY DESIGN",
     privacyTitle: "Your screenshots stay\non your Mac.",
-    privacyBody: "No account, cloud sync, or telemetry. Captures, annotations, the latest 50 history items, and preferences stay on-device; network access is used only for software updates. Empty or abnormal frames are rejected without replacing your clipboard.",
-    privacyPoints: ["Updates-only network access", "No analytics", "Abnormal-frame protection", "Native system frameworks"],
+    privacyBody: "The Mac app has no account, cloud sync, or telemetry. Captures, annotations, the latest 50 history items, and preferences stay on-device; the website uses Google tag for basic visit measurement. Empty or abnormal frames are rejected without replacing your clipboard.",
+    privacyPoints: ["App updates-only network access", "Website visit measurement", "Abnormal-frame protection", "Native system frameworks"],
     trustEyebrow: "TRUST SIGNALS",
     trustTitle: "Publicly checkable,\nwithout overclaiming.",
     trustBody: "PinboardShot builds trust through its open repository, privacy policy, security policy, and public scan results. Formal privacy certifications or community listings are shown only after they are actually earned.",
@@ -295,10 +295,10 @@ const copy = {
       "Mac, macOS, Retina, Apple, Apple Silicon, Developer ID, and Apple notarization are trademarks or service marks of Apple Inc., registered in the U.S. and other countries and regions. PinboardShot is not affiliated with, sponsored by, or endorsed by Apple Inc. The GitHub name and mark belong to GitHub, Inc. and are used only to link to the project repository.",
     privacyConsent: {
       title: "Privacy choices",
-      body: "This site does not use advertising or analytics cookies. We only store your language preference and this choice; hosting, update, and download services may process necessary access logs.",
+      body: "This site uses Google tag for basic visit measurement and does not enable ad personalization. We store your language preference and this choice; hosting, update, and download services may process necessary access logs.",
       privacy: "Read the privacy policy",
       essential: "Essential only",
-      accept: "Got it",
+      accept: "Allow analytics",
     },
   },
 } as const;
@@ -357,6 +357,10 @@ export function PinboardShotHome({
 
   const savePrivacyConsent = (choice: "accepted" | "essential") => {
     window.localStorage.setItem(privacyConsentStorageKey, choice);
+    const gtag = (window as typeof window & { gtag?: (...args: unknown[]) => void }).gtag;
+    gtag?.("consent", "update", {
+      analytics_storage: choice === "accepted" ? "granted" : "denied",
+    });
     setShowPrivacyConsent(false);
   };
 

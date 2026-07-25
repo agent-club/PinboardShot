@@ -48,6 +48,24 @@ GitHub 仓库需要配置以下 Actions secrets：
 不要把这些值写入仓库。`website/scripts/check-app-version.mjs` 依赖未公开的
 应用 `Resources/Info.plist`，因此它只适合本地发布前检查，不在公开仓库 CI 中运行。
 
+## Google 收录
+
+网站会输出可索引的页面 metadata、`/robots.txt` 和 `/sitemap.xml`。
+`robots.txt` 声明 sitemap 地址；sitemap 只列出适合进入 Google 搜索结果的
+规范页面，并为中英文页面声明 alternate 关系。
+
+Search Console 验证码不要写入仓库。需要使用 HTML meta 验证时，在
+Cloudflare/GitHub Actions 环境中设置：
+
+- `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION`
+
+网站已添加 Google tag（`G-WDBY7TDB0R`）用于 Google 设置和基础访问衡量。
+脚本默认拒绝广告存储、广告个性化和分析存储；访客选择“同意分析”后才会
+把 analytics storage 更新为允许。
+
+部署后，在 Google Search Console 添加 `https://pinboardshot.agentclub.dev/`
+属性，并提交 `https://pinboardshot.agentclub.dev/sitemap.xml`。
+
 ## Workspace Auth Headers
 
 OpenAI workspace sites can read the current user's email from
