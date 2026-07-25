@@ -10,7 +10,7 @@ const languageAlternates = {
 };
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const lastModified = new Date(releaseIsoDate());
+  const lastModified = releaseIsoDate();
 
   return [
     {

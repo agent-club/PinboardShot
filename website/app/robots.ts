@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { SITE_URL, absoluteUrl } from "./seo";
+import { absoluteUrl } from "./seo";
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -18,6 +18,5 @@ export default function robots(): MetadataRoute.Robots {
       },
     ],
     sitemap: absoluteUrl("/sitemap.xml"),
-    host: SITE_URL,
   };
 }

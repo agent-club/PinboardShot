@@ -37,11 +37,11 @@ export const metadata: Metadata = {
     ],
   },
   alternates: {
-    canonical: SITE_URL,
+    canonical: absoluteUrl("/"),
     languages: {
       "zh-CN": absoluteUrl(localeSeo.zh.path),
       en: absoluteUrl(localeSeo.en.path),
-      "x-default": SITE_URL,
+      "x-default": absoluteUrl("/"),
     },
   },
   robots: {
@@ -64,7 +64,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "PinboardShot - Mac 截图、标注与贴图工具",
     description: localeSeo.zh.description,
-    url: SITE_URL,
+    url: absoluteUrl("/"),
     siteName: "PinboardShot",
     type: "website",
     locale: "zh_CN",
@@ -83,24 +83,25 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN">
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+try {
+  window["ga-disable-${GOOGLE_TAG_ID}"] = localStorage.getItem("pinboardshot-privacy-consent-v1") === "essential";
+} catch (_) {}
+`.trim(),
+          }}
+        />
         <script async src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} />
         <script
           dangerouslySetInnerHTML={{
             __html: `
 window.dataLayer = window.dataLayer || [];
 function gtag(){dataLayer.push(arguments);}
-var pinboardshotAnalyticsConsent = "granted";
-try {
-  pinboardshotAnalyticsConsent = localStorage.getItem("pinboardshot-privacy-consent-v1") === "essential" ? "denied" : "granted";
-} catch (_) {}
-gtag("consent", "default", {
-  ad_storage: "denied",
-  ad_user_data: "denied",
-  ad_personalization: "denied",
-  analytics_storage: pinboardshotAnalyticsConsent
+gtag('js', new Date());
+gtag('config', '${GOOGLE_TAG_ID}', {
+  allow_ad_personalization_signals: false
 });
-gtag("js", new Date());
-gtag("config", "${GOOGLE_TAG_ID}");
 `.trim(),
           }}
         />

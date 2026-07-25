@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import currentRelease from "@/content/current-release.json";
-import { DOWNLOAD_PATH, geoContent, structuredData, type SeoLanguage } from "./seo";
+import { DOWNLOAD_PATH, GOOGLE_TAG_ID, geoContent, structuredData, type SeoLanguage } from "./seo";
 
 type Language = SeoLanguage;
 
@@ -357,7 +357,9 @@ export function PinboardShotHome({
 
   const savePrivacyConsent = (choice: "accepted" | "essential") => {
     window.localStorage.setItem(privacyConsentStorageKey, choice);
-    const gtag = (window as typeof window & { gtag?: (...args: unknown[]) => void }).gtag;
+    const analyticsWindow = window as typeof window & { [key: string]: boolean; gtag?: (...args: unknown[]) => void };
+    analyticsWindow[`ga-disable-${GOOGLE_TAG_ID}`] = choice === "essential";
+    const gtag = analyticsWindow.gtag;
     gtag?.("consent", "update", {
       analytics_storage: choice === "accepted" ? "granted" : "denied",
     });

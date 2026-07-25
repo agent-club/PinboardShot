@@ -141,7 +141,7 @@ export function localizedMetadata(language: SeoLanguage): Metadata {
       languages: {
         "zh-CN": absoluteUrl(localeSeo.zh.path),
         en: absoluteUrl(localeSeo.en.path),
-        "x-default": SITE_URL,
+        "x-default": absoluteUrl("/"),
       },
     },
     openGraph: {
@@ -176,7 +176,7 @@ export function structuredData(language: SeoLanguage) {
       "@type": "Organization",
       "@id": absoluteUrl("/#organization"),
       name: "PinboardShot",
-      url: SITE_URL,
+      url: absoluteUrl("/"),
       sameAs: [GITHUB_URL],
     },
     {
@@ -184,7 +184,7 @@ export function structuredData(language: SeoLanguage) {
       "@type": "WebSite",
       "@id": absoluteUrl("/#website"),
       name: "PinboardShot",
-      url: SITE_URL,
+      url: absoluteUrl("/"),
       inLanguage: [localeSeo.zh.htmlLang, localeSeo.en.htmlLang],
     },
     {
@@ -260,7 +260,7 @@ export function structuredData(language: SeoLanguage) {
           "@type": "ListItem",
           position: 1,
           name: "PinboardShot",
-          item: SITE_URL,
+          item: absoluteUrl("/"),
         },
         {
           "@type": "ListItem",

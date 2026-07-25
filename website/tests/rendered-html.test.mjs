@@ -54,16 +54,15 @@ test("server-renders the PinboardShot download page", async () => {
   assert.ok(html.length > 10000);
   assert.match(html, /<meta name="robots" content="index, follow"\/>/i);
   assert.match(html, /<meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1"\/>/i);
-  assert.match(html, /<link rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev"\/>/i);
+  assert.match(html, /<link rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/"\/>/i);
   assert.match(html, /<link rel="alternate" hrefLang="zh-CN" href="https:\/\/pinboardshot\.agentclub\.dev\/zh"\/>/i);
   assert.match(html, /<link rel="alternate" hrefLang="en" href="https:\/\/pinboardshot\.agentclub\.dev\/en"\/>/i);
-  assert.match(html, /<link rel="alternate" hrefLang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev"\/>/i);
+  assert.match(html, /<link rel="alternate" hrefLang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev\/"\/>/i);
   assert.match(html, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-WDBY7TDB0R/i);
-  assert.match(html, /gtag\("config", "G-WDBY7TDB0R"\)/i);
-  assert.match(html, /var pinboardshotAnalyticsConsent = "granted"/i);
-  assert.match(html, /localStorage\.getItem\("pinboardshot-privacy-consent-v1"\) === "essential" \? "denied" : "granted"/i);
-  assert.match(html, /analytics_storage: pinboardshotAnalyticsConsent/i);
-  assert.match(html, /ad_personalization: "denied"/i);
+  assert.match(html, /window\["ga-disable-G-WDBY7TDB0R"\] = localStorage\.getItem\("pinboardshot-privacy-consent-v1"\) === "essential"/i);
+  assert.match(html, /gtag\('js', new Date\(\)\)/i);
+  assert.match(html, /gtag\('config', 'G-WDBY7TDB0R'/i);
+  assert.match(html, /allow_ad_personalization_signals: false/i);
   assert.match(html, /property="og:image" content="https:\/\/pinboardshot\.agentclub\.dev\/opengraph-image\.png"/i);
   assert.match(html, /name="twitter:image" content="https:\/\/pinboardshot\.agentclub\.dev\/twitter-image\.png"/i);
   assert.match(html, /href="\/download"/i);
@@ -164,12 +163,14 @@ test("serves robots and sitemap for search crawlers", async () => {
   assert.match(robotsText, /User-Agent: OAI-SearchBot\s+Allow: \//i);
   assert.match(robotsText, /User-Agent: GPTBot\s+Disallow: \//i);
   assert.match(robotsText, /Sitemap: https:\/\/pinboardshot\.agentclub\.dev\/sitemap\.xml/i);
+  assert.doesNotMatch(robotsText, /^Host:/im);
 
   const sitemap = await render("/sitemap.xml", "application/xml");
   assert.equal(sitemap.status, 200);
   assert.match(sitemap.headers.get("content-type") ?? "", /^application\/xml\b/i);
   const sitemapXml = await sitemap.text();
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/<\/loc>/i);
+  assert.match(sitemapXml, new RegExp(`<lastmod>${currentRelease.date.replaceAll(".", "-")}</lastmod>`, "i"));
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/zh<\/loc>/i);
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/en<\/loc>/i);
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/privacy<\/loc>/i);
