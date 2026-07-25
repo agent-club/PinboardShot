@@ -1,46 +1,42 @@
 {
-  "version": "0.5.12",
-  "build": "34",
-  "date": "2026.07.24",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.12",
+  "version": "0.5.13",
+  "build": "35",
+  "date": "2026.07.25",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.13",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.5.12-34.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.12/PinboardShot-0.5.12-34.dmg",
-      "sha256": "129028631f21cdab6d56b07d446cd9724cfd2f72965770b964a0349555c26974"
+      "name": "PinboardShot-0.5.13-35.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.13/PinboardShot-0.5.13-35.dmg",
+      "sha256": "bbc0d35ff228713557141052ab1f2eb125403d0aff8de89f4625971108f57989"
     },
     "zip": {
-      "name": "PinboardShot-0.5.12-34.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.12/PinboardShot-0.5.12-34.zip",
-      "sha256": "77c40031eb161021d55d2b9dc5ec6ee4f5b9ea4779b3e737367e2e59d83e0285"
+      "name": "PinboardShot-0.5.13-35.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.13/PinboardShot-0.5.13-35.zip",
+      "sha256": "b9794f9a0be63b50f5e1cda44643b971f6649fd1d4b1b45463d86d58e0196ef2"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.12/appcast.xml",
-      "sha256": "92362574f34964039dca38f2b5efc3369c60b27e3b6e02ff1b6034c816f9e914"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.13/appcast.xml",
+      "sha256": "1a1c11f6287e346f9cbc8760cfa0450185f5f72332fd42d006b18bd52cda7ee9"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "隐私、许可与合规声明完善",
+    "title": "许可与声明面板优化",
     "changes": [
-      "新增 App 托盘中的“许可与声明”入口，并在 App 包内附带 LICENSE 和 NOTICE",
-      "网站新增隐私条款和底部隐私选择提示",
-      "网站与 NOTICE 明确声明展示图片为 AI 生成示意图",
-      "清理竞品 SEO 表述，并补充 Apple、GitHub 等商标归属说明",
-      "升级网站依赖并将生产与完整 npm audit 漏洞数降为 0",
+      "“许可与声明”现在会像“给用户的信”一样在 App 内面板中打开",
+      "许可与声明面板展示随 App 打包的 NOTICE 和 LICENSE 内容，并支持滚动查看与复制",
+      "托盘入口文案去掉省略号，中文、繁中和英文菜单显示更干净",
       "应用、Sparkle 更新 ZIP 和手动安装 DMG 均已签名并通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Privacy, license, and compliance notices",
+    "title": "License & Notices panel polish",
     "changes": [
-      "Added a License & Notices entry in the app tray and bundled LICENSE and NOTICE inside the app.",
-      "Added a website privacy policy and bottom privacy choices notice.",
-      "Clarified that website and product showcase images are AI-generated illustrative assets.",
-      "Removed competitor SEO positioning and added Apple, GitHub, and related trademark attribution.",
-      "Upgraded website dependencies and reduced both production and full npm audit vulnerability counts to 0.",
+      "License & Notices now opens in an in-app panel like A Note to Users.",
+      "The License & Notices panel shows the bundled NOTICE and LICENSE content, with scrolling and selectable text.",
+      "The tray entry no longer uses an ellipsis, keeping the Chinese, Traditional Chinese, and English menus cleaner.",
       "The app, Sparkle update ZIP, and manual-install DMG are signed and notarized by Apple."
     ]
   }
