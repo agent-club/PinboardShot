@@ -1,0 +1,4 @@
+[[IgnoredVulns]]
+id = "GHSA-mh99-v99m-4gvg"
+ignoreUntil = 2026-08-31
+reason = "The affected 1.x package is used only by development-time ESLint glob resolution with repository-controlled patterns. No compatible 1.x fix is published; revisit when minimatch or eslint-config-next accepts a patched brace-expansion release."
