@@ -68,6 +68,8 @@ GitHub Release notes must be bilingual and use this order:
 
 PinboardShot <version>（build <build>）...
 
+官网：https://pinboardshot.agentclub.dev/zh
+
 ### 更新内容
 
 - ...
@@ -91,6 +93,8 @@ PinboardShot <version>（build <build>）...
 ## English
 
 PinboardShot <version> (build <build>) ...
+
+Official website: https://pinboardshot.agentclub.dev/en
 
 ### What's new
 
@@ -173,6 +177,8 @@ Do not overwrite or delete an existing public Release without explicit user conf
    ```
 
 5. Clean temporary public downloads after verification.
+
+6. Refresh search and AI discovery signals using `docs/search-ai-indexing.md`.
 
 ## Website Metadata
 
