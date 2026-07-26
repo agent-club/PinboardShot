@@ -257,8 +257,8 @@ Update `website/content/current-release.json` with:
 Then validate:
 
 ```bash
-npm run check:app-version
-npm test
+pnpm run check:app-version
+pnpm test
 ```
 
 Run those commands from `website/`.

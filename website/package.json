@@ -2,6 +2,7 @@
   "name": "pinboardshot-site",
   "version": "0.1.0",
   "private": true,
+  "packageManager": "pnpm@10.22.0",
   "engines": {
     "node": ">=22.13.0"
   },
@@ -12,7 +13,7 @@
     "generate:hero-art": "node scripts/generate-hero-pinboard.mjs",
     "generate:og": "node scripts/generate-og.mjs",
     "start": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext start",
-    "test": "npm run build && node --test tests/rendered-html.test.mjs",
+    "test": "pnpm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "check:cloudflare": "vinext check",
     "deploy:dry-run": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext deploy --dry-run",
@@ -25,21 +26,22 @@
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },
-  "overrides": {
-    "@babel/core": "7.29.7",
-    "@esbuild-kit/core-utils": {
-      "esbuild": "0.25.12"
+  "pnpm": {
+    "overrides": {
+      "@babel/core": "7.29.7",
+      "@esbuild-kit/core-utils>esbuild": "0.25.12",
+      "fast-uri": "3.1.4",
+      "js-yaml": "4.3.0",
+      "minimatch@3.1.5>brace-expansion": "1.1.16",
+      "minimatch@10.2.5>brace-expansion": "5.0.8",
+      "postcss": "8.5.22",
+      "sharp": "0.35.2"
     },
-    "fast-uri": "3.1.4",
-    "js-yaml": "4.3.0",
-    "minimatch@3.1.5": {
-      "brace-expansion": "1.1.16"
-    },
-    "minimatch@10.2.5": {
-      "brace-expansion": "5.0.8"
-    },
-    "postcss": "8.5.22",
-    "sharp": "0.35.2"
+    "onlyBuiltDependencies": [
+      "esbuild@0.25.12 || 0.28.1",
+      "unrs-resolver@1.12.2",
+      "workerd@1.20260722.1"
+    ]
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.47.0",

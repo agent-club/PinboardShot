@@ -1,6 +1,7 @@
 version: 2
 
 updates:
+  # GitHub uses the "npm" ecosystem value for npm, pnpm, and Yarn manifests.
   - package-ecosystem: npm
     directory: /website
     schedule:
@@ -10,7 +11,7 @@ updates:
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
     groups:
-      npm-minor-and-patch:
+      pnpm-minor-and-patch:
         patterns:
           - "*"
         update-types:
