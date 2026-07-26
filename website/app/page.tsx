@@ -10,6 +10,12 @@ const releaseUrl = currentRelease.releaseUrl;
 const primaryDownloadUrl = DOWNLOAD_PATH;
 const githubUrl = "https://github.com/agent-club/PinboardShot";
 const privacyConsentStorageKey = "pinboardshot-privacy-consent-v1";
+const showcaseImages = [
+  { src: "/showcase/snow-mountain.jpg" },
+  { src: "/showcase/blossoms.jpg" },
+  { src: "/showcase/sunset.jpg" },
+  { src: "/showcase/lakeside-panel.jpg" },
+];
 
 function GitHubIcon() {
   return (
@@ -20,6 +26,10 @@ function GitHubIcon() {
       />
     </svg>
   );
+}
+
+function ShowcasePhoto({ src, className = "" }: { src: string; className?: string }) {
+  return <span className={`showcase-photo ${className}`} style={{ backgroundImage: `url(${src})` }} aria-hidden="true" />;
 }
 
 const copy = {
@@ -151,7 +161,7 @@ const copy = {
     copyright: "本地优先，由设计开始",
     privacyLink: "隐私条款",
     noticeLink: "许可与声明",
-    assetNotice: "网站与产品展示图片均为 AI 生成的示意图，用于展示 PinboardShot 的功能和界面氛围。",
+    assetNotice: "网站与产品展示图片使用自有照片与界面示意素材，用于展示 PinboardShot 的功能和界面氛围。",
     trademarkNotice:
       "Mac、macOS、Retina、Apple、Apple Silicon、Developer ID 和 Apple 公证为 Apple Inc. 在美国及其他国家和地区的商标或服务标记。PinboardShot 与 Apple Inc. 无隶属、赞助或背书关系。GitHub 名称与标识归 GitHub, Inc. 所有，本站仅用于链接项目仓库。",
     privacyConsent: {
@@ -290,7 +300,7 @@ const copy = {
     copyright: "Local-first by design.",
     privacyLink: "Privacy Policy",
     noticeLink: "License & notices",
-    assetNotice: "Website and product showcase images are AI-generated illustrative assets created to demonstrate PinboardShot features and interface mood.",
+    assetNotice: "Website and product showcase images use owned photos and interface mockups to demonstrate PinboardShot features and interface mood.",
     trademarkNotice:
       "Mac, macOS, Retina, Apple, Apple Silicon, Developer ID, and Apple notarization are trademarks or service marks of Apple Inc., registered in the U.S. and other countries and regions. PinboardShot is not affiliated with, sponsored by, or endorsed by Apple Inc. The GitHub name and mark belong to GitHub, Inc. and are used only to link to the project repository.",
     privacyConsent: {
@@ -410,19 +420,10 @@ export function PinboardShotHome({
           <p className="requirement">{content.requirement}</p>
         </div>
 
-        <div className="product-stage" aria-label={language === "zh" ? "PinboardShot 截图贴屏效果示意" : "PinboardShot capture and pin preview"}>
+        <div className="product-stage" role="img" aria-label={language === "zh" ? "PinboardShot 截图贴屏效果示意" : "PinboardShot capture and pin preview"}>
           <div className="selection-frame"><span className="corner corner-a" /><span className="corner corner-b" /><span className="selection-label">{content.selection}</span></div>
-          <div className="pin-window">
-            <div className="window-bar"><span className="traffic"><i /><i /><i /></span><span>{content.pinned}</span></div>
-            <div className="window-content">
-              <div className="mock-title" />
-              <div className="mock-line line-long" />
-              <div className="mock-line line-medium" />
-              <div className="mock-grid">
-                <div className="mock-canvas"><span className="annotation-box" /><span className="annotation-arrow">↗</span></div>
-                <div className="quality-card"><strong>8K</strong><span>Native → 8K</span></div>
-              </div>
-            </div>
+          <div className="pin-window" aria-hidden="true">
+            <ShowcasePhoto src="/showcase/hero-pinboard.png" className="hero-pinboard-art" />
           </div>
           <div className="floating-note"><span>⌘</span><strong>{content.toolbar}</strong></div>
           <div className="stage-glow" />
@@ -478,10 +479,11 @@ export function PinboardShotHome({
             <div className="desktop-menu"><span /><span /><span /><i>PinboardShot</i></div>
             <div className="source-panel">
               <div className="source-bar"><i /><i /><i /></div>
-              <div className="source-title" />
-              <div className="source-line line-a" />
-              <div className="source-line line-b" />
-              <div className="source-tiles"><i /><i /><i /></div>
+              <div className="source-photo-grid" aria-hidden="true">
+                {showcaseImages.map((image, index) => (
+                  <ShowcasePhoto className={`source-photo source-photo-${index + 1}`} src={image.src} key={image.src} />
+                ))}
+              </div>
             </div>
             <div className="demo-selection">
               <i className="handle h1" /><i className="handle h2" /><i className="handle h3" /><i className="handle h4" />
@@ -493,7 +495,7 @@ export function PinboardShotHome({
             <div className="annotation-toolbar" aria-hidden="true"><span>▦</span><span>✎</span><span>□</span><span>↗</span><span>T</span><span className="tool-color" /></div>
             <div className="demo-pin">
               <div className="pin-top"><i /><i /><i /><span>{content.pinned}</span></div>
-              <div className="pin-art"><span /><i /></div>
+              <div className="pin-art"><ShowcasePhoto src={showcaseImages[0].src} /></div>
             </div>
             <div className="demo-quality"><strong>8K</strong><span>Native → 8K</span></div>
             <div className="demo-cursor" aria-hidden="true">↖</div>
@@ -516,9 +518,9 @@ export function PinboardShotHome({
         </div>
         <div className="pin-playground" role="img" aria-label={language === "zh" ? "多张贴图、透明度和鼠标穿透动态演示" : "Animated demo of multiple pins, opacity, and click-through"}>
           <div className="playground-grid" />
-          <div className="floating-pin pin-one"><div className="mini-bar"><i /><i /><i /></div><div className="pin-gradient pin-gradient-a" /></div>
-          <div className="floating-pin pin-two"><div className="mini-bar"><i /><i /><i /></div><div className="pin-lines"><span /><span /><span /></div></div>
-          <div className="floating-pin pin-three"><div className="mini-bar"><i /><i /><i /></div><div className="pin-gradient pin-gradient-b" /></div>
+          <div className="floating-pin pin-one"><div className="mini-bar"><i /><i /><i /></div><div className="pin-gradient pin-gradient-a"><ShowcasePhoto src={showcaseImages[2].src} /></div></div>
+          <div className="floating-pin pin-two"><div className="mini-bar"><i /><i /><i /></div><div className="pin-lines"><ShowcasePhoto src={showcaseImages[1].src} /></div></div>
+          <div className="floating-pin pin-three"><div className="mini-bar"><i /><i /><i /></div><div className="pin-gradient pin-gradient-b"><ShowcasePhoto src={showcaseImages[3].src} /></div></div>
           <div className="opacity-control"><span>{language === "zh" ? "透明度" : "Opacity"}</span><div><i /></div><strong>64%</strong></div>
           <div className="passthrough-badge"><i>↗</i><span>{language === "zh" ? "鼠标穿透" : "Click-through"}</span><strong>{language === "zh" ? "已开启" : "On"}</strong></div>
           <div className="playground-cursor">↖</div>
