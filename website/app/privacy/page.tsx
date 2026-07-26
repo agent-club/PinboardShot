@@ -111,12 +111,12 @@ export default function PrivacyPolicyPage() {
             access, security, and delivery logs.
           </p>
 
-          <h3>6. AI-Generated Images</h3>
+          <h3>6. Showcase Images</h3>
           <p>
-            Website and product showcase images are AI-generated illustrative
-            assets created for PinboardShot. They are used to demonstrate the
+            Website and product showcase images use owned photos and interface
+            mockups created for PinboardShot. They are used to demonstrate the
             product interface mood and feature concepts, not to depict a
-            third-party product or user content.
+            third-party product or unrelated user content.
           </p>
 
           <h3>7. Third-Party Services</h3>
@@ -191,10 +191,10 @@ export default function PrivacyPolicyPage() {
             访问、安全和内容分发日志。
           </p>
 
-          <h3>6. AI 生成图片</h3>
+          <h3>6. 展示图片</h3>
           <p>
-            网站与产品展示图片均为 PinboardShot 创建的 AI 生成示意图，用于展示产品界面
-            氛围和功能概念，不用于描绘第三方产品或用户内容。
+            网站与产品展示图片使用自有照片与 PinboardShot 创建的界面示意素材，用于展示
+            产品界面氛围和功能概念，不用于描绘第三方产品或无关用户内容。
           </p>
 
           <h3>7. 第三方服务</h3>

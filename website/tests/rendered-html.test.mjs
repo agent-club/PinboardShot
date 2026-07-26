@@ -74,7 +74,7 @@ test("server-renders the PinboardShot download page", async () => {
   assert.ok(html.includes(currentRelease.version));
   assert.match(html, /Your screenshots stay|你的截图/);
   assert.match(html, /href="\/privacy"/i);
-  assert.match(html, /AI 生成的示意图|AI-generated illustrative assets/i);
+  assert.match(html, /自有照片与界面示意素材|owned photos and interface mockups/i);
   assert.match(html, /Apple Inc\./i);
   assert.match(html, /application\/ld\+json/i);
   assert.match(html, /SoftwareApplication/i);
@@ -158,7 +158,7 @@ test("server-renders the privacy policy", async () => {
   assert.match(html, /The website uses Google tag for basic visit measurement/i);
   assert.match(html, /Analytics storage is enabled by default/i);
   assert.match(html, /do not\s+(?:<!-- -->)?enable ad personalization/i);
-  assert.match(html, /AI-generated illustrative assets/i);
+  assert.match(html, /owned photos and interface mockups/i);
 });
 
 test("serves robots and sitemap for search crawlers", async () => {

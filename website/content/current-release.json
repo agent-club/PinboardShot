@@ -1,42 +1,42 @@
 {
-  "version": "0.5.13",
-  "build": "35",
-  "date": "2026.07.25",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.13",
+  "version": "0.5.14",
+  "build": "36",
+  "date": "2026.07.26",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.14",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.5.13-35.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.13/PinboardShot-0.5.13-35.dmg",
-      "sha256": "bbc0d35ff228713557141052ab1f2eb125403d0aff8de89f4625971108f57989"
+      "name": "PinboardShot-0.5.14-36.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.14/PinboardShot-0.5.14-36.dmg",
+      "sha256": "ad57d5e009b2930fe48e8a8b29b1f1df3dd58df46f61bea4f20ef42402b21356"
     },
     "zip": {
-      "name": "PinboardShot-0.5.13-35.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.13/PinboardShot-0.5.13-35.zip",
-      "sha256": "b9794f9a0be63b50f5e1cda44643b971f6649fd1d4b1b45463d86d58e0196ef2"
+      "name": "PinboardShot-0.5.14-36.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.14/PinboardShot-0.5.14-36.zip",
+      "sha256": "49328cefa08209aa93083732ae2b50e0cbdd0a061f12f725c337f6f196551ab7"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.13/appcast.xml",
-      "sha256": "1a1c11f6287e346f9cbc8760cfa0450185f5f72332fd42d006b18bd52cda7ee9"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.14/appcast.xml",
+      "sha256": "00f2fcf2e68975a4154ca974db20d537c3bfee0eaac70950a7d5e3db494da44d"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "许可与声明面板优化",
+    "title": "自有照片视觉更新",
     "changes": [
-      "“许可与声明”现在会像“给用户的信”一样在 App 内面板中打开",
-      "许可与声明面板展示随 App 打包的 NOTICE 和 LICENSE 内容，并支持滚动查看与复制",
-      "托盘入口文案去掉省略号，中文、繁中和英文菜单显示更干净",
+      "托盘贴图板预览更新为雪山、花、夕阳和湖山四张自有照片，并优化拼接构图",
+      "官网首页、功能演示、社交分享图和 GitHub README 统一使用自有照片素材",
+      "隐私与版权说明同步更新，明确展示图片来自自有照片与界面示意素材",
       "应用、Sparkle 更新 ZIP 和手动安装 DMG 均已签名并通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "License & Notices panel polish",
+    "title": "Owned-photo visual refresh",
     "changes": [
-      "License & Notices now opens in an in-app panel like A Note to Users.",
-      "The License & Notices panel shows the bundled NOTICE and LICENSE content, with scrolling and selectable text.",
-      "The tray entry no longer uses an ellipsis, keeping the Chinese, Traditional Chinese, and English menus cleaner.",
+      "The tray pinboard preview now uses four owned photos of snowy mountains, blossoms, sunset, and lakeside scenery in a refined collage.",
+      "The website hero, feature demos, social preview, and GitHub README now share the same owned-photo visual language.",
+      "Privacy and copyright wording now clearly identifies showcase imagery as owned photos and interface mockups.",
       "The app, Sparkle update ZIP, and manual-install DMG are signed and notarized by Apple."
     ]
   }
