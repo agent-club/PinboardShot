@@ -4,11 +4,15 @@
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/agent-club/PinboardShot/badge)](https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot)
 
+Official website: <https://pinboardshot.agentclub.dev>
+
 ![PinboardShot 产品介绍图：截图、标注与贴屏](website/public/og.png)
 
 ## 中文
 
 PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴图工具。它基于 AppKit、SwiftUI 和 ScreenCaptureKit；除软件更新外不发起网络请求，也不包含分析服务。
+
+官网：<https://pinboardshot.agentclub.dev/zh>
 
 它的核心工作流很简单：截取屏幕内容，按需完成标注，然后把结果复制到剪贴板或贴在桌面最前方，继续当前工作。
 
@@ -218,6 +222,8 @@ PINBOARDSHOT_NOTARY_PROFILE="PinboardShot-notary" \
 ## English
 
 PinboardShot is a fully native, local-first screenshot and pinboard utility for macOS. It is built with AppKit, SwiftUI, and ScreenCaptureKit. It makes no network requests except for software updates and contains no analytics services.
+
+Official website: <https://pinboardshot.agentclub.dev/en>
 
 Its core workflow is simple: capture content from the screen, annotate it when needed, then copy the result to the clipboard or pin it above the desktop and continue working.
 

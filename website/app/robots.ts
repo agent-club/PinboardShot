@@ -9,7 +9,35 @@ export default function robots(): MetadataRoute.Robots {
         allow: "/",
       },
       {
+        userAgent: "Googlebot",
+        allow: "/",
+      },
+      {
+        userAgent: "Bingbot",
+        allow: "/",
+      },
+      {
+        userAgent: "Applebot",
+        allow: "/",
+      },
+      {
         userAgent: "OAI-SearchBot",
+        allow: "/",
+      },
+      {
+        userAgent: "OAI-AdsBot",
+        allow: "/",
+      },
+      {
+        userAgent: "ChatGPT-User",
+        allow: "/",
+      },
+      {
+        userAgent: "PerplexityBot",
+        allow: "/",
+      },
+      {
+        userAgent: "Perplexity-User",
         allow: "/",
       },
       {
