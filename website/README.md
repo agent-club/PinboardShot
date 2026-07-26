@@ -7,13 +7,14 @@ Workers + Static Assets。
 ## Prerequisites
 
 - Node.js `>=22.13.0`
+- pnpm `10.22.0`
 
 ## Quick Start
 
 ```bash
-npm install
-npm run dev
-npm run build
+pnpm install
+pnpm run dev
+pnpm run build
 ```
 
 部署配置位于 `wrangler.jsonc`。当前站点不使用 D1、R2、Cloudflare
@@ -22,16 +23,16 @@ Images 或其他远程绑定。
 ## Cloudflare 部署准备
 
 ```bash
-npm run lint
-npm test
-npm run check:cloudflare
-npm run deploy:dry-run
+pnpm run lint
+pnpm test
+pnpm run check:cloudflare
+pnpm run deploy:dry-run
 ```
 
 确认 dry-run 产物无误后，登录 Cloudflare，再显式执行：
 
 ```bash
-npm run deploy
+pnpm run deploy
 ```
 
 ## GitHub Actions 自动部署
@@ -126,13 +127,13 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 
 ## Useful Commands
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: 构建网站并验证服务端渲染的下载页
-- `npm run check:cloudflare`: 检查 vinext 与 Cloudflare Workers 的兼容性
-- `npm run deploy:dry-run`: 生成部署包但不上传
-- `npm run deploy`: 构建并部署到 Cloudflare Workers
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+- `pnpm run dev`: start local development
+- `pnpm run build`: verify the vinext build output
+- `pnpm test`: 构建网站并验证服务端渲染的下载页
+- `pnpm run check:cloudflare`: 检查 vinext 与 Cloudflare Workers 的兼容性
+- `pnpm run deploy:dry-run`: 生成部署包但不上传
+- `pnpm run deploy`: 构建并部署到 Cloudflare Workers
+- `pnpm run db:generate`: generate Drizzle migrations after schema changes
 
 ## Learn More
 
