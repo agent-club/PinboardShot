@@ -19,7 +19,7 @@ const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
-  title: "PinboardShot - Mac 截图、标注与贴图工具",
+  title: localeSeo.zh.title,
   description: localeSeo.zh.description,
   applicationName: "PinboardShot",
   authors: [{ name: "PinboardShot" }],
@@ -62,7 +62,7 @@ export const metadata: Metadata = {
       }
     : {}),
   openGraph: {
-    title: "PinboardShot - Mac 截图、标注与贴图工具",
+    title: localeSeo.zh.title,
     description: localeSeo.zh.description,
     url: absoluteUrl("/"),
     siteName: "PinboardShot",
@@ -73,7 +73,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "PinboardShot - Mac 截图、标注与贴图工具",
+    title: localeSeo.zh.title,
     description: localeSeo.zh.description,
     images: [twitterImage],
   },

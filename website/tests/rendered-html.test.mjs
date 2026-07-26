@@ -51,7 +51,9 @@ test("server-renders the PinboardShot download page", async () => {
   assert.equal(response.headers.get("cache-control"), "no-transform");
 
   const html = await response.text();
-  assert.match(html, /<title>PinboardShot - Mac 截图、标注与贴图工具<\/title>/i);
+  assert.match(html, /<title>PinboardShot - Mac 截图标注与贴图 Pinboard 工具<\/title>/i);
+  assert.match(html, /<meta name="description" content="PinboardShot 是免费开源的原生 macOS 截图、标注与贴图工具。支持区域\/窗口截图、马赛克文字箭头、跨桌面贴屏、鼠标穿透、本地历史和 Retina 到 8K 输出，无账号、无云同步。"/i);
+  assert.match(html, /<meta name="keywords" content="[^"]*PinboardShot download[^"]*Shottr alternative[^"]*Mac 截图贴图[^"]*"/i);
   assert.ok(html.length > 10000);
   assert.match(html, /<meta name="robots" content="index, follow"\/>/i);
   assert.match(html, /<meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1"\/>/i);
@@ -89,7 +91,7 @@ test("server-renders the PinboardShot download page", async () => {
   const structuredData = extractStructuredData(html);
   const software = structuredData.find((entry) => entry["@type"] === "SoftwareApplication");
   assert.equal(software.name, "PinboardShot");
-  assert.equal(software.description, "PinboardShot 是原生 macOS 截图、标注与贴图工具。截图、标注、最近历史和偏好设置默认只保存在本机，支持跨桌面贴屏、透明度、鼠标穿透、Retina 到 8K 输出和应用内更新。");
+  assert.equal(software.description, "PinboardShot 是免费开源的原生 macOS 截图、标注与贴图工具。支持区域/窗口截图、马赛克文字箭头、跨桌面贴屏、鼠标穿透、本地历史和 Retina 到 8K 输出，无账号、无云同步。");
   assert.equal(software.operatingSystem, "macOS 14 or later");
   assert.equal(software.applicationCategory, "ProductivityApplication");
   assert.equal(software.downloadUrl, "https://pinboardshot.agentclub.dev/download");
@@ -122,7 +124,8 @@ test("server-renders the localized English page", async () => {
   assert.equal(response.headers.get("cache-control"), "no-transform");
 
   const html = await response.text();
-  assert.match(html, /<title>PinboardShot - Native Screenshot, Annotation, and Screen Pinning for Mac<\/title>/i);
+  assert.match(html, /<title>PinboardShot - Screenshot Annotation and Pinboard App for Mac<\/title>/i);
+  assert.match(html, /<meta name="description" content="PinboardShot is a free, open-source macOS screenshot app for capture, annotation, and screen pinning. Keep references local with click-through pins, local history, and 8K export."/i);
   assert.match(html, /<html lang="en">/i);
   assert.match(html, /<main lang="en">/i);
   assert.match(html, /Frequently Asked Questions/);
