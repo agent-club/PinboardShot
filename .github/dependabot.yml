@@ -17,21 +17,12 @@ updates:
           - minor
           - patch
 
-  - package-ecosystem: swift
-    directory: /
-    schedule:
-      interval: weekly
-      day: monday
-      time: "09:15"
-      timezone: Asia/Shanghai
-    open-pull-requests-limit: 3
-
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
       day: monday
-      time: "09:30"
+      time: "09:15"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
     groups:
