@@ -57,10 +57,10 @@ test("server-renders the PinboardShot download page", async () => {
   assert.ok(html.length > 10000);
   assert.match(html, /<meta name="robots" content="index, follow"\/>/i);
   assert.match(html, /<meta name="googlebot" content="index, follow, max-image-preview:large, max-snippet:-1"\/>/i);
-  assert.match(html, /<link rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/"\/>/i);
+  assert.match(html, /<link rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/?"\/>/i);
   assert.match(html, /<link rel="alternate" hrefLang="zh-CN" href="https:\/\/pinboardshot\.agentclub\.dev\/zh"\/>/i);
   assert.match(html, /<link rel="alternate" hrefLang="en" href="https:\/\/pinboardshot\.agentclub\.dev\/en"\/>/i);
-  assert.match(html, /<link rel="alternate" hrefLang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev\/"\/>/i);
+  assert.match(html, /<link rel="alternate" hrefLang="x-default" href="https:\/\/pinboardshot\.agentclub\.dev\/?"\/>/i);
   assert.match(html, /https:\/\/www\.googletagmanager\.com\/gtag\/js\?id=G-WDBY7TDB0R/i);
   assert.match(html, /gtag\('js', new Date\(\)\)/i);
   assert.match(html, /gtag\('config', 'G-WDBY7TDB0R'\)/i);
