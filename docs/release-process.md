@@ -135,6 +135,41 @@ gh release create "v<version>" \
 
 Do not overwrite or delete an existing public Release without explicit user confirmation.
 
+## Sign Release Assets
+
+Publishing the Release triggers `.github/workflows/sign-release.yml`. The
+workflow uses GitHub OIDC and Sigstore keyless signing to create one bundle for
+each public asset:
+
+- `PinboardShot-<version>-<build>.zip.sigstore.json`
+- `PinboardShot-<version>-<build>.dmg.sigstore.json`
+- `appcast.xml.sigstore.json`
+
+The workflow only adds signature bundles. It does not overwrite the ZIP, DMG,
+appcast, or any existing signature bundle.
+
+Wait for the signing workflow to finish:
+
+```bash
+gh run list \
+  --repo agent-club/PinboardShot \
+  --workflow sign-release.yml \
+  --limit 1
+gh run watch <run-id> \
+  --repo agent-club/PinboardShot \
+  --exit-status
+```
+
+To sign an older Release that does not yet have bundles, dispatch the same
+workflow explicitly:
+
+```bash
+gh workflow run sign-release.yml \
+  --repo agent-club/PinboardShot \
+  --ref main \
+  -f tag="v<version>"
+```
+
 ## Post-Publish Verification
 
 1. Inspect the Release:
@@ -145,7 +180,9 @@ Do not overwrite or delete an existing public Release without explicit user conf
      --json tagName,isDraft,isPrerelease,publishedAt,url,assets
    ```
 
-2. Download public assets using anonymous URLs and compare SHA-256 with the local artifacts:
+2. Confirm the Release contains all three `.sigstore.json` bundles.
+
+3. Download public assets using anonymous URLs and compare SHA-256 with the local artifacts:
 
    ```bash
    curl -L --fail --silent --show-error \
@@ -163,22 +200,49 @@ Do not overwrite or delete an existing public Release without explicit user conf
      "/private/tmp/PinboardShot-<version>.appcast.public.xml"
    ```
 
-3. Confirm appcast points at the new ZIP:
+4. Download and verify the Sigstore bundles:
+
+   ```bash
+   gh release download "v<version>" \
+     --repo agent-club/PinboardShot \
+     --pattern "*.sigstore.json" \
+     --dir "/private/tmp/PinboardShot-<version>-signatures"
+
+   cosign verify-blob \
+     --bundle "/private/tmp/PinboardShot-<version>-signatures/PinboardShot-<version>-<build>.zip.sigstore.json" \
+     --certificate-identity-regexp '^https://github\.com/agent-club/PinboardShot/\.github/workflows/sign-release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$' \
+     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+     "/private/tmp/PinboardShot-<version>-<build>.public.zip"
+
+   cosign verify-blob \
+     --bundle "/private/tmp/PinboardShot-<version>-signatures/PinboardShot-<version>-<build>.dmg.sigstore.json" \
+     --certificate-identity-regexp '^https://github\.com/agent-club/PinboardShot/\.github/workflows/sign-release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$' \
+     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+     "/private/tmp/PinboardShot-<version>-<build>.public.dmg"
+
+   cosign verify-blob \
+     --bundle "/private/tmp/PinboardShot-<version>-signatures/appcast.xml.sigstore.json" \
+     --certificate-identity-regexp '^https://github\.com/agent-club/PinboardShot/\.github/workflows/sign-release\.yml@refs/(heads/main|tags/v[0-9]+\.[0-9]+\.[0-9]+)$' \
+     --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+     "/private/tmp/PinboardShot-<version>.appcast.public.xml"
+   ```
+
+5. Confirm appcast points at the new ZIP:
 
    ```bash
    rg -n "<version>|<build>|PinboardShot-<version>-<build>\\.zip|sparkle:edSignature" \
      "/private/tmp/PinboardShot-<version>.appcast.public.xml"
    ```
 
-4. Confirm repository visibility is public:
+6. Confirm repository visibility is public:
 
    ```bash
    gh repo view agent-club/PinboardShot --json visibility,url,defaultBranchRef
    ```
 
-5. Clean temporary public downloads after verification.
+7. Clean temporary public downloads and signature bundles after verification.
 
-6. Refresh search and AI discovery signals using `docs/search-ai-indexing.md`.
+8. Refresh search and AI discovery signals using `docs/search-ai-indexing.md`.
 
 ## Website Metadata
 
@@ -228,6 +292,7 @@ Include:
 - PR URL, if website metadata is not already on `main`.
 - Version/build.
 - Uploaded assets.
+- Sigstore signature bundles and verification result.
 - Final SHA-256 values.
 - Validation commands and results.
 - Whether `/Applications/PinboardShot.app` was updated and verified.

@@ -1,0 +1,73 @@
+name: Sign Release Assets
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing release tag to sign, for example v0.5.14
+        required: true
+        type: string
+
+permissions: read-all
+
+jobs:
+  sign:
+    name: Sign release assets with Sigstore
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+
+    env:
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Validate release tag
+        shell: bash
+        run: |
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must match v<major>.<minor>.<patch>." >&2
+            exit 1
+          fi
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+
+      - name: Download release assets
+        shell: bash
+        run: |
+          mkdir release-assets
+          gh release download "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "*.zip" \
+            --pattern "*.dmg" \
+            --pattern "appcast.xml" \
+            --dir release-assets
+
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f -print | sort)
+          if [[ "${#assets[@]}" -ne 3 ]]; then
+            echo "Expected exactly one ZIP, one DMG, and appcast.xml." >&2
+            exit 1
+          fi
+
+      - name: Sign release assets
+        shell: bash
+        run: |
+          for asset in release-assets/*.zip release-assets/*.dmg release-assets/appcast.xml; do
+            cosign sign-blob \
+              --yes \
+              --bundle "${asset}.sigstore.json" \
+              "$asset"
+          done
+
+      - name: Upload signature bundles
+        shell: bash
+        run: |
+          gh release upload "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            release-assets/*.sigstore.json
