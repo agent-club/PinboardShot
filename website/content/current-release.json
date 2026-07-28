@@ -1,42 +1,42 @@
 {
-  "version": "0.5.15",
-  "build": "37",
+  "version": "0.5.16",
+  "build": "38",
   "date": "2026.07.28",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.15",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.5.16",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.5.15-37.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.15/PinboardShot-0.5.15-37.dmg",
-      "sha256": "27f9f4be2b3af7a00d174c21e8ef52d06633c634ecf5409da6b7abe3850183a0"
+      "name": "PinboardShot-0.5.16-38.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.16/PinboardShot-0.5.16-38.dmg",
+      "sha256": "c99d90db403884cc1e99f9899a58c757cdb1c28b2c32f972d50fc7da96e47b19"
     },
     "zip": {
-      "name": "PinboardShot-0.5.15-37.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.15/PinboardShot-0.5.15-37.zip",
-      "sha256": "eb8ae56ad13e0501a908b11c54acd6b7a8b3b4a6e64b07b43e5149704c7608f8"
+      "name": "PinboardShot-0.5.16-38.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.16/PinboardShot-0.5.16-38.zip",
+      "sha256": "89ace1745b8ad1364a234cb36e2ca638e13da42a3bcfce9769001587be32abee"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.15/appcast.xml",
-      "sha256": "47d1c657fee38c95ace8250825b8340f0d6939b956de4622531f63fd2fee5bf5"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.5.16/appcast.xml",
+      "sha256": "aca40f938ef88dc4561c5878b754281b52ce4ff83ea0768e25916db075892d2e"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "矩形标注可移动",
+    "title": "滚动长截图无缝回访",
     "changes": [
-      "使用矩形工具时，可以直接按住已有矩形并整体拖动",
-      "拖动过程提供手型光标、选中框和实时位置预览",
-      "移动后的矩形保持原有尺寸并限制在截图范围内，且支持一次撤销恢复",
+      "向上回看已捕获区域时不再重复写入，再次向下超过历史边界后无缝恢复拼接",
+      "双向位移匹配结合高分辨率复核，减少滚动换向与小幅回退造成的错位",
+      "历史关键帧可在掉帧或大跨度滚动后重新定位，重复内容无法唯一判断时会拒绝误拼",
       "应用、Sparkle 更新 ZIP 和手动安装 DMG 均已签名并通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Movable rectangle annotations",
+    "title": "Seamless scroll-capture revisits",
     "changes": [
-      "With the Rectangle tool active, you can press and drag an existing rectangle to move it as a whole.",
-      "A hand cursor, selection outline, and live position preview provide clear feedback while dragging.",
-      "Moved rectangles retain their size, stay within the captured image, and can be restored with one Undo.",
+      "Scrolling back through captured content no longer adds duplicate rows, and stitching resumes seamlessly past the previous boundary.",
+      "Bidirectional motion matching with high-resolution verification reduces seams after direction changes and small reversals.",
+      "Historical keyframes recover position after dropped frames or large jumps, while ambiguous repeated content is rejected instead of mis-stitched.",
       "The app, Sparkle update ZIP, and manual-install DMG are signed and notarized by Apple."
     ]
   }
