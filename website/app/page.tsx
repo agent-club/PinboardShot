@@ -32,6 +32,51 @@ function ShowcasePhoto({ src, className = "" }: { src: string; className?: strin
   return <span className={`showcase-photo ${className}`} style={{ backgroundImage: `url(${src})` }} aria-hidden="true" />;
 }
 
+function CaptureDemoScene({
+  demoStep,
+  content,
+  compact = false,
+}: {
+  demoStep: number;
+  content: (typeof copy)[keyof typeof copy];
+  compact?: boolean;
+}) {
+  return (
+    <div className={`capture-stage ${compact ? "capture-stage--hero" : ""}`} role="img" aria-label={content.workflow[demoStep][2]}>
+      <div className="desktop-menu"><span /><span /><span /><i>PinboardShot</i></div>
+      <div className="source-panel">
+        <div className="source-bar"><i /><i /><i /></div>
+        <div className="source-photo-grid" aria-hidden="true">
+          {showcaseImages.map((image, index) => (
+            <ShowcasePhoto className={`source-photo source-photo-${index + 1}`} src={image.src} key={image.src} />
+          ))}
+        </div>
+      </div>
+      <div className="demo-selection">
+        <i className="handle h1" /><i className="handle h2" /><i className="handle h3" /><i className="handle h4" />
+        <span className="selection-size">684 × 428</span>
+        <span className="drawn-rectangle" />
+        <span className="drawn-arrow">↗</span>
+        <span className="text-note">Pin this</span>
+      </div>
+      <div className="annotation-toolbar" aria-hidden="true"><span>▦</span><span>✎</span><span>□</span><span>↗</span><span>T</span><span className="tool-color" /></div>
+      <div className="demo-pin">
+        <div className="pin-top"><i /><i /><i /><span>{content.pinned}</span></div>
+        <div className="pin-art"><ShowcasePhoto src={showcaseImages[0].src} /></div>
+      </div>
+      <div className="demo-quality"><strong>8K</strong><span>Native → 8K</span></div>
+      <div className="demo-cursor" aria-hidden="true">↖</div>
+      <div className="demo-status" aria-live="polite"><span />{content.pinStatus[demoStep]}</div>
+      {compact && (
+        <div className="hero-inline-guide" aria-live="polite">
+          <span>{content.workflow[demoStep][1]}</span>
+          <p>{content.workflow[demoStep][2]}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 const copy = {
   zh: {
     nav: { features: "功能", workflow: "使用方式", compare: "原则", privacy: "隐私", faq: "问答", changelog: "更新日志", download: "下载" },
@@ -420,13 +465,28 @@ export function PinboardShotHome({
           <p className="requirement">{content.requirement}</p>
         </div>
 
-        <div className="product-stage" role="img" aria-label={language === "zh" ? "PinboardShot 截图贴屏效果示意" : "PinboardShot capture and pin preview"}>
-          <div className="selection-frame"><span className="corner corner-a" /><span className="corner corner-b" /><span className="selection-label">{content.selection}</span></div>
-          <div className="pin-window" aria-hidden="true">
-            <ShowcasePhoto src="/showcase/hero-pinboard.png" className="hero-pinboard-art" />
+        <div
+          className={`hero-showcase demo-step-${demoStep}`}
+          onMouseEnter={() => setDemoPaused(true)}
+          onMouseLeave={() => setDemoPaused(false)}
+          onFocus={() => setDemoPaused(true)}
+          onBlur={() => setDemoPaused(false)}
+        >
+          <div className="hero-step-nav" role="tablist" aria-label={language === "zh" ? "主操作步骤" : "Main interaction steps"}>
+            {content.workflow.map(([number, title], index) => (
+              <button
+                key={number}
+                type="button"
+                role="tab"
+                aria-selected={demoStep === index}
+                className={demoStep === index ? "active" : ""}
+                onClick={() => setDemoStep(index)}
+              >
+                <span>{number}</span><strong>{title}</strong>
+              </button>
+            ))}
           </div>
-          <div className="floating-note"><span>⌘</span><strong>{content.toolbar}</strong></div>
-          <div className="stage-glow" />
+          <CaptureDemoScene demoStep={demoStep} content={content} compact />
         </div>
       </section>
 
@@ -475,32 +535,7 @@ export function PinboardShotHome({
               </button>
             ))}
           </div>
-          <div className="capture-stage" role="img" aria-label={content.workflow[demoStep][2]}>
-            <div className="desktop-menu"><span /><span /><span /><i>PinboardShot</i></div>
-            <div className="source-panel">
-              <div className="source-bar"><i /><i /><i /></div>
-              <div className="source-photo-grid" aria-hidden="true">
-                {showcaseImages.map((image, index) => (
-                  <ShowcasePhoto className={`source-photo source-photo-${index + 1}`} src={image.src} key={image.src} />
-                ))}
-              </div>
-            </div>
-            <div className="demo-selection">
-              <i className="handle h1" /><i className="handle h2" /><i className="handle h3" /><i className="handle h4" />
-              <span className="selection-size">684 × 428</span>
-              <span className="drawn-rectangle" />
-              <span className="drawn-arrow">↗</span>
-              <span className="text-note">Pin this</span>
-            </div>
-            <div className="annotation-toolbar" aria-hidden="true"><span>▦</span><span>✎</span><span>□</span><span>↗</span><span>T</span><span className="tool-color" /></div>
-            <div className="demo-pin">
-              <div className="pin-top"><i /><i /><i /><span>{content.pinned}</span></div>
-              <div className="pin-art"><ShowcasePhoto src={showcaseImages[0].src} /></div>
-            </div>
-            <div className="demo-quality"><strong>8K</strong><span>Native → 8K</span></div>
-            <div className="demo-cursor" aria-hidden="true">↖</div>
-            <div className="demo-status" aria-live="polite"><span />{content.pinStatus[demoStep]}</div>
-          </div>
+          <CaptureDemoScene demoStep={demoStep} content={content} />
         </div>
         <div className="capability-rail">
           {content.features.slice(4).map(([title, body], index) => (
