@@ -25,6 +25,9 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 - 滚动截图期间在目标窗口右侧实时显示长图预览；预览窗口不会进入成品
 - 区域截图后直接贴屏，以及从剪贴板创建贴图
 - 3 秒延迟区域截图
+- 一键重复上次区域；方向键像素级移动选区，`Option` + 方向键调整尺寸，并可输入精确宽高或锁定比例
+- 截图完成后显示可关闭的快速结果浮层，可复制、保存、标注、贴屏或直接拖入其他 App
+- 支持从本地图片文件创建贴图，并提供 `pinboardshot://` URL Scheme 与 macOS 快捷指令动作
 - 区域截图时显示冻结的屏幕快照，避免 PinboardShot 自身遮罩和窗口进入成品
 - 框选后可通过八个控制点继续调整选区；双击选区可直接复制
 - 可选择是否在区域截图和全屏截图中包含鼠标指针
@@ -36,7 +39,9 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 
 区域框选完成后可直接进入标注模式，无需先保存文件。当前支持：
 
-- 马赛克、画笔、矩形、高亮、箭头和文字
+- 马赛克、画笔、矩形、椭圆、直线、编号、高亮、箭头和文字
+- 本机 OCR、取色，以及基于文字、条码和人脸检测结果的可预览智能脱敏
+- 裁剪与顺时针旋转
 - 自定义颜色和笔触粗细
 - 撤销、重做与清除全部标注
 - 已有文字可重新编辑、调整样式并拖动位置
@@ -49,6 +54,8 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 - 拖动贴图移动位置，拖动窗口边缘或使用触控板双指捏合，可按原始宽高比自由缩放
 - 可显示或隐藏全部贴图、关闭全部贴图，以及统一恢复鼠标交互
 - 支持按贴图切换鼠标穿透
+- 单张贴图可调透明度、锁定位置、限制到当前桌面空间或当前 App，并可在鼠标移入时自动暂隐
+- 支持 `⌘C`、`⌘S`、`⌘+`、`⌘-`、`⌘0` 与方向键操作贴图
 - 支持全局开启或关闭贴图阴影
 - 右键贴图可放大、缩小、一键恢复首次贴屏时的位置/尺寸/交互状态，以及复制、保存、切换鼠标穿透或关闭
 
@@ -58,7 +65,9 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 - 同一动作可以绑定多组快捷键
 - 自动拒绝冲突或不安全的全局快捷键；普通字母组合必须包含 `⌘`、`⌥` 或 `⌃`，也可直接使用功能键
 - 菜单会显示未能注册的快捷键，便于定位系统级冲突
-- 自动保留最近 50 张截图，可查看尺寸与时间并重新贴屏
+- 可配置保留 10–250 张截图及 1–90 天保留期；可查看、复制、保存、删除或重新贴屏
+- 可在本机为历史截图建立 OCR 索引并搜索识别文字
+- 可从多张历史截图创建横向、纵向或网格拼板，自定义背景、间距、圆角、阴影和标题
 - 可手动清空历史，或选择在退出应用时自动清理
 
 #### 系统集成与语言
@@ -94,7 +103,7 @@ PinboardShot 默认不启用任何全局快捷键，避免占用其他应用的�
 2. 框选结束后在原窗口内使用滚轮或触控板向下滚动；建议每次保留一部分可见内容，避免一次跨过整个画面。
 3. 在右侧预览中确认拼接结果，完成后点击“完成”；结果会复制到剪贴板并保留到截图历史。
 
-滚动截图适合网页、文档、聊天记录和代码等纵向内容。固定悬浮栏、视频、动画或快速跨页滚动可能妨碍重叠识别；出现匹配提示时请放慢滚动。为控制内存占用，单张长图最多生成 3200 万像素。
+滚动截图适合网页、文档、聊天记录和代码等纵向内容。固定悬浮栏、视频、动画或快速跨页滚动可能妨碍重叠识别；出现匹配提示时请放慢滚动。拼接像素使用自动清理的临时磁盘后备存储，避免长图在内存中保留两份；为避免占满临时磁盘，单张长图最多生成 2.5 亿像素（原始后备数据约 1 GB）。
 
 #### 使用贴图
 
@@ -105,7 +114,7 @@ PinboardShot 默认不启用任何全局快捷键，避免占用其他应用的�
 
 ### 设置项
 
-设置窗口分为快捷键、历史和偏好三个部分，可配置：
+设置窗口分为快捷键、历史、水印和偏好四个部分，可配置：
 
 - 全局快捷键与多组动作绑定
 - 截图输出清晰度、鼠标指针和进入动画
@@ -113,7 +122,9 @@ PinboardShot 默认不启用任何全局快捷键，避免占用其他应用的�
 - 登录时自动启动
 - 自动检查更新开关与检查周期
 - 退出时清空历史
+- 历史数量、保留期限、OCR 索引与快速结果浮层
 - 贴图阴影
+- 屏幕录制权限状态与修复入口
 
 选择 8K 输出时会显著增加内存占用、剪贴板体积和 PNG 编码时间；只有确实需要高分辨率成品时才建议启用。
 
@@ -236,6 +247,9 @@ Its core workflow is simple: capture content from the screen, annotate it when n
 - Show a live long-image preview to the right of the target window during scrolling capture; the preview window is excluded from the result.
 - Pin an area capture immediately, or create a pin from an image on the clipboard.
 - Start an area capture after a three-second delay.
+- Repeat the last region in one step. Move or resize the selection by pixels with the arrow keys, enter exact dimensions, or lock its aspect ratio.
+- Use the dismissible quick result overlay to copy, save, annotate, pin, or drag a finished capture into another app.
+- Create pins from local image files, use the `pinboardshot://` URL scheme, or run macOS Shortcuts actions.
 - Display a frozen screen snapshot while selecting an area so PinboardShot's own overlays and windows do not appear in the result.
 - Refine the selection with eight resize handles; double-click the selection to copy it immediately.
 - Choose whether the pointer is included in area and full-display captures.
@@ -247,7 +261,9 @@ Its core workflow is simple: capture content from the screen, annotate it when n
 
 After selecting an area, you can enter annotation mode directly without saving a file first. The current tools include:
 
-- Mosaic, pen, rectangle, highlight, arrow, and text.
+- Mosaic, pen, rectangle, ellipse, line, numbered step, highlight, arrow, and text.
+- On-device OCR, color picking, and previewable smart redaction based on detected text, barcodes, and faces.
+- Crop and rotate clockwise.
 - Custom colors and stroke widths.
 - Undo, redo, and clear-all actions.
 - Re-edit, restyle, and reposition existing text.
@@ -260,6 +276,8 @@ After selecting an area, you can enter annotation mode directly without saving a
 - Drag a pin to move it. Drag a window edge or use a two-finger trackpad pinch to resize it while preserving the original aspect ratio.
 - Show or hide all pins, close all pins, or restore pointer interaction for all pins at once.
 - Toggle click-through separately for each pin.
+- Tune a pin's opacity, lock its position, limit it to the current Space or app, or fade it temporarily on hover.
+- Operate pins with `⌘C`, `⌘S`, `⌘+`, `⌘-`, `⌘0`, and the arrow keys.
 - Enable or disable shadows for all pins.
 - Right-click a pin to zoom in, zoom out, restore its original position, size, and interaction state, or copy, save, toggle click-through, or close it.
 
@@ -269,7 +287,9 @@ After selecting an area, you can enter annotation mode directly without saving a
 - Assign multiple shortcuts to the same action.
 - Reject conflicting or unsafe global shortcuts automatically. Ordinary letter combinations must include `⌘`, `⌥`, or `⌃`; function keys can also be used directly.
 - Show shortcuts that could not be registered in the menu, making system-level conflicts easier to diagnose.
-- Keep the 50 most recent captures automatically, display their dimensions and timestamps, and pin them again.
+- Keep 10–250 captures for a configurable 1–90 day retention period, then inspect, copy, save, delete, or pin them again.
+- Build an on-device OCR index and search recognized text in capture history.
+- Combine history items into horizontal, vertical, or grid boards with configurable backgrounds, spacing, corners, shadows, and titles.
 - Clear history manually or choose to clear it automatically when the app quits.
 
 #### System integration and languages
@@ -305,7 +325,7 @@ Press `Esc` or right-click to cancel. The selection stage always exits after 12 
 2. Scroll down in the original window with a mouse wheel or trackpad. Keep part of the previous content visible between movements instead of jumping by a full page.
 3. Review the stitched result in the preview on the right, then choose Done. The result is copied to the clipboard and retained in capture history.
 
-Scrolling capture works well for webpages, documents, conversations, and code. Fixed floating bars, video, animation, or rapid page-sized scrolling can interfere with overlap detection; slow down when a matching warning appears. A single long image is limited to 32 million pixels to control memory usage.
+Scrolling capture works well for webpages, documents, conversations, and code. Fixed floating bars, video, animation, or rapid page-sized scrolling can interfere with overlap detection; slow down when a matching warning appears. Stitched pixels use automatically cleaned temporary disk backing so the long image is not retained twice in memory. A single long image is limited to 250 million pixels (about 1 GB of raw backing data) to avoid exhausting temporary storage.
 
 #### Using pins
 
@@ -316,7 +336,7 @@ Scrolling capture works well for webpages, documents, conversations, and code. F
 
 ### Settings
 
-The Settings window is divided into Shortcuts, History, and Preferences. It includes controls for:
+The Settings window is divided into Shortcuts, History, Watermark, and Preferences. It includes controls for:
 
 - Global shortcuts and multiple bindings per action.
 - Capture output quality, pointer inclusion, and the entrance animation.
@@ -324,7 +344,9 @@ The Settings window is divided into Shortcuts, History, and Preferences. It incl
 - Launch at login.
 - Automatic update checks and their interval.
 - Clearing history when the app quits.
+- History limits, retention, OCR indexing, and the quick result overlay.
 - Pin shadows.
+- Screen Recording permission status and recovery actions.
 
 Selecting 8K output significantly increases memory usage, clipboard size, and PNG encoding time. Enable it only when the final image genuinely requires that resolution.
 
