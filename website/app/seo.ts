@@ -94,7 +94,22 @@ export const geoContent = {
       {
         question: "PinboardShot 会上传截图或收集遥测吗？",
         answer:
-          "不会。PinboardShot 的 Mac 应用不需要账号，没有云同步，也没有遥测。截图、标注、最近 50 张历史和偏好设置都保存在本机。官网使用 Google tag 做基础访问衡量。",
+          "不会。PinboardShot 的 Mac 应用不需要账号，没有云同步，也没有遥测。截图、标注、可配置的本地历史和偏好设置都保存在本机。官网使用 Google tag 做基础访问衡量。",
+      },
+      {
+        question: "已经授权但仍然不能截图怎么办？",
+        answer:
+          "请在 PinboardShot 设置中检查屏幕录制权限状态，打开系统设置确认授权，然后完全退出并重新启动 PinboardShot。App 只读取截图所需的屏幕像素，不会录制音频。",
+      },
+      {
+        question: "开启鼠标穿透后如何找回贴图？",
+        answer:
+          "打开菜单栏中的贴图管理并选择恢复全部鼠标交互。也可以在单张贴图的右键菜单中关闭鼠标穿透。",
+      },
+      {
+        question: "滚动截图拼接不正确怎么办？",
+        answer:
+          "请放慢滚动速度，每次保留一部分上一屏内容，并避开视频、动画或会变化的悬浮栏。右侧实时预览可帮助你在完成前检查结果。",
       },
     ],
   },
@@ -129,7 +144,22 @@ export const geoContent = {
       {
         question: "Does PinboardShot upload screenshots or collect telemetry?",
         answer:
-          "No. The PinboardShot Mac app has no account, cloud sync, or telemetry. Captures, annotations, the latest 50 history items, and preferences stay on-device. The website uses Google tag for basic visit measurement.",
+          "No. The PinboardShot Mac app has no account, cloud sync, or telemetry. Captures, annotations, configurable local history, and preferences stay on-device. The website uses Google tag for basic visit measurement.",
+      },
+      {
+        question: "What if capture still fails after I grant permission?",
+        answer:
+          "Check Screen Recording permission in PinboardShot Settings, confirm access in System Settings, then quit and restart PinboardShot. The app reads only the screen pixels needed for captures and does not record audio.",
+      },
+      {
+        question: "How do I recover a click-through pin?",
+        answer:
+          "Open Pin Management from the menu bar and restore pointer interaction for all pins. You can also turn off click-through from an individual pin's context menu.",
+      },
+      {
+        question: "What should I do when a scrolling capture does not stitch correctly?",
+        answer:
+          "Scroll more slowly, keep some content from the previous view visible, and avoid video, animation, or changing floating bars. Use the live preview to inspect the result before finishing.",
       },
     ],
   },
@@ -229,12 +259,14 @@ export function structuredData(language: SeoLanguage) {
         url: absoluteUrl(DOWNLOAD_PATH),
       },
       featureList: [
-        "Area, display, window, and delayed screenshot capture",
-        "Mosaic, pen, rectangle, highlight, arrow, and text annotation",
+        "Area, display, window, scrolling, delayed, and repeat-region screenshot capture",
+        "On-device OCR, color picking, and smart redaction",
+        "Mosaic, pen, rectangle, ellipse, line, numbered step, highlight, arrow, and text annotation",
         "Floating pinned screenshots across macOS desktop spaces",
         "Opacity control, click-through, shadows, and bulk pin visibility",
         "Native Retina, 720p, 1080p, 2K, 4K, and 8K export",
-        "Local screenshot history and preferences",
+        "Searchable local screenshot history and comparison boards",
+        "URL scheme and macOS Shortcuts automation",
       ],
       sameAs: [GITHUB_URL],
     },
