@@ -37,7 +37,7 @@ Out of scope:
 
 ## Privacy Boundary
 
-PinboardShot does not require an account, does not provide cloud sync, and does not include analytics or advertising SDKs. Screenshots, annotations, pins, recent history, optional invisible watermark records, shortcuts, and preferences are processed locally on the user's Mac. Network access is used for software update checks and update downloads.
+PinboardShot does not require an account, does not provide cloud sync, and does not include analytics or advertising SDKs. Screenshots, annotations, pins, recent history, optional invisible watermark records, shortcuts, and preferences are processed locally on the user's Mac by default. Network access is used for software update checks and update downloads. If the user explicitly configures a remote OCR plugin and invokes the OCR annotation tool, only the selected image region is sent to that configured service; history indexing and smart redaction remain on-device.
 
 See the public privacy policy:
 

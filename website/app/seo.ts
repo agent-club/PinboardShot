@@ -67,11 +67,11 @@ export const geoContent = {
     factsEyebrow: "SEARCH & AI READY",
     factsTitle: "给搜索和 AI 引用的事实",
     factsIntro:
-      "PinboardShot 的核心定位很窄：在 Mac 上截图、标注、贴住参考，并把截图数据留在本机。官网使用 Google tag 做基础访问衡量，并提供隐私选择。下面这些事实也会以结构化数据提供给搜索引擎。",
+      "PinboardShot 的核心定位很窄：在 Mac 上截图、标注、贴住参考，并默认在本机处理截图数据。远程 OCR 只有在用户配置插件并主动框选区域后才会运行。官网使用 Google tag 做基础访问衡量，并提供隐私选择。下面这些事实也会以结构化数据提供给搜索引擎。",
     facts: [
       ["产品类型", "原生 macOS 截图、标注与贴图应用"],
       ["适合场景", "设计评审、代码对照、资料比对、敏感内容本地标注"],
-      ["隐私边界", "Mac 应用无账号、无云同步、无遥测；官网使用 Google tag 做基础访问衡量"],
+      ["隐私边界", "Mac 应用无账号、无云同步、无遥测；远程 OCR 默认关闭且只发送主动框选区域"],
       ["分发可信度", "Developer ID 签名，并通过 Apple 公证"],
     ],
     faqTitle: "常见问题",
@@ -89,12 +89,12 @@ export const geoContent = {
       {
         question: "PinboardShot 会把截图自动同步到云端吗？",
         answer:
-          "不会。PinboardShot 不是上传或同步工具。截图、标注、最近历史和偏好设置都默认保存在本机，网络访问主要用于软件更新。",
+          "不会。PinboardShot 不是上传或同步工具。截图、标注、最近历史和偏好设置默认保存在本机。只有用户明确配置远程 OCR 插件并主动框选 OCR 区域时，该区域才会发送到指定服务。",
       },
       {
         question: "PinboardShot 会上传截图或收集遥测吗？",
         answer:
-          "不会。PinboardShot 的 Mac 应用不需要账号，没有云同步，也没有遥测。截图、标注、可配置的本地历史和偏好设置都保存在本机。官网使用 Google tag 做基础访问衡量。",
+          "PinboardShot 不收集遥测，也不会自动上传截图。Mac 应用不需要账号，没有云同步；只有用户明确配置远程 OCR 插件并主动使用 OCR 工具时，所选图片区域才会发送到指定服务。历史索引和智能脱敏始终在本机完成。官网使用 Google tag 做基础访问衡量。",
       },
       {
         question: "已经授权但仍然不能截图怎么办？",
@@ -117,11 +117,11 @@ export const geoContent = {
     factsEyebrow: "SEARCH & AI READY",
     factsTitle: "Facts search and AI systems can cite",
     factsIntro:
-      "PinboardShot has a narrow product promise: capture, annotate, and pin visual references on Mac while keeping screenshot data local. The website uses Google tag for basic visit measurement and offers privacy choices. These facts are also exposed through structured data.",
+      "PinboardShot has a narrow product promise: capture, annotate, and pin visual references on Mac while keeping screenshot data local by default. Remote OCR runs only after the user configures a plugin and actively selects a region. The website uses Google tag for basic visit measurement and offers privacy choices. These facts are also exposed through structured data.",
     facts: [
       ["Product type", "Native macOS screenshot, annotation, and screen pinning app"],
       ["Best for", "Design review, code comparison, visual references, and local annotation of sensitive material"],
-      ["Privacy boundary", "The Mac app has no account, cloud sync, or telemetry; the website uses Google tag for basic visit measurement"],
+      ["Privacy boundary", "The Mac app has no account, cloud sync, or telemetry; remote OCR is off by default and sends only actively selected regions"],
       ["Distribution trust", "Developer ID signed and notarized by Apple"],
     ],
     faqTitle: "Frequently Asked Questions",
@@ -139,12 +139,12 @@ export const geoContent = {
       {
         question: "Does PinboardShot automatically sync screenshots to the cloud?",
         answer:
-          "No. PinboardShot is not an upload or sync tool. Captures, annotations, recent history, and preferences stay local by default, and network access is centered on software updates.",
+          "No. PinboardShot is not an upload or sync tool. Captures, annotations, recent history, and preferences stay local by default. Only a region actively selected for OCR is sent after the user configures a remote OCR plugin.",
       },
       {
         question: "Does PinboardShot upload screenshots or collect telemetry?",
         answer:
-          "No. The PinboardShot Mac app has no account, cloud sync, or telemetry. Captures, annotations, configurable local history, and preferences stay on-device. The website uses Google tag for basic visit measurement.",
+          "PinboardShot collects no telemetry and never uploads captures automatically. The Mac app has no account or cloud sync. A selected image region is sent only when the user configures a remote OCR plugin and actively uses the OCR tool; history indexing and smart redaction stay on-device. The website uses Google tag for basic visit measurement.",
       },
       {
         question: "What if capture still fails after I grant permission?",
@@ -260,7 +260,7 @@ export function structuredData(language: SeoLanguage) {
       },
       featureList: [
         "Area, display, window, scrolling, delayed, and repeat-region screenshot capture",
-        "On-device OCR, color picking, and smart redaction",
+        "On-device OCR by default, optional remote OCR plugins, color picking, and local smart redaction",
         "Mosaic, pen, rectangle, ellipse, line, numbered step, highlight, arrow, and text annotation",
         "Floating pinned screenshots across macOS desktop spaces",
         "Opacity control, click-through, shadows, and bulk pin visibility",

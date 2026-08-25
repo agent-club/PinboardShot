@@ -72,7 +72,7 @@ test("server-renders the PinboardShot download page", async () => {
   assert.match(html, /href="https:\/\/github\.com\/agent-club\/PinboardShot"/i);
   assert.doesNotMatch(html, /Not notarized|未经 Apple 公证/i);
   assert.ok(html.includes(currentRelease.version));
-  assert.match(html, /Your screenshots stay|你的截图/);
+  assert.match(html, /Remote OCR is your choice|远程 OCR 由你决定/);
   assert.match(html, /href="\/privacy"/i);
   assert.match(html, /自有照片与界面示意素材|owned photos and interface mockups/i);
   assert.match(html, /Apple Inc\./i);
@@ -113,7 +113,7 @@ test("server-renders substantial localized Chinese HTML", async () => {
   assert.ok(text.length > 3000);
   assert.match(text, /截图，然后/);
   assert.match(text, /原生 macOS 截图、标注与贴图工具/);
-  assert.match(text, /你的截图，\s*只留在你的 Mac/);
+  assert.match(text, /默认本机处理，\s*远程 OCR 由你决定/);
   assert.match(text, /PinboardShot 是什么？/);
 });
 
@@ -137,7 +137,7 @@ test("server-renders the localized English page", async () => {
   assert.ok(text.length > 3000);
   assert.match(text, /Capture it\. Keep it in sight\./);
   assert.match(text, /native capture, annotation, and pinboard tool for macOS/i);
-  assert.match(text, /Your screenshots stay on your Mac\./);
+  assert.match(text, /Local by default\. Remote OCR is your choice\./);
 });
 
 test("server-renders the privacy policy", async () => {
@@ -152,9 +152,11 @@ test("server-renders the privacy policy", async () => {
   assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/privacy"/i);
   assert.match(html, /property="og:url" content="https:\/\/pinboardshot\.agentclub\.dev\/privacy"/i);
   assert.match(html, /property="og:locale" content="en_US"/i);
-  assert.match(html, /Last updated:<\/strong>\s*(?:<!-- -->)?July 25, 2026/i);
-  assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 7 月 25 日/i);
+  assert.match(html, /Last updated:<\/strong>\s*(?:<!-- -->)?August 23, 2026/i);
+  assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 8 月 23 日/i);
   assert.match(html, /does not include analytics or advertising SDKs/i);
+  assert.match(html, /remote OCR plugin/i);
+  assert.match(html, /API Keys are stored in macOS Keychain/i);
   assert.match(html, /The website uses Google tag for basic visit measurement/i);
   assert.match(html, /Analytics storage is enabled by default/i);
   assert.match(html, /do not\s+(?:<!-- -->)?enable ad personalization/i);

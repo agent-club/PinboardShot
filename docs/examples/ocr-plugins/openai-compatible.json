@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "example.openai-compatible-ocr",
+  "name": "Example OpenAI-compatible OCR",
+  "endpoint": "/chat/completions",
+  "authentication": {
+    "header": "Authorization",
+    "prefix": "Bearer "
+  },
+  "request": {
+    "model": "{{model}}",
+    "messages": [
+      {
+        "role": "user",
+        "content": [
+          {
+            "type": "text",
+            "text": "Perform OCR on this image. Return only the recognized text, preserving reading order and line breaks."
+          },
+          {
+            "type": "image_url",
+            "image_url": {
+              "url": "{{imageDataURL}}"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "responseTextPath": "choices.0.message.content",
+  "defaultBaseURL": "",
+  "defaultModel": ""
+}
