@@ -1,44 +1,44 @@
 {
-  "version": "0.6.0",
-  "build": "39",
-  "date": "2026.08.16",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.6.0",
+  "version": "0.6.1",
+  "build": "40",
+  "date": "2026.08.25",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.6.1",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.6.0-39.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.6.0/PinboardShot-0.6.0-39.dmg",
-      "sha256": "7441783eb6ec72fa21345ce3afd81d7bc97989a2ab7ee0bff94d8e8acc7e5465"
+      "name": "PinboardShot-0.6.1-40.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.6.1/PinboardShot-0.6.1-40.dmg",
+      "sha256": "1a6b0f8c8b5d41bb68016905bac6ab37edcb252b7c6c0a267357de2021ab7fc2"
     },
     "zip": {
-      "name": "PinboardShot-0.6.0-39.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.6.0/PinboardShot-0.6.0-39.zip",
-      "sha256": "d383dd697fbf108df70bf814a64defa60acec61cb505082dfd3e1a72aab8571d"
+      "name": "PinboardShot-0.6.1-40.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.6.1/PinboardShot-0.6.1-40.zip",
+      "sha256": "023a4185305be1dc651f5646d4e89a77ef44921a8b5dc4a66317d17892839b6d"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.6.0/appcast.xml",
-      "sha256": "dcee1bc591ac2eb2d5fce4d5c7a80a047e255adfe8216c907e3116e0b80c49eb"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.6.1/appcast.xml",
+      "sha256": "355874b6162ed0dfe32f14062ef9ee33094ec687ac0d8cdead9d33ea93dda4b7"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "更完整的本机截图工作流",
+    "title": "可配置的 OCR 插件",
     "changes": [
-      "新增重复上次区域、精确宽高、比例锁定、键盘微调和截图后快速结果浮层",
-      "扩展本机标注与识别能力，加入 OCR、裁剪旋转、更多图形工具及文字、条码和人脸智能脱敏",
-      "贴图支持导入图片、透明度与显示范围控制；历史支持保留策略、OCR 搜索和多图拼板",
-      "提供 URL Scheme 与 macOS 快捷指令自动化入口，并完善截图工具栏和拖拽交互",
+      "新增 OCR 插件设置，可配置 Base URL、模型和 API Key，并支持导入声明式 JSON 插件",
+      "内置 OpenAI-compatible 请求模板；API Key 保存在 macOS 钥匙串中，不写入插件文件",
+      "远程 OCR 只处理用户主动框选的标注区域；默认 OCR、历史搜索与智能脱敏继续使用本机 Vision",
+      "远程请求限制为 HTTPS（localhost 除外），并加入同源重定向、超时及请求/响应大小限制",
       "应用、Sparkle 更新 ZIP 和手动安装 DMG 均已签名并通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "A more complete on-device capture workflow",
+    "title": "Configurable OCR plugins",
     "changes": [
-      "Adds repeat-region capture, exact dimensions, aspect locking, keyboard adjustments, and a quick result overlay after capture.",
-      "Expands on-device annotation and recognition with OCR, crop and rotate, more drawing tools, and smart redaction for text, barcodes, and faces.",
-      "Pins gain image import, opacity, and visibility controls; history gains retention options, OCR search, and multi-image boards.",
-      "Adds URL scheme and macOS Shortcuts automation while refining the capture toolbar and drag interactions.",
+      "Adds OCR plugin settings for a Base URL, model, and API key, plus importable declarative JSON plugins.",
+      "Includes an OpenAI-compatible request template; API keys stay in the macOS Keychain instead of plugin files.",
+      "Remote OCR only processes annotation regions explicitly selected by the user; default OCR, history search, and smart redaction remain on-device with Vision.",
+      "Remote requests require HTTPS except for localhost and enforce same-origin redirects, timeouts, and request/response size limits.",
       "The app, Sparkle update ZIP, and manual-install DMG are signed and notarized by Apple."
     ]
   }

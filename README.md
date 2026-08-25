@@ -40,7 +40,7 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 区域框选完成后可直接进入标注模式，无需先保存文件。当前支持：
 
 - 马赛克、画笔、矩形、椭圆、直线、编号、高亮、箭头和文字
-- 本机 OCR、取色，以及基于文字、条码和人脸检测结果的可预览智能脱敏
+- 默认使用本机 OCR，也可为主动框选的 OCR 区域配置声明式远程插件；取色、历史索引和基于文字、条码、人脸的智能脱敏仍在本机完成
 - 裁剪与顺时针旋转
 - 自定义颜色和笔触粗细
 - 撤销、重做与清除全部标注
@@ -189,7 +189,7 @@ xcrun notarytool store-credentials "PinboardShot-notary"
 ~/Library/Application Support/PinboardShot/History
 ```
 
-PinboardShot 仅为检查和下载软件更新访问网络，不上传截图，也不包含遥测或分析服务。历史可以在设置中手动清空，或配置为退出应用时自动清理。
+PinboardShot 默认仅为检查和下载软件更新访问网络，也不包含遥测或分析服务。只有当用户明确选择并配置远程 OCR 插件、随后主动使用 OCR 标注工具时，所框选的图片区域才会发送到用户指定的 OCR 服务；API Key 保存在 macOS 钥匙串中。历史 OCR 索引与智能脱敏始终在本机执行。历史可以在设置中手动清空，或配置为退出应用时自动清理。OCR 插件格式见 [`docs/ocr-plugins.md`](docs/ocr-plugins.md)。
 
 ### 隐私与安全背书
 
@@ -262,7 +262,7 @@ Its core workflow is simple: capture content from the screen, annotate it when n
 After selecting an area, you can enter annotation mode directly without saving a file first. The current tools include:
 
 - Mosaic, pen, rectangle, ellipse, line, numbered step, highlight, arrow, and text.
-- On-device OCR, color picking, and previewable smart redaction based on detected text, barcodes, and faces.
+- On-device OCR by default, with optional declarative remote plugins for actively selected OCR regions. Color picking, history indexing, and smart redaction based on text, barcodes, and faces remain on-device.
 - Crop and rotate clockwise.
 - Custom colors and stroke widths.
 - Undo, redo, and clear-all actions.
@@ -405,7 +405,7 @@ Capture history is stored at:
 ~/Library/Application Support/PinboardShot/History
 ```
 
-PinboardShot accesses the network only to check for and download software updates. It does not upload captures and contains no telemetry or analytics services. History can be cleared manually in Settings or configured to clear automatically when the app quits.
+By default, PinboardShot accesses the network only to check for and download software updates, and it contains no telemetry or analytics services. A selected image region is sent only after the user explicitly selects and configures a remote OCR plugin and then actively uses the OCR annotation tool. API Keys stay in macOS Keychain. History OCR indexing and smart redaction always remain on-device. History can be cleared manually in Settings or configured to clear automatically when the app quits. See [`docs/ocr-plugins.md`](docs/ocr-plugins.md) for the plugin format.
 
 ### Privacy and Security Signals
 

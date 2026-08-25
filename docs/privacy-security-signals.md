@@ -65,7 +65,7 @@ Recommended path:
 2. Submit a concise description of the app's threat model:
    - local-first screenshot, annotation, and pinning;
    - no account, cloud sync, telemetry, advertising SDK, or analytics service;
-   - network access limited to update checks and downloads;
+   - network access limited to update checks and downloads by default, plus user-configured remote OCR for explicitly selected regions;
    - Developer ID signing, Apple notarization, and Sparkle update signatures for public releases.
 3. Be explicit about limits:
    - screenshots shared through other apps are controlled by the user and destination service;
