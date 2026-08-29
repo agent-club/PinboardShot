@@ -58,6 +58,9 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 - 支持 `⌘C`、`⌘S`、`⌘+`、`⌘-`、`⌘0` 与方向键操作贴图
 - 支持全局开启或关闭贴图阴影
 - 右键贴图可放大、缩小、一键恢复首次贴屏时的位置/尺寸/交互状态，以及复制、保存、切换鼠标穿透或关闭
+- 右键贴图可与另一张贴图进行并排、差异或混合对比
+- 每张贴图可添加备注与标签，并随贴图工作区和会话恢复快照保存
+- 贴图工作区支持搜索、排序、重命名、复制、最近工作区恢复，以及图片、PDF、Markdown 导出
 
 #### 快捷键与历史
 
@@ -66,9 +69,10 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 - 自动拒绝冲突或不安全的全局快捷键；普通字母组合必须包含 `⌘`、`⌥` 或 `⌃`，也可直接使用功能键
 - 菜单会显示未能注册的快捷键，便于定位系统级冲突
 - 可配置保留 10–250 张截图及 1–90 天保留期；可查看、复制、保存、删除或重新贴屏
-- 可在本机为历史截图建立 OCR 索引并搜索识别文字
+- 可在本机为历史截图建立 OCR 索引并搜索识别文字，同时查看状态、复制文字、打开详情或重试失败识别
 - 可从多张历史截图创建横向、纵向或网格拼板，自定义背景、间距、圆角、阴影和标题
-- 可手动清空历史，或选择在退出应用时自动清理
+- 可手动清空历史、按时间清理或选择在退出应用时自动清理，并可预览存储占用和排除指定来源 App
+- 可选择开启崩溃/重启后的贴图会话恢复；默认关闭，恢复快照最长保留 24 小时
 
 #### 系统集成与语言
 
@@ -280,6 +284,9 @@ After selecting an area, you can enter annotation mode directly without saving a
 - Operate pins with `⌘C`, `⌘S`, `⌘+`, `⌘-`, `⌘0`, and the arrow keys.
 - Enable or disable shadows for all pins.
 - Right-click a pin to zoom in, zoom out, restore its original position, size, and interaction state, or copy, save, toggle click-through, or close it.
+- Compare a pin with another pin side by side, as a difference view, or with an adjustable blend from the context menu.
+- Add notes and tags to each pin and preserve them in workspaces and session-recovery snapshots.
+- Search, sort, rename, duplicate, and restore recent pin workspaces, or export them as images, PDF, or Markdown.
 
 #### Shortcuts and history
 
@@ -288,9 +295,10 @@ After selecting an area, you can enter annotation mode directly without saving a
 - Reject conflicting or unsafe global shortcuts automatically. Ordinary letter combinations must include `⌘`, `⌥`, or `⌃`; function keys can also be used directly.
 - Show shortcuts that could not be registered in the menu, making system-level conflicts easier to diagnose.
 - Keep 10–250 captures for a configurable 1–90 day retention period, then inspect, copy, save, delete, or pin them again.
-- Build an on-device OCR index and search recognized text in capture history.
+- Build an on-device OCR index, search recognized text, inspect recognition status, copy text, open details, or retry failed recognition.
 - Combine history items into horizontal, vertical, or grid boards with configurable backgrounds, spacing, corners, shadows, and titles.
-- Clear history manually or choose to clear it automatically when the app quits.
+- Clear history manually, by age, or automatically when the app quits; preview storage usage and exclude selected source apps.
+- Optionally recover pin sessions after a crash or restart. Recovery is off by default, and snapshots are retained for at most 24 hours.
 
 #### System integration and languages
 
