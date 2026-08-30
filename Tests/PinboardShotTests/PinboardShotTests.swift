@@ -1898,8 +1898,9 @@ func selectionToolbarUsesCenteredAccessibleIcons() throws {
     let mosaic = try #require(buttons.first { $0.toolTip == L10n.text(AnnotationTool.mosaic.titleKey) })
     let pen = try #require(buttons.first { $0.toolTip == L10n.text(AnnotationTool.pen.titleKey) })
     let clear = try #require(buttons.first { $0.toolTip == L10n.text("annotation.clear") })
-    let colorWell = try #require(stack.arrangedSubviews.compactMap { $0 as? NSColorWell }.first)
-    let widthControl = try #require(stack.arrangedSubviews.compactMap { $0 as? OverlayWidthControl }.first)
+    let stylePalette = try #require(view.subviews.compactMap { $0 as? AnnotationStylePaletteView }.first)
+    let colorWell = stylePalette.colorWell
+    let widthControl = stylePalette.widthControl
 
     #expect(!toolbar.isHidden)
     #expect(toolbar.frame.minX >= 12)
@@ -1907,35 +1908,32 @@ func selectionToolbarUsesCenteredAccessibleIcons() throws {
     #expect(toolbar.frame.maxY < 150)
     #expect(toolbar.frame.width < 460)
     #expect(stack.distribution == .equalSpacing)
-    #expect(visibleButtons.count == 10)
+    #expect(visibleButtons.count == 13)
     #expect(Array(visibleButtons.prefix(AnnotationTool.selectionTools.count)).map { $0.accessibilityLabel() ?? "" } ==
         AnnotationTool.selectionTools.map { L10n.text($0.titleKey) })
     #expect(!visibleButtons.contains { $0.accessibilityLabel() == L10n.text("overlay.edit") })
     #expect(!visibleButtons.contains { $0.accessibilityLabel() == L10n.text("overlay.finishEditing") })
     #expect(dragHandle.accessibilityLabel() == L10n.text("overlay.dragToolbar"))
-    #expect(colorWell.isHidden)
+    #expect(stylePalette.isHidden)
     #expect(stack.arrangedSubviews.compactMap { $0 as? NSPopUpButton }.allSatisfy { $0.isHidden })
-    #expect(widthControl.isHidden)
-    #expect(clear.isHidden)
+    #expect(!clear.isHidden)
     #expect(!clear.isEnabled)
     #expect(separators.filter { !$0.isHidden }.count == 2)
     #expect(copy.isPrimaryActionStyle)
     #expect(SelectionToolbarAction.copy.iconDefaultsKey == "selectionToolbar.icon.copy")
     #expect(buttons.allSatisfy { $0.image != nil && !($0.toolTip ?? "").isEmpty })
-    let penIndex = try #require(stack.arrangedSubviews.firstIndex { $0 === pen })
-    let colorIndex = try #require(stack.arrangedSubviews.firstIndex { $0 === colorWell })
-    let widthIndex = try #require(stack.arrangedSubviews.firstIndex { $0 === widthControl })
-
-    #expect(colorIndex == penIndex + 1)
-    #expect(widthIndex == colorIndex + 1)
     #expect(widthControl.value == AnnotationStyleSettings.defaultBrushPixelWidth(for: .mosaic))
     #expect(widthControl.accessibilityLabel() == L10n.text("annotation.width"))
     #expect(mosaic.state == .off)
     pen.performClick(nil)
     let canvas = try #require(view.subviews.compactMap { $0 as? AnnotationCanvasView }.first)
     #expect(!canvas.isHidden)
-    #expect(toolbar.frame.width > 520)
+    #expect(toolbar.frame.width < 460)
     #expect(buttons.filter { !$0.isHidden }.count == 13)
+    #expect(!stylePalette.isHidden)
+    #expect(widthControl.choices == [2, 3, 4, 6, 10])
+    #expect(stylePalette.frame.maxY <= toolbar.frame.minY || stylePalette.frame.minY >= toolbar.frame.maxY)
+    #expect(abs(stylePalette.frame.midX - pen.convert(pen.bounds, to: view).midX) < 120)
     #expect(!colorWell.isHidden)
     #expect(!widthControl.isHidden)
     #expect(!clear.isHidden)
@@ -1945,9 +1943,8 @@ func selectionToolbarUsesCenteredAccessibleIcons() throws {
     #expect(mosaic.state == .off)
     pen.performClick(nil)
     #expect(canvas.isHidden)
-    #expect(colorWell.isHidden)
-    #expect(widthControl.isHidden)
-    #expect(clear.isHidden)
+    #expect(stylePalette.isHidden)
+    #expect(!clear.isHidden)
     #expect(pen.state == .off)
     #expect(!pen.isSelectedStyle)
     for button in buttons where !button.isHidden {
@@ -2285,7 +2282,8 @@ func selectionToolbarPersistsAnnotationWidth() {
 
     let toolbar = view.subviews.compactMap { $0 as? NSVisualEffectView }.first!
     let stack = toolbar.subviews.compactMap { $0 as? NSStackView }.first!
-    let widthControl = stack.arrangedSubviews.compactMap { $0 as? OverlayWidthControl }.first!
+    let stylePalette = view.subviews.compactMap { $0 as? AnnotationStylePaletteView }.first!
+    let widthControl = stylePalette.widthControl
     #expect(widthControl.value == 14)
 
     widthControl.value = 22
@@ -2312,7 +2310,8 @@ func selectionToolbarPersistsAnnotationWidth() {
 
     let nextToolbar = nextView.subviews.compactMap { $0 as? NSVisualEffectView }.first!
     let nextStack = nextToolbar.subviews.compactMap { $0 as? NSStackView }.first!
-    let nextWidthControl = nextStack.arrangedSubviews.compactMap { $0 as? OverlayWidthControl }.first!
+    let nextStylePalette = nextView.subviews.compactMap { $0 as? AnnotationStylePaletteView }.first!
+    let nextWidthControl = nextStylePalette.widthControl
     #expect(nextWidthControl.value == 22)
     let nextArrow = nextStack.arrangedSubviews.compactMap { $0 as? OverlayToolbarButton }
         .first { $0.toolTip == L10n.text(AnnotationTool.arrow.titleKey) }!
@@ -2375,6 +2374,7 @@ func selectionToolbarOCRStartsAnnotationMode() {
 
     let toolbar = view.subviews.compactMap { $0 as? NSVisualEffectView }.first!
     let stack = toolbar.subviews.compactMap { $0 as? NSStackView }.first!
+    let stylePalette = view.subviews.compactMap { $0 as? AnnotationStylePaletteView }.first!
     let ocr = stack.arrangedSubviews.compactMap { $0 as? OverlayToolbarButton }
         .first { $0.toolTip == L10n.text(AnnotationTool.ocr.titleKey) }!
     ocr.performClick(nil)
@@ -2383,11 +2383,12 @@ func selectionToolbarOCRStartsAnnotationMode() {
     #expect(recorder.completedRect == nil)
     #expect(!canvas.isHidden)
     #expect(ocr.isSelectedStyle)
+    #expect(stylePalette.isHidden)
 }
 
-@Test("选区工具栏左侧把手可拖拽且不替换选区")
+@Test("选区工具栏末端移动把手可拖拽且不替换选区")
 @MainActor
-func selectionToolbarDragHandleMovesToolbarWithoutReplacingSelection() {
+func selectionToolbarDragHandleMovesToolbarWithoutReplacingSelection() throws {
     let view = SelectionOverlayView(frame: CGRect(x: 0, y: 0, width: 900, height: 600))
     let recorder = SelectionCompletionRecorder()
     view.delegate = recorder
@@ -2403,7 +2404,13 @@ func selectionToolbarDragHandleMovesToolbarWithoutReplacingSelection() {
     #expect((dragGlyph?.image?.size.width ?? 0) > 0)
     #expect((dragGlyph?.image?.size.height ?? 0) > 0)
     #expect(dragGlyph?.contentTintColor == .secondaryLabelColor)
-    #expect(handle.bounds.width == 16)
+    #expect(handle.bounds.width == 20)
+    let handleIndex = try #require(stack.arrangedSubviews.firstIndex { $0 === handle })
+    let cancel = stack.arrangedSubviews.compactMap { $0 as? OverlayToolbarButton }
+        .first { $0.toolTip == L10n.text("overlay.cancelTooltip") }!
+    let cancelIndex = try #require(stack.arrangedSubviews.firstIndex { $0 === cancel })
+    #expect(handleIndex < cancelIndex)
+    #expect(handleIndex > AnnotationTool.selectionTools.count - 1)
     let originalFrame = toolbar.frame
     let start = handle.convert(CGPoint(x: handle.bounds.midX, y: handle.bounds.midY), to: view)
     handle.mouseDown(with: mouseEvent(.leftMouseDown, at: start, timestamp: 2))
@@ -2578,13 +2585,15 @@ func expandedAnnotationToolbarPreservesStyleBeforeToolSelection() {
 
     let toolbar = view.subviews.compactMap { $0 as? NSVisualEffectView }.first!
     let stack = toolbar.subviews.compactMap { $0 as? NSStackView }.first!
-    let colorWell = stack.arrangedSubviews.compactMap { $0 as? NSColorWell }.first!
-    let widthControl = stack.arrangedSubviews.compactMap { $0 as? OverlayWidthControl }.first!
+    let stylePalette = view.subviews.compactMap { $0 as? AnnotationStylePaletteView }.first!
+    let widthControl = stylePalette.widthControl
     let pen = stack.arrangedSubviews.compactMap { $0 as? OverlayToolbarButton }
         .first { $0.toolTip == L10n.text(AnnotationTool.pen.titleKey) }!
     pen.performClick(nil)
-    colorWell.color = .systemBlue
-    colorWell.sendAction(colorWell.action, to: colorWell.target)
+    let blueSwatch = stylePalette.swatchButtons.first {
+        AnnotationColor($0.swatchColor) == AnnotationColor(.systemBlue)
+    }!
+    blueSwatch.performClick(nil)
     widthControl.value = 18
     widthControl.sendAction(widthControl.action, to: widthControl.target)
     let canvas = view.subviews.compactMap { $0 as? AnnotationCanvasView }.first!
@@ -2595,6 +2604,173 @@ func expandedAnnotationToolbarPreservesStyleBeforeToolSelection() {
     let stroke = view.annotations.first!
     #expect(stroke.color == AnnotationColor(.systemBlue))
     #expect(abs(stroke.width - 0.06) < 0.0001)
+}
+
+@Test("二级粗细控件可通过真实命中点击更新当前工具")
+@MainActor
+func annotationStylePaletteWidthControlHandlesPointerClick() throws {
+    let suiteName = "PinboardShotSecondaryWidthTests.\(UUID().uuidString)"
+    let defaults = try #require(UserDefaults(suiteName: suiteName))
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    let size = CGSize(width: 800, height: 600)
+    let image = solidImage(size: size, color: .white)
+    var proposedRect = CGRect(origin: .zero, size: size)
+    let view = SelectionOverlayView(frame: CGRect(origin: .zero, size: size))
+    view.previewSourceImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil)
+    view.previewImage = image
+    view.annotationStyleDefaults = defaults
+    let window = NSWindow(
+        contentRect: CGRect(origin: .zero, size: size),
+        styleMask: .borderless,
+        backing: .buffered,
+        defer: false
+    )
+    window.contentView = view
+
+    view.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 100, y: 100), timestamp: 1))
+    view.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 500, y: 400), timestamp: 1.1))
+    view.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 500, y: 400), timestamp: 1.2))
+    let toolbar = try #require(view.subviews.compactMap { $0 as? OverlayToolbarView }.first)
+    let stack = try #require(toolbar.subviews.compactMap { $0 as? NSStackView }.first)
+    let arrow = try #require(stack.arrangedSubviews.compactMap { $0 as? OverlayToolbarButton }
+        .first { $0.toolTip == L10n.text(AnnotationTool.arrow.titleKey) })
+    arrow.performClick(nil)
+    let palette = try #require(view.subviews.compactMap { $0 as? AnnotationStylePaletteView }.first)
+    view.layoutSubtreeIfNeeded()
+    #expect(!palette.isHidden)
+    #expect(palette.alphaValue > 0)
+    let control = palette.widthControl
+    let localPoint = CGPoint(x: control.bounds.maxX - 13, y: control.bounds.midY)
+    let windowPoint = control.convert(localPoint, to: nil)
+    let viewPoint = control.convert(localPoint, to: view)
+    let palettePoint = control.convert(localPoint, to: palette)
+    #expect(palette.frame.contains(viewPoint))
+    #expect(palette.bounds.contains(palettePoint))
+    #expect(palette.hitTest(palettePoint) === control)
+    let canvas = try #require(view.subviews.compactMap { $0 as? AnnotationCanvasView }.first)
+    let paletteIndex = try #require(view.subviews.firstIndex { $0 === palette })
+    let canvasIndex = try #require(view.subviews.firstIndex { $0 === canvas })
+    #expect(paletteIndex > canvasIndex)
+    #expect(view.hitTest(viewPoint) === control)
+    let event = try #require(NSEvent.mouseEvent(
+        with: .leftMouseDown,
+        location: windowPoint,
+        modifierFlags: [],
+        timestamp: 2,
+        windowNumber: window.windowNumber,
+        context: nil,
+        eventNumber: 0,
+        clickCount: 1,
+        pressure: 1
+    ))
+    control.mouseDown(with: event)
+
+    #expect(control.value == 8)
+    #expect(AnnotationStyleSettings.brushPixelWidth(for: .arrow, defaults: defaults) == 8)
+}
+
+@Test("二级粗细控件为每种标注工具提供五档且包含默认值")
+@MainActor
+func annotationStylePaletteOffersFiveWidthChoicesPerTool() {
+    let control = OverlayWidthControl(frame: .zero)
+    for tool in AnnotationTool.allCases {
+        control.configure(for: tool)
+        #expect(control.choices.count == 5)
+        #expect(control.choices == control.choices.sorted())
+        #expect(control.choices.contains(AnnotationStyleSettings.defaultBrushPixelWidth(for: tool)))
+        let diameters = control.choices.map { control.previewDiameter(for: $0) }
+        #expect(diameters == diameters.sorted())
+        let expectedMinimumDiameter: CGFloat = tool == .mosaic ? 8 : 5
+        #expect(abs((diameters.first ?? 0) - expectedMinimumDiameter) < 0.001)
+        #expect(abs((diameters.last ?? 0) - 14) < 0.001)
+    }
+
+    control.configure(for: .mosaic)
+    #expect(control.choices == [10, 14, 18, 24, 32])
+    control.configure(for: .arrow)
+    #expect(control.choices.map { control.previewDiameter(for: $0) } == [5, 6.5, 8, 11, 14])
+}
+
+@Test("箭头二级栏保留普通模式并可切换自由模式")
+@MainActor
+func annotationStylePaletteShowsArrowDrawingModesOnlyForArrow() {
+    let colorWell = AnchoredColorWell(frame: CGRect(x: 0, y: 0, width: 24, height: 24))
+    let widthControl = OverlayWidthControl(frame: .zero)
+    let modeControl = NSSegmentedControl(
+        images: AnnotationArrowMode.allCases.map { _ in NSImage(size: CGSize(width: 16, height: 16)) },
+        trackingMode: .selectOne,
+        target: nil,
+        action: nil
+    )
+    let target = NSObject()
+    let palette = AnnotationStylePaletteView(
+        colorWell: colorWell,
+        widthControl: widthControl,
+        arrowModeControl: modeControl,
+        target: target,
+        colorAction: NSSelectorFromString("noop:")
+    )
+
+    palette.update(tool: .arrow, color: .systemRed, width: 4, arrowMode: .freehand)
+    #expect(!modeControl.isHidden)
+    #expect(modeControl.selectedSegment == AnnotationArrowMode.freehand.rawValue)
+    #expect(palette.frame.width == 372)
+
+    palette.update(tool: .pen, color: .systemRed, width: 4)
+    #expect(modeControl.isHidden)
+    #expect(palette.frame.width == 296)
+
+    palette.update(tool: .arrow, color: .systemRed, width: 4, arrowMode: .straight)
+    #expect(modeControl.selectedSegment == AnnotationArrowMode.straight.rawValue)
+}
+
+@Test("选区箭头模式切换会驱动画布并保留普通箭头")
+@MainActor
+func selectionOverlayArrowModeControlDrivesCanvas() throws {
+    let size = CGSize(width: 800, height: 600)
+    let image = solidImage(size: size, color: .white)
+    var proposedRect = CGRect(origin: .zero, size: size)
+    let view = SelectionOverlayView(frame: CGRect(origin: .zero, size: size))
+    view.previewSourceImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil)
+    view.previewImage = image
+    view.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 100, y: 100), timestamp: 1))
+    view.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 500, y: 400), timestamp: 1.1))
+    view.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 500, y: 400), timestamp: 1.2))
+
+    let toolbar = try #require(view.subviews.compactMap { $0 as? OverlayToolbarView }.first)
+    let stack = try #require(toolbar.subviews.compactMap { $0 as? NSStackView }.first)
+    let arrow = try #require(stack.arrangedSubviews.compactMap { $0 as? OverlayToolbarButton }
+        .first { $0.toolTip == L10n.text(AnnotationTool.arrow.titleKey) })
+    arrow.performClick(nil)
+
+    let palette = try #require(view.subviews.compactMap { $0 as? AnnotationStylePaletteView }.first)
+    let canvas = try #require(view.subviews.compactMap { $0 as? AnnotationCanvasView }.first)
+    #expect(palette.arrowModeControl.selectedSegment == AnnotationArrowMode.straight.rawValue)
+    #expect(canvas.arrowDrawingMode == .straight)
+
+    palette.arrowModeControl.selectedSegment = AnnotationArrowMode.freehand.rawValue
+    palette.arrowModeControl.sendAction(
+        palette.arrowModeControl.action,
+        to: palette.arrowModeControl.target
+    )
+    #expect(canvas.arrowDrawingMode == .freehand)
+
+    canvas.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 140, y: 140), timestamp: 2))
+    canvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 210, y: 155), timestamp: 2.1))
+    canvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 280, y: 210), timestamp: 2.2))
+    canvas.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 340, y: 280), timestamp: 2.3))
+    #expect(view.annotations.first?.points.count ?? 0 > 2)
+
+    canvas.clear()
+    palette.arrowModeControl.selectedSegment = AnnotationArrowMode.straight.rawValue
+    palette.arrowModeControl.sendAction(
+        palette.arrowModeControl.action,
+        to: palette.arrowModeControl.target
+    )
+    canvas.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 150, y: 150), timestamp: 5))
+    canvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 300, y: 260), timestamp: 5.1))
+    canvas.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 360, y: 300), timestamp: 5.2))
+    #expect(view.annotations.first?.points.count == 2)
 }
 
 @Test("OCR 工具拖选后立即生成识别 tooltip")
@@ -2886,6 +3062,67 @@ func committedRectangleCanBeDraggedWithinCanvasAndUndone() throws {
     #expect(abs((boundedPoints[1].x - boundedPoints[0].x) - (originalPoints[1].x - originalPoints[0].x)) < 0.001)
     #expect(abs((boundedPoints[1].y - boundedPoints[0].y) - (originalPoints[1].y - originalPoints[0].y)) < 0.001)
     #expect(boundedPoints.allSatisfy { (0 ... 1).contains($0.x) && (0 ... 1).contains($0.y) })
+}
+
+@Test("已提交箭头可重新激活、改样式、拖动并撤销")
+@MainActor
+func committedArrowCanBeReactivatedRestyledDraggedAndUndone() throws {
+    let context = CGContext(
+        data: nil,
+        width: 240,
+        height: 120,
+        bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )!
+    context.setFillColor(NSColor.white.cgColor)
+    context.fill(CGRect(x: 0, y: 0, width: 240, height: 120))
+    let canvas = AnnotationCanvasView(
+        sourceImage: context.makeImage()!,
+        logicalSize: CGSize(width: 240, height: 120),
+        contentInset: 0
+    )
+    canvas.frame = CGRect(x: 0, y: 0, width: 240, height: 120)
+    canvas.tool = .arrow
+    canvas.annotationColor = .systemRed
+    canvas.brushPixelWidth = 4
+
+    canvas.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 30, y: 30), timestamp: 1))
+    canvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 110, y: 70), timestamp: 1.1))
+    canvas.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 110, y: 70), timestamp: 1.2))
+    let original = try #require(canvas.strokes.first)
+
+    var selectedStyle: (AnnotationColor, CGFloat)?
+    var selectedTool: AnnotationTool?
+    canvas.onSelectedAnnotationStyleChanged = { tool, color, width in
+        selectedTool = tool
+        selectedStyle = (AnnotationColor(color), width)
+    }
+    canvas.tool = .pen
+    canvas.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 70, y: 50), timestamp: 2))
+    canvas.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 70, y: 50), timestamp: 2.01))
+    #expect(canvas.tool == .arrow)
+    #expect(selectedTool == .arrow)
+    #expect(selectedStyle?.0 == AnnotationColor(.systemRed))
+    #expect(abs((selectedStyle?.1 ?? 0) - 4) < 0.001)
+
+    canvas.annotationColor = .systemBlue
+    canvas.brushPixelWidth = 10
+    var restyled = try #require(canvas.strokes.first)
+    #expect(restyled.color == AnnotationColor(.systemBlue))
+    #expect(abs(restyled.width - 10 / 120) < 0.001)
+
+    canvas.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 70, y: 50), timestamp: 3))
+    canvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 100, y: 70), timestamp: 3.1))
+    canvas.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 100, y: 70), timestamp: 3.2))
+    restyled = try #require(canvas.strokes.first)
+    #expect(restyled.points != original.points)
+    #expect(canvas.strokes.count == 1)
+
+    canvas.undo()
+    #expect(canvas.strokes.first?.points == original.points)
+    #expect(canvas.strokes.first?.color == AnnotationColor(.systemBlue))
 }
 
 @Test("文字工具空输入框双击仍会完成截图")
@@ -3548,16 +3785,145 @@ func annotationHistoryOperations() {
     #expect(history.canRedo)
 }
 
-@Test("箭头端点几何保持对称")
+@Test("箭头轮廓保持尾细头大并约束短箭头")
 func annotationArrowGeometry() {
-    let head = AnnotationGeometry.arrowHead(
+    let path = AnnotationGeometry.taperedArrowPath(
         from: CGPoint(x: 0, y: 0),
         to: CGPoint(x: 100, y: 0),
-        length: 20
+        lineWidth: 4
     )
-    #expect(abs(head.0.x - head.1.x) < 0.001)
-    #expect(abs(head.0.y + head.1.y) < 0.001)
-    #expect(head.0.x < 100)
+    #expect(path.contains(CGPoint(x: 1, y: 0)))
+    #expect(path.contains(CGPoint(x: 50, y: 0)))
+    #expect(!path.contains(CGPoint(x: 50, y: 5)))
+    #expect(path.contains(CGPoint(x: 90, y: 4)))
+    #expect(path.boundingBoxOfPath.height > 12)
+
+    let shortPath = AnnotationGeometry.taperedArrowPath(
+        from: CGPoint(x: 0, y: 0),
+        to: CGPoint(x: 10, y: 0),
+        lineWidth: 4
+    )
+    #expect(shortPath.contains(CGPoint(x: 10, y: 0)))
+    #expect(shortPath.boundingBoxOfPath.width <= 4.001)
+    #expect(shortPath.boundingBoxOfPath.height <= 4.001)
+}
+
+@Test("自由箭头平滑轨迹但保持手势首尾位置")
+func freehandArrowSmoothingPreservesGestureEndpoints() {
+    let points = [
+        CGPoint(x: 0, y: 0),
+        CGPoint(x: 10, y: 1),
+        CGPoint(x: 20, y: 12),
+        CGPoint(x: 30, y: 9),
+        CGPoint(x: 40, y: 25)
+    ]
+    let smoothed = AnnotationGeometry.smoothedGesturePoints(points, minimumDistance: 0.5)
+
+    #expect(smoothed.count == points.count)
+    #expect(smoothed.first == points.first)
+    #expect(smoothed.last == points.last)
+    #expect(smoothed[2].y < points[2].y)
+    #expect(smoothed[3].y > points[3].y)
+}
+
+@Test("自由箭头轮廓跟随多点曲线并保留普通两点箭头")
+func freehandArrowGeometryFollowsGesturePath() {
+    let gesture = [
+        CGPoint(x: 0, y: 0),
+        CGPoint(x: 24, y: 3),
+        CGPoint(x: 48, y: 22),
+        CGPoint(x: 72, y: 45),
+        CGPoint(x: 78, y: 76)
+    ]
+    let path = AnnotationGeometry.gestureArrowPath(points: gesture, lineWidth: 4)
+    #expect(path.contains(CGPoint(x: 24, y: 3)))
+    #expect(path.contains(CGPoint(x: 48, y: 22)))
+    #expect(path.boundingBoxOfPath.maxY >= 76)
+    #expect(path.boundingBoxOfPath.width > 70)
+
+    let ribbonPath = AnnotationGeometry.gestureArrowPath(
+        points: [
+            CGPoint(x: 0, y: 0),
+            CGPoint(x: 30, y: 0),
+            CGPoint(x: 60, y: 0),
+            CGPoint(x: 90, y: 0),
+            CGPoint(x: 120, y: 0)
+        ],
+        lineWidth: 8
+    )
+    #expect(ribbonPath.contains(CGPoint(x: 18, y: 3)))
+    #expect(!ribbonPath.contains(CGPoint(x: 18, y: 5.5)))
+    #expect(ribbonPath.contains(CGPoint(x: 74, y: 4.5)))
+    #expect(ribbonPath.contains(CGPoint(x: 95, y: 14)))
+    #expect(!ribbonPath.contains(CGPoint(x: 95, y: 21)))
+    #expect(ribbonPath.boundingBoxOfPath.height >= 34)
+    #expect(ribbonPath.boundingBoxOfPath.height <= 40)
+
+    let straightStroke = AnnotationStroke(
+        tool: .arrow,
+        points: [CGPoint(x: 0, y: 0), CGPoint(x: 1, y: 1)],
+        color: AnnotationColor(.systemRed),
+        width: 0.02
+    )
+    let freehandStroke = AnnotationStroke(
+        tool: .arrow,
+        points: [CGPoint(x: 0, y: 0), CGPoint(x: 0.5, y: 0.2), CGPoint(x: 1, y: 1)],
+        color: AnnotationColor(.systemRed),
+        width: 0.02
+    )
+    #expect(AnnotationArrowMode.mode(for: straightStroke) == .straight)
+    #expect(AnnotationArrowMode.mode(for: freehandStroke) == .freehand)
+}
+
+@Test("箭头画布可切换自由手势且普通模式仍保持两点")
+@MainActor
+func annotationCanvasSupportsStraightAndFreehandArrowModes() throws {
+    let context = CGContext(
+        data: nil,
+        width: 240,
+        height: 160,
+        bitsPerComponent: 8,
+        bytesPerRow: 0,
+        space: CGColorSpaceCreateDeviceRGB(),
+        bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+    )!
+    context.setFillColor(NSColor.white.cgColor)
+    context.fill(CGRect(x: 0, y: 0, width: 240, height: 160))
+
+    func makeCanvas() -> AnnotationCanvasView {
+        let canvas = AnnotationCanvasView(
+            sourceImage: context.makeImage()!,
+            logicalSize: CGSize(width: 240, height: 160),
+            contentInset: 0
+        )
+        canvas.frame = CGRect(x: 0, y: 0, width: 240, height: 160)
+        canvas.tool = .arrow
+        canvas.annotationColor = .systemRed
+        canvas.brushPixelWidth = 4
+        return canvas
+    }
+
+    let straightCanvas = makeCanvas()
+    straightCanvas.arrowDrawingMode = .straight
+    straightCanvas.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 20, y: 20), timestamp: 1))
+    straightCanvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 80, y: 60), timestamp: 1.1))
+    straightCanvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 140, y: 90), timestamp: 1.2))
+    straightCanvas.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 180, y: 110), timestamp: 1.3))
+    #expect(straightCanvas.strokes.first?.points.count == 2)
+    #expect(AnnotationArrowMode.mode(for: try #require(straightCanvas.strokes.first)) == .straight)
+
+    let freehandCanvas = makeCanvas()
+    freehandCanvas.arrowDrawingMode = .freehand
+    freehandCanvas.mouseDown(with: mouseEvent(.leftMouseDown, at: CGPoint(x: 20, y: 20), timestamp: 3))
+    freehandCanvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 55, y: 24), timestamp: 3.1))
+    freehandCanvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 90, y: 50), timestamp: 3.2))
+    freehandCanvas.mouseDragged(with: mouseEvent(.leftMouseDragged, at: CGPoint(x: 125, y: 85), timestamp: 3.3))
+    freehandCanvas.mouseUp(with: mouseEvent(.leftMouseUp, at: CGPoint(x: 150, y: 125), timestamp: 3.4))
+    let freehandStroke = try #require(freehandCanvas.strokes.first)
+    #expect(freehandStroke.points.count > 2)
+    #expect(AnnotationArrowMode.mode(for: freehandStroke) == .freehand)
+    #expect(freehandStroke.points.first == CGPoint(x: CGFloat(20) / 240, y: CGFloat(20) / 160))
+    #expect(freehandStroke.points.last == CGPoint(x: CGFloat(150) / 240, y: CGFloat(125) / 160))
 }
 
 @Test("马赛克和画笔渲染保持原始像素尺寸")

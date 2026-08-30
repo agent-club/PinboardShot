@@ -863,12 +863,12 @@ final class OverlayToolbarDragHandleView: NSView {
 
     override init(frame frameRect: NSRect) {
         let image = NSImage(
-            systemSymbolName: "circle.grid.3x3.fill",
+            systemSymbolName: "arrow.up.and.down.and.arrow.left.and.right",
             accessibilityDescription: L10n.text("overlay.dragToolbar")
-        )?.withSymbolConfiguration(.init(pointSize: 10, weight: .regular))
+        )?.withSymbolConfiguration(.init(pointSize: 12, weight: .semibold))
         glyphView = NSImageView(image: image ?? NSImage())
         super.init(frame: frameRect)
-        widthAnchor.constraint(equalToConstant: 16).isActive = true
+        widthAnchor.constraint(equalToConstant: 20).isActive = true
         heightAnchor.constraint(equalToConstant: 32).isActive = true
         glyphView.contentTintColor = .secondaryLabelColor
         glyphView.translatesAutoresizingMaskIntoConstraints = false
@@ -877,7 +877,7 @@ final class OverlayToolbarDragHandleView: NSView {
         NSLayoutConstraint.activate([
             glyphView.centerXAnchor.constraint(equalTo: centerXAnchor),
             glyphView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            glyphView.widthAnchor.constraint(equalToConstant: 10),
+            glyphView.widthAnchor.constraint(equalToConstant: 13),
             glyphView.heightAnchor.constraint(equalToConstant: 16)
         ])
         setAccessibilityElement(true)
@@ -1008,15 +1008,15 @@ final class OverlayWidthControl: NSControl {
             needsDisplay = true
         }
     }
-
-    private let horizontalInset: CGFloat = 10
+    private(set) var choices: [CGFloat] = [10, 14, 18, 24, 32]
+    private var minimumPreviewDiameter: CGFloat = 8
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         toolTip = L10n.text("annotation.width")
         setAccessibilityLabel(L10n.text("annotation.width"))
         setAccessibilityRole(.slider)
-        widthAnchor.constraint(equalToConstant: 68).isActive = true
+        widthAnchor.constraint(equalToConstant: 112).isActive = true
         heightAnchor.constraint(equalToConstant: 32).isActive = true
     }
 
@@ -1032,24 +1032,24 @@ final class OverlayWidthControl: NSControl {
     }
 
     override func mouseDown(with event: NSEvent) {
-        updateValue(with: event, sendsAction: true)
+        selectChoice(with: event)
     }
 
     override func mouseDragged(with event: NSEvent) {
-        updateValue(with: event, sendsAction: true)
+        selectChoice(with: event)
     }
 
     override func scrollWheel(with event: NSEvent) {
         let delta = event.scrollingDeltaY == 0 ? -event.scrollingDeltaX : event.scrollingDeltaY
-        adjustValue(by: delta > 0 ? 1 : -1)
+        selectAdjacentChoice(by: delta > 0 ? 1 : -1)
     }
 
     override func keyDown(with event: NSEvent) {
         switch event.keyCode {
         case UInt16(kVK_LeftArrow), UInt16(kVK_DownArrow):
-            adjustValue(by: -1)
+            selectAdjacentChoice(by: -1)
         case UInt16(kVK_RightArrow), UInt16(kVK_UpArrow):
-            adjustValue(by: 1)
+            selectAdjacentChoice(by: 1)
         default:
             super.keyDown(with: event)
         }
@@ -1057,58 +1057,201 @@ final class OverlayWidthControl: NSControl {
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
-        let track = trackRect
-        let trackPath = NSBezierPath(roundedRect: track, xRadius: track.height / 2, yRadius: track.height / 2)
-        NSColor.labelColor.withAlphaComponent(0.18).setFill()
-        trackPath.fill()
-
-        let thumbX = thumbCenterX
-        let activeTrack = CGRect(
-            x: track.minX,
-            y: track.minY,
-            width: max(2, thumbX - track.minX),
-            height: track.height
-        )
-        NSColor.controlAccentColor.withAlphaComponent(0.88).setFill()
-        NSBezierPath(roundedRect: activeTrack, xRadius: track.height / 2, yRadius: track.height / 2).fill()
-
-        let previewDiameter = min(max(value / 3.6, 2.5), 10)
-        NSColor.labelColor.withAlphaComponent(0.55).setFill()
-        NSBezierPath(ovalIn: CGRect(
-            x: bounds.minX + 2,
-            y: bounds.midY - previewDiameter / 2,
-            width: previewDiameter,
-            height: previewDiameter
-        )).fill()
-
-        let thumbRect = CGRect(x: thumbX - 4, y: bounds.midY - 4, width: 8, height: 8)
-        NSColor.windowBackgroundColor.withAlphaComponent(0.96).setFill()
-        NSBezierPath(ovalIn: thumbRect).fill()
-        NSColor.controlAccentColor.setStroke()
-        let thumbBorder = NSBezierPath(ovalIn: thumbRect.insetBy(dx: 0.5, dy: 0.5))
-        thumbBorder.lineWidth = 1
-        thumbBorder.stroke()
+        let selectedIndex = nearestChoiceIndex(to: value)
+        for (index, choice) in choices.enumerated() {
+            let center = centerX(for: index)
+            let diameter = previewDiameter(for: choice)
+            (index == selectedIndex
+                ? NSColor.controlAccentColor
+                : NSColor.labelColor.withAlphaComponent(0.45)
+            ).setFill()
+            NSBezierPath(ovalIn: CGRect(
+                x: center - diameter / 2,
+                y: bounds.midY - diameter / 2,
+                width: diameter,
+                height: diameter
+            )).fill()
+        }
     }
 
-    private var trackRect: CGRect {
-        CGRect(x: bounds.minX + horizontalInset + 8, y: bounds.midY - 1, width: bounds.width - horizontalInset * 2 - 8, height: 2)
+    func configure(for tool: AnnotationTool) {
+        switch tool {
+        case .mosaic: choices = [10, 14, 18, 24, 32]
+        case .pen: choices = [2, 3, 4, 6, 10]
+        case .arrow: choices = [2, 3, 4, 6, 8]
+        case .rectangle, .ellipse, .line: choices = [2, 3, 4, 6, 8]
+        case .highlight: choices = [6, 9, 12, 16, 22]
+        case .text: choices = [6, 8, 10, 12, 16]
+        case .number: choices = [10, 13, 16, 20, 26]
+        case .ocr, .redaction: choices = [2, 3, 4, 6, 8]
+        }
+        minimumPreviewDiameter = tool == .mosaic ? 8 : 5
+        needsDisplay = true
     }
 
-    private var thumbCenterX: CGFloat {
-        let progress = (value - minimumValue) / (maximumValue - minimumValue)
-        return trackRect.minX + trackRect.width * progress
+    func previewDiameter(for choice: CGFloat) -> CGFloat {
+        guard let smallest = choices.first,
+              let largest = choices.last,
+              largest > smallest else { return 9.5 }
+        let progress = min(max((choice - smallest) / (largest - smallest), 0), 1)
+        return minimumPreviewDiameter + progress * (14 - minimumPreviewDiameter)
     }
 
-    private func updateValue(with event: NSEvent, sendsAction: Bool) {
+    private func selectChoice(with event: NSEvent) {
         let point = convert(event.locationInWindow, from: nil)
-        let progress = min(max((point.x - trackRect.minX) / trackRect.width, 0), 1)
-        value = minimumValue + (maximumValue - minimumValue) * progress
-        if sendsAction { _ = sendAction(action, to: target) }
+        let index = choices.indices.min { lhs, rhs in
+            abs(centerX(for: lhs) - point.x) < abs(centerX(for: rhs) - point.x)
+        } ?? 0
+        value = choices[index]
+        _ = sendAction(action, to: target)
     }
 
-    private func adjustValue(by step: CGFloat) {
-        value += step
+    private func selectAdjacentChoice(by step: Int) {
+        let next = min(max(nearestChoiceIndex(to: value) + step, 0), choices.count - 1)
+        value = choices[next]
         _ = sendAction(action, to: target)
+    }
+
+    private func nearestChoiceIndex(to value: CGFloat) -> Int {
+        choices.indices.min { lhs, rhs in
+            abs(choices[lhs] - value) < abs(choices[rhs] - value)
+        } ?? 0
+    }
+
+    private func centerX(for index: Int) -> CGFloat {
+        let inset: CGFloat = 10
+        guard choices.count > 1 else { return bounds.midX }
+        return inset + CGFloat(index) * (bounds.width - inset * 2) / CGFloat(choices.count - 1)
+    }
+}
+
+final class AnnotationColorSwatchButton: NSButton {
+    let swatchColor: NSColor
+    var isSelectedSwatch = false { didSet { needsDisplay = true } }
+
+    init(color: NSColor, target: AnyObject?, action: Selector?) {
+        swatchColor = color
+        super.init(frame: .zero)
+        self.target = target
+        self.action = action
+        isBordered = false
+        title = ""
+        toolTip = L10n.text("annotation.color")
+        setAccessibilityLabel(L10n.text("annotation.color"))
+        widthAnchor.constraint(equalToConstant: 24).isActive = true
+        heightAnchor.constraint(equalToConstant: 32).isActive = true
+    }
+
+    required init?(coder: NSCoder) { nil }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        let circle = CGRect(x: bounds.midX - 7, y: bounds.midY - 7, width: 14, height: 14)
+        swatchColor.setFill()
+        NSBezierPath(ovalIn: circle).fill()
+        (swatchColor == .white ? NSColor.separatorColor : NSColor.white.withAlphaComponent(0.26)).setStroke()
+        let border = NSBezierPath(ovalIn: circle.insetBy(dx: 0.5, dy: 0.5))
+        border.lineWidth = 1
+        border.stroke()
+        guard isSelectedSwatch else { return }
+        NSColor.controlAccentColor.setStroke()
+        let selection = NSBezierPath(ovalIn: circle.insetBy(dx: -3, dy: -3))
+        selection.lineWidth = 2
+        selection.stroke()
+    }
+}
+
+final class AnnotationStylePaletteView: NSVisualEffectView {
+    let colorWell: AnchoredColorWell
+    let widthControl: OverlayWidthControl
+    let arrowModeControl: NSSegmentedControl
+    private(set) var swatchButtons: [AnnotationColorSwatchButton] = []
+    private let modeDivider = OverlayToolbarSeparator(frame: .zero)
+    private let divider = OverlayToolbarSeparator(frame: .zero)
+
+    init(
+        colorWell: AnchoredColorWell,
+        widthControl: OverlayWidthControl,
+        arrowModeControl: NSSegmentedControl,
+        target: AnyObject,
+        colorAction: Selector
+    ) {
+        self.colorWell = colorWell
+        self.widthControl = widthControl
+        self.arrowModeControl = arrowModeControl
+        super.init(frame: CGRect(x: 0, y: 0, width: 296, height: 48))
+        material = .hudWindow
+        blendingMode = .withinWindow
+        state = .active
+        wantsLayer = true
+        layer?.cornerRadius = 11
+        layer?.cornerCurve = .continuous
+        layer?.borderWidth = 1
+        layer?.borderColor = NSColor.white.withAlphaComponent(0.14).cgColor
+        layer?.shadowColor = NSColor.black.cgColor
+        layer?.shadowOpacity = 0.28
+        layer?.shadowRadius = 10
+        layer?.shadowOffset = CGSize(width: 0, height: -3)
+        isHidden = true
+
+        let colors: [NSColor] = [.systemBlue, .systemGreen, .systemYellow, .darkGray, .white]
+        swatchButtons = colors.map { AnnotationColorSwatchButton(color: $0, target: target, action: colorAction) }
+        let stack = NSStackView(
+            views: [arrowModeControl, modeDivider, widthControl, divider] + swatchButtons + [colorWell]
+        )
+        stack.orientation = .horizontal
+        stack.alignment = .centerY
+        stack.spacing = 3
+        stack.frame = bounds.insetBy(dx: 7, dy: 8)
+        stack.autoresizingMask = [.width, .height]
+        addSubview(stack)
+    }
+
+    required init?(coder: NSCoder) { nil }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isHidden, alphaValue > 0, bounds.contains(point) else { return nil }
+        // 浮层是覆盖层的兄弟视图；显式向下命中，避免 NSVisualEffectView 在无标题覆盖窗口里
+        // 把透明材质区域判为不可交互，导致粗细和色板点击穿透到截图画布。
+        for subview in subviews.reversed() {
+            let localPoint = convert(point, to: subview)
+            if let hit = subview.hitTest(localPoint) { return hit }
+        }
+        return self
+    }
+
+    override func mouseDown(with event: NSEvent) {}
+    override func mouseDragged(with event: NSEvent) {}
+    override func mouseUp(with event: NSEvent) {}
+
+    func update(
+        tool: AnnotationTool,
+        color: NSColor,
+        width: CGFloat,
+        arrowMode: AnnotationArrowMode? = nil
+    ) {
+        widthControl.configure(for: tool)
+        widthControl.value = width
+        if let arrowMode { arrowModeControl.selectedSegment = arrowMode.rawValue }
+        colorWell.color = color
+        swatchButtons.forEach { $0.isSelectedSwatch = AnnotationColor($0.swatchColor) == AnnotationColor(color) }
+        let showsArrowMode = tool == .arrow
+        arrowModeControl.isHidden = !showsArrowMode
+        modeDivider.isHidden = !showsArrowMode
+        let showsColor = tool != .mosaic
+        divider.isHidden = !showsColor
+        swatchButtons.forEach { $0.isHidden = !showsColor }
+        colorWell.isHidden = !showsColor
+        let paletteWidth: CGFloat
+        if showsArrowMode {
+            paletteWidth = 372
+        } else {
+            paletteWidth = showsColor ? 296 : 132
+        }
+        setFrameSize(CGSize(width: paletteWidth, height: 48))
+        subviews.compactMap { $0 as? NSStackView }.first?.frame = bounds.insetBy(dx: 7, dy: 8)
     }
 }
 
@@ -1503,6 +1646,8 @@ final class SelectionOverlayView: NSView {
     private weak var annotationClearButton: NSButton?
     private weak var annotationColorWell: NSColorWell?
     private weak var annotationWidthControl: OverlayWidthControl?
+    private weak var annotationArrowModeControl: NSSegmentedControl?
+    private weak var annotationStylePalette: AnnotationStylePaletteView?
     private weak var colorFormatPopup: NSPopUpButton?
     private weak var selectionSizeButton: OverlayToolbarButton?
     private var selectionSizePopover: NSPopover?
@@ -1516,6 +1661,7 @@ final class SelectionOverlayView: NSView {
                 defaults: annotationStyleDefaults
             )
             annotationWidthControl?.value = selectedAnnotationWidth
+            annotationWidthControl?.configure(for: selectedAnnotationTool)
             annotationCanvas?.brushPixelWidth = selectedAnnotationWidth
         }
     }
@@ -1533,6 +1679,7 @@ final class SelectionOverlayView: NSView {
     private var selectedAnnotationColor: NSColor = .systemRed
     private var selectedAnnotationTool: AnnotationTool = .mosaic
     private var selectedAnnotationWidth: CGFloat = AnnotationStyleSettings.defaultBrushPixelWidth(for: .mosaic)
+    private var selectedArrowMode: AnnotationArrowMode = .straight
     private var selectedColorSampleFormat: ColorSampleFormat = .hex
     private var hoveredColorSample: (point: CGPoint, color: NSColor)?
     private var isColorPickerFrozen = false
@@ -1592,6 +1739,12 @@ final class SelectionOverlayView: NSView {
         guard bounds.contains(point) else { return nil }
         if !toolbar.isHidden, toolbar.frame.contains(point) {
             return super.hitTest(point)
+        }
+        if let annotationStylePalette,
+           !annotationStylePalette.isHidden,
+           annotationStylePalette.frame.contains(point) {
+            let palettePoint = convert(point, to: annotationStylePalette)
+            return annotationStylePalette.hitTest(palettePoint) ?? annotationStylePalette
         }
         if !colorPreview.isHidden, colorPreview.frame.contains(point) {
             return super.hitTest(point)
@@ -1951,6 +2104,37 @@ final class SelectionOverlayView: NSView {
         widthControl.action = #selector(annotationWidthChanged(_:))
         annotationWidthControl = widthControl
 
+        let arrowModeControl = NSSegmentedControl(
+            images: AnnotationArrowMode.allCases.map { mode in
+                NSImage(
+                    systemSymbolName: mode.symbolName,
+                    accessibilityDescription: L10n.text(mode.titleKey)
+                ) ?? NSImage()
+            },
+            trackingMode: .selectOne,
+            target: self,
+            action: #selector(annotationArrowModeChanged(_:))
+        )
+        arrowModeControl.segmentStyle = .rounded
+        arrowModeControl.controlSize = .small
+        arrowModeControl.selectedSegment = selectedArrowMode.rawValue
+        arrowModeControl.setAccessibilityLabel(L10n.text("annotation.arrow.mode"))
+        for mode in AnnotationArrowMode.allCases {
+            arrowModeControl.setToolTip(L10n.text(mode.titleKey), forSegment: mode.rawValue)
+        }
+        arrowModeControl.widthAnchor.constraint(equalToConstant: 64).isActive = true
+        arrowModeControl.heightAnchor.constraint(equalToConstant: 28).isActive = true
+        annotationArrowModeControl = arrowModeControl
+
+        let stylePalette = AnnotationStylePaletteView(
+            colorWell: colorWell,
+            widthControl: widthControl,
+            arrowModeControl: arrowModeControl,
+            target: self,
+            colorAction: #selector(annotationPresetColorChanged(_:))
+        )
+        annotationStylePalette = stylePalette
+
         let undoButton = toolbarButton(
             symbolName: "arrow.uturn.backward",
             accessibilityLabel: L10n.text("annotation.undo"),
@@ -1977,9 +2161,7 @@ final class SelectionOverlayView: NSView {
         annotationRedoButton = redoButton
         annotationClearButton = clearButton
 
-        let annotationControls = toolButtons.prefix(2).map { $0 as NSView }
-            + [colorWell, widthControl]
-            + toolButtons.dropFirst(2).map { $0 as NSView }
+        let annotationControls = toolButtons.map { $0 as NSView }
             + [undoButton, redoButton, clearButton]
 
         let copyButton = toolbarButton(
@@ -2039,6 +2221,7 @@ final class SelectionOverlayView: NSView {
         stack.autoresizingMask = [.width, .height]
         effect.addSubview(stack)
         addSubview(effect)
+        addSubview(stylePalette)
         toolbar = effect
         toolbarStack = stack
         toolbarDragHandle = dragHandle
@@ -2078,8 +2261,8 @@ final class SelectionOverlayView: NSView {
         managedViews.forEach { $0.isHidden = true }
         toolbarDragHandle.isHidden = false
 
-        var views: [NSView] = [toolbarDragHandle]
-        var appended = Set<ObjectIdentifier>([ObjectIdentifier(toolbarDragHandle)])
+        var views: [NSView] = []
+        var appended = Set<ObjectIdentifier>()
         func append(_ view: NSView, visible: Bool) {
             guard appended.insert(ObjectIdentifier(view)).inserted else { return }
             view.isHidden = !visible
@@ -2089,8 +2272,7 @@ final class SelectionOverlayView: NSView {
         for (index, action) in toolbarActionOrder.enumerated() {
             if action == .annotate {
                 annotationToolbarViews.forEach { view in
-                    let isDirectTool = annotationToolButtons.contains { $0 === view }
-                    append(view, visible: isDirectTool || isAnnotationMode)
+                    append(view, visible: true)
                 }
                 if toolbarActionOrder.dropFirst(index + 1).contains(where: { $0 != .annotate }) {
                     append(annotationSeparator, visible: true)
@@ -2099,6 +2281,7 @@ final class SelectionOverlayView: NSView {
             }
             guard let view = toolbarActionViews[action] else { continue }
             if action == .cancel, views.count > 1, !(views.last is OverlayToolbarSeparator) {
+                append(toolbarDragHandle, visible: true)
                 append(exitSeparator, visible: true)
             }
             append(view, visible: true)
@@ -2110,6 +2293,7 @@ final class SelectionOverlayView: NSView {
         hiddenActions.compactMap { toolbarActionViews[$0] }.forEach { append($0, visible: false) }
         if let colorFormatPopup { append(colorFormatPopup, visible: false) }
         annotationToolbarViews.forEach { append($0, visible: false) }
+        append(toolbarDragHandle, visible: true)
         append(annotationSeparator, visible: false)
         append(exitSeparator, visible: exitSeparator.isHidden == false)
 
@@ -2186,6 +2370,7 @@ final class SelectionOverlayView: NSView {
     private func positionToolbar(around rect: CGRect) {
         if didManuallyPositionToolbar {
             clampToolbarIntoBounds()
+            positionAnnotationStylePalette()
             return
         }
         let screenMargin: CGFloat = 12
@@ -2205,6 +2390,7 @@ final class SelectionOverlayView: NSView {
             y = screenMargin
         }
         toolbar.setFrameOrigin(CGPoint(x: x, y: y))
+        positionAnnotationStylePalette()
     }
 
     private func moveToolbar(by translation: CGPoint) {
@@ -2215,6 +2401,7 @@ final class SelectionOverlayView: NSView {
         ))
         didManuallyPositionToolbar = true
         clampToolbarIntoBounds()
+        positionAnnotationStylePalette()
     }
 
     private func clampToolbarIntoBounds() {
@@ -2231,7 +2418,34 @@ final class SelectionOverlayView: NSView {
     }
 
     private func isPointInToolbarInteractionArea(_ point: CGPoint) -> Bool {
-        !toolbar.isHidden && toolbar.frame.insetBy(dx: -6, dy: -6).contains(point)
+        let isInPrimaryToolbar = !toolbar.isHidden && toolbar.frame.insetBy(dx: -6, dy: -6).contains(point)
+        let isInStylePalette = annotationStylePalette.map {
+            !$0.isHidden && $0.frame.insetBy(dx: -6, dy: -6).contains(point)
+        } ?? false
+        return isInPrimaryToolbar || isInStylePalette
+    }
+
+    private func positionAnnotationStylePalette() {
+        guard let palette = annotationStylePalette,
+              !palette.isHidden,
+              let toolIndex = AnnotationTool.selectionTools.firstIndex(of: selectedAnnotationTool),
+              annotationToolButtons.indices.contains(toolIndex) else { return }
+        let buttonRect = annotationToolButtons[toolIndex].convert(
+            annotationToolButtons[toolIndex].bounds,
+            to: self
+        )
+        let margin: CGFloat = 8
+        let spacing: CGFloat = 8
+        let x = min(
+            max(buttonRect.midX - palette.frame.width / 2, bounds.minX + margin),
+            max(bounds.minX + margin, bounds.maxX - palette.frame.width - margin)
+        )
+        let below = toolbar.frame.minY - palette.frame.height - spacing
+        let above = toolbar.frame.maxY + spacing
+        let y = below >= bounds.minY + margin
+            ? below
+            : min(above, bounds.maxY - palette.frame.height - margin)
+        palette.setFrameOrigin(CGPoint(x: x, y: max(bounds.minY + margin, y)))
     }
 
     private func isPointInColorPreview(_ point: CGPoint) -> Bool {
@@ -2396,6 +2610,7 @@ final class SelectionOverlayView: NSView {
         toolbarStack.frame = toolbar.bounds.insetBy(dx: 6, dy: 8)
         toolbarStack.layoutSubtreeIfNeeded()
         toolbar.layoutSubtreeIfNeeded()
+        positionAnnotationStylePalette()
     }
 
     private func invalidateSelectionCursorRects() {
@@ -2644,6 +2859,17 @@ final class SelectionOverlayView: NSView {
             button.state = isActiveTool ? .on : .off
         }
         annotationCanvas?.isHidden = !isAnnotationMode
+        if let annotationStylePalette {
+            annotationStylePalette.isHidden = !isAnnotationMode || selectedAnnotationTool == .ocr
+            if !annotationStylePalette.isHidden {
+                annotationStylePalette.update(
+                    tool: selectedAnnotationTool,
+                    color: selectedAnnotationColor,
+                    width: selectedAnnotationWidth,
+                    arrowMode: selectedArrowMode
+                )
+            }
+        }
         if isAnnotationMode {
             window?.makeFirstResponder(annotationCanvas)
         } else {
@@ -2670,15 +2896,34 @@ final class SelectionOverlayView: NSView {
         }
         selectedAnnotationTool = selectedTool
         annotationWidthControl?.value = selectedAnnotationWidth
+        annotationWidthControl?.configure(for: selectedTool)
         setAnnotationMode(true)
         guard isAnnotationMode else { return }
         annotationCanvas?.tool = selectedTool
         annotationCanvas?.brushPixelWidth = selectedAnnotationWidth
+        annotationCanvas?.arrowDrawingMode = selectedArrowMode
     }
 
     @objc private func annotationColorChanged(_ sender: NSColorWell) {
         selectedAnnotationColor = sender.color
         annotationCanvas?.annotationColor = sender.color
+        annotationStylePalette?.update(
+            tool: selectedAnnotationTool,
+            color: selectedAnnotationColor,
+            width: selectedAnnotationWidth,
+            arrowMode: selectedArrowMode
+        )
+    }
+
+    @objc private func annotationPresetColorChanged(_ sender: AnnotationColorSwatchButton) {
+        selectedAnnotationColor = sender.swatchColor
+        annotationCanvas?.annotationColor = sender.swatchColor
+        annotationStylePalette?.update(
+            tool: selectedAnnotationTool,
+            color: selectedAnnotationColor,
+            width: selectedAnnotationWidth,
+            arrowMode: selectedArrowMode
+        )
     }
 
     @objc private func annotationWidthChanged(_ sender: OverlayWidthControl) {
@@ -2689,6 +2934,25 @@ final class SelectionOverlayView: NSView {
             defaults: annotationStyleDefaults
         )
         annotationCanvas?.brushPixelWidth = selectedAnnotationWidth
+        annotationStylePalette?.update(
+            tool: selectedAnnotationTool,
+            color: selectedAnnotationColor,
+            width: selectedAnnotationWidth,
+            arrowMode: selectedArrowMode
+        )
+    }
+
+    @objc private func annotationArrowModeChanged(_ sender: NSSegmentedControl) {
+        guard let mode = AnnotationArrowMode(rawValue: sender.selectedSegment) else { return }
+        selectedArrowMode = mode
+        annotationCanvas?.arrowDrawingMode = mode
+        annotationStylePalette?.update(
+            tool: selectedAnnotationTool,
+            color: selectedAnnotationColor,
+            width: selectedAnnotationWidth,
+            arrowMode: mode
+        )
+        positionAnnotationStylePalette()
     }
 
     @objc private func undoAnnotation() { annotationCanvas?.undo() }
@@ -2713,6 +2977,7 @@ final class SelectionOverlayView: NSView {
         canvas.tool = selectedAnnotationTool
         canvas.annotationColor = selectedAnnotationColor
         canvas.brushPixelWidth = selectedAnnotationWidth
+        canvas.arrowDrawingMode = selectedArrowMode
         canvas.onHistoryChanged = { [weak self, weak canvas] canUndo, canRedo in
             // 非标注态由父视图绘制缓存结果，避免画布子视图遮住边缘控制点。
             self?.annotationUndoButton?.isEnabled = canUndo
@@ -2729,6 +2994,36 @@ final class SelectionOverlayView: NSView {
             self?.selectedAnnotationWidth = width
             self?.annotationColorWell?.color = color
             self?.annotationWidthControl?.value = width
+            guard let self else { return }
+            self.annotationStylePalette?.update(
+                tool: self.selectedAnnotationTool,
+                color: color,
+                width: width,
+                arrowMode: self.selectedArrowMode
+            )
+        }
+        canvas.onSelectedArrowModeChanged = { [weak self] mode in
+            self?.selectedArrowMode = mode
+            self?.annotationArrowModeControl?.selectedSegment = mode.rawValue
+        }
+        canvas.onSelectedAnnotationStyleChanged = { [weak self] tool, color, width in
+            guard let self else { return }
+            selectedAnnotationTool = tool
+            selectedAnnotationColor = color
+            selectedAnnotationWidth = width
+            for (index, button) in annotationToolButtons.enumerated() {
+                let isActive = AnnotationTool.selectionTools[index] == tool
+                button.isSelectedStyle = isActive
+                button.state = isActive ? .on : .off
+            }
+            annotationStylePalette?.isHidden = tool == .ocr
+            annotationStylePalette?.update(
+                tool: tool,
+                color: color,
+                width: width,
+                arrowMode: selectedArrowMode
+            )
+            positionAnnotationStylePalette()
         }
         addSubview(canvas, positioned: .below, relativeTo: toolbar)
         annotationCanvas = canvas

@@ -268,14 +268,23 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         }
     }
     var annotationColor: NSColor = .systemRed {
-        didSet { applyCurrentStyleToSelectedText() }
+        didSet {
+            applyCurrentStyleToSelectedText()
+            applyCurrentStyleToSelectedAnnotation()
+        }
     }
     var brushPixelWidth: CGFloat = AnnotationStyleSettings.defaultBrushPixelWidth(for: .mosaic) {
-        didSet { applyCurrentStyleToSelectedText() }
+        didSet {
+            applyCurrentStyleToSelectedText()
+            applyCurrentStyleToSelectedAnnotation()
+        }
     }
+    var arrowDrawingMode: AnnotationArrowMode = .straight
     var onHistoryChanged: ((Bool, Bool) -> Void)?
     var onDoubleClick: (() -> Void)?
     var onSelectedTextStyleChanged: ((NSColor, CGFloat) -> Void)?
+    var onSelectedAnnotationStyleChanged: ((AnnotationTool, NSColor, CGFloat) -> Void)?
+    var onSelectedArrowModeChanged: ((AnnotationArrowMode) -> Void)?
     var strokes: [AnnotationStroke] { history.strokes }
     var currentRenderedImage: NSImage { cachedImage }
     var sourceImageForAnalysis: CGImage { sourceImage }
@@ -301,7 +310,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     private var textDragOriginalStroke: AnnotationStroke?
     private var textDragPreviewStroke: AnnotationStroke?
     private var textDragDidMove = false
-    // 矩形拖动沿用文字的“预览后一次提交”语义，避免拖动每一帧都进入撤销栈。
+    // 非文字标注沿用“预览后一次提交”语义，避免拖动每一帧都进入撤销栈。
     private var selectedRectangleIndex: Int?
     private var rectangleDragIndex: Int?
     private var rectangleDragStartPoint: CGPoint?
@@ -344,10 +353,10 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         }
         if let rectangleDragPreviewStroke {
             drawPreview(rectangleDragPreviewStroke, in: rect)
-            drawRectangleSelection(for: rectangleDragPreviewStroke, in: rect)
+            drawAnnotationSelection(for: rectangleDragPreviewStroke, in: rect)
         } else if let selectedRectangleIndex,
                   history.strokes.indices.contains(selectedRectangleIndex) {
-            drawRectangleSelection(for: history.strokes[selectedRectangleIndex], in: rect)
+            drawAnnotationSelection(for: history.strokes[selectedRectangleIndex], in: rect)
         }
     }
 
@@ -357,9 +366,9 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
             for stroke in history.strokes where stroke.tool == .text {
                 addCursorRect(textBounds(for: stroke, in: imageRect).insetBy(dx: -6, dy: -6), cursor: .openHand)
             }
-        } else if tool == .rectangle {
-            for stroke in history.strokes where stroke.tool == .rectangle {
-                addCursorRect(rectangleBounds(for: stroke, in: imageRect).insetBy(dx: -6, dy: -6), cursor: .openHand)
+        } else {
+            for stroke in history.strokes where stroke.tool == tool && supportsDirectEditing(stroke.tool) {
+                addCursorRect(annotationBounds(for: stroke, in: imageRect).insetBy(dx: -6, dy: -6), cursor: .openHand)
             }
         }
     }
@@ -376,6 +385,8 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
                 } else {
                     beginTextDrag(at: point, index: index)
                 }
+            } else if let index = editableStrokeIndex(at: point) {
+                activateEditableStroke(at: point, index: index)
             } else if event.clickCount >= 2 {
                 selectText(at: nil)
                 onDoubleClick?()
@@ -397,8 +408,14 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
             onDoubleClick?()
             return
         }
-        if tool == .rectangle, let index = rectangleStrokeIndex(at: point) {
-            beginRectangleDrag(at: point, index: index)
+        if let index = textStrokeIndex(at: point) {
+            tool = .text
+            selectText(at: index)
+            beginTextDrag(at: point, index: index)
+            return
+        }
+        if let index = editableStrokeIndex(at: point) {
+            activateEditableStroke(at: point, index: index)
             return
         }
         selectedRectangleIndex = nil
@@ -427,7 +444,8 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         doubleClickTracker.reset()
         lastCommittedStrokeWasTap = false
         let point = normalizedPoint(convert(event.locationInWindow, from: nil))
-        if stroke.tool == .pen || stroke.tool == .mosaic {
+        if stroke.tool == .pen || stroke.tool == .mosaic ||
+            (stroke.tool == .arrow && arrowDrawingMode == .freehand) {
             stroke.points.append(point)
         } else if stroke.points.count == 1 {
             stroke.points.append(point)
@@ -448,9 +466,25 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
             return
         }
         guard var stroke = currentStroke else { return }
+        let releasePoint = normalizedPoint(convert(event.locationInWindow, from: nil))
         lastCommittedStrokeWasTap = stroke.points.count == 1
         if stroke.points.count == 1 {
-            stroke.points.append(normalizedPoint(convert(event.locationInWindow, from: nil)))
+            stroke.points.append(releasePoint)
+        } else if stroke.tool == .arrow, arrowDrawingMode == .freehand {
+            if stroke.points.last != releasePoint { stroke.points.append(releasePoint) }
+            let rect = imageRect
+            let displayPoints = stroke.points.map {
+                CGPoint(x: rect.minX + $0.x * rect.width, y: rect.minY + $0.y * rect.height)
+            }
+            stroke.points = AnnotationGeometry.smoothedGesturePoints(
+                displayPoints,
+                minimumDistance: max(0.75, brushPixelWidth * 0.12)
+            ).map {
+                CGPoint(
+                    x: min(max(($0.x - rect.minX) / rect.width, 0), 1),
+                    y: min(max(($0.y - rect.minY) / rect.height, 0), 1)
+                )
+            }
         }
         currentStroke = nil
         if stroke.tool == .ocr {
@@ -462,8 +496,9 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
             stroke.text = String(next)
         }
         history.append(stroke)
-        if stroke.tool == .rectangle {
+        if supportsDirectEditing(stroke.tool) {
             selectedRectangleIndex = history.strokes.count - 1
+            notifySelectedAnnotationStyle(at: selectedRectangleIndex)
         }
         rebuildCache()
     }
@@ -768,7 +803,15 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         rectangleDragPreviewStroke = stroke
         rectangleDragDidMove = false
         rebuildCache(excludingTextAt: index)
+        notifySelectedAnnotationStyle(at: index)
         NSCursor.closedHand.set()
+    }
+
+    private func activateEditableStroke(at point: CGPoint, index: Int) {
+        guard history.strokes.indices.contains(index) else { return }
+        let selectedTool = history.strokes[index].tool
+        if tool != selectedTool { tool = selectedTool }
+        beginRectangleDrag(at: point, index: index)
     }
 
     private func updateRectangleDrag(to point: CGPoint) {
@@ -805,7 +848,22 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         }
         selectedRectangleIndex = history.strokes.indices.contains(index) ? index : nil
         rebuildCache()
+        notifySelectedAnnotationStyle(at: selectedRectangleIndex)
         NSCursor.openHand.set()
+    }
+
+    private func applyCurrentStyleToSelectedAnnotation() {
+        guard !isSynchronizingTextStyle,
+              tool != .text,
+              let selectedRectangleIndex,
+              history.strokes.indices.contains(selectedRectangleIndex),
+              history.strokes[selectedRectangleIndex].tool == tool,
+              supportsDirectEditing(tool) else { return }
+        var stroke = history.strokes[selectedRectangleIndex]
+        stroke.color = AnnotationColor(annotationColor)
+        stroke.width = brushPixelWidth / CGFloat(max(1, min(sourceImage.width, sourceImage.height)))
+        history.replace(at: selectedRectangleIndex, with: stroke)
+        rebuildCache()
     }
 
     private func applyCurrentStyleToSelectedText() {
@@ -881,36 +939,124 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         path.stroke()
     }
 
-    private func rectangleStrokeIndex(at point: CGPoint) -> Int? {
+    private func editableStrokeIndex(at point: CGPoint) -> Int? {
         for index in history.strokes.indices.reversed() {
             let stroke = history.strokes[index]
-            guard stroke.tool == .rectangle else { continue }
-            if rectangleBounds(for: stroke, in: imageRect).insetBy(dx: -6, dy: -6).contains(point) {
+            guard supportsDirectEditing(stroke.tool) else { continue }
+            if hitTest(stroke, at: point, in: imageRect) {
                 return index
             }
         }
         return nil
     }
 
-    private func rectangleBounds(for stroke: AnnotationStroke, in rect: CGRect) -> CGRect {
-        guard let first = stroke.points.first, let last = stroke.points.last else { return .zero }
-        let firstPoint = CGPoint(x: rect.minX + first.x * rect.width, y: rect.minY + first.y * rect.height)
-        let lastPoint = CGPoint(x: rect.minX + last.x * rect.width, y: rect.minY + last.y * rect.height)
+    private func annotationBounds(for stroke: AnnotationStroke, in rect: CGRect) -> CGRect {
+        let points = stroke.points.map { point in
+            CGPoint(x: rect.minX + point.x * rect.width, y: rect.minY + point.y * rect.height)
+        }
+        guard let first = points.first else { return .zero }
+        if stroke.tool == .arrow, let last = points.last {
+            let lineWidth = max(1, stroke.width * min(rect.width, rect.height))
+            let path = points.count > 2
+                ? AnnotationGeometry.gestureArrowPath(points: points, lineWidth: lineWidth)
+                : AnnotationGeometry.taperedArrowPath(from: first, to: last, lineWidth: lineWidth)
+            return path.boundingBoxOfPath
+        }
+        let minX = points.map(\.x).min() ?? first.x
+        let maxX = points.map(\.x).max() ?? first.x
+        let minY = points.map(\.y).min() ?? first.y
+        let maxY = points.map(\.y).max() ?? first.y
         return CGRect(
-            x: min(firstPoint.x, lastPoint.x),
-            y: min(firstPoint.y, lastPoint.y),
-            width: abs(lastPoint.x - firstPoint.x),
-            height: abs(lastPoint.y - firstPoint.y)
+            x: minX,
+            y: minY,
+            width: max(1, maxX - minX),
+            height: max(1, maxY - minY)
         )
     }
 
-    private func drawRectangleSelection(for stroke: AnnotationStroke, in rect: CGRect) {
-        let selectionRect = rectangleBounds(for: stroke, in: rect).insetBy(dx: -4, dy: -4)
-        let path = NSBezierPath(rect: selectionRect)
+    private func drawAnnotationSelection(for stroke: AnnotationStroke, in rect: CGRect) {
+        let selectionRect = annotationBounds(for: stroke, in: rect).insetBy(dx: -5, dy: -5)
+        let path = NSBezierPath(roundedRect: selectionRect, xRadius: 4, yRadius: 4)
+        NSColor.controlAccentColor.withAlphaComponent(0.08).setFill()
+        path.fill()
         NSColor.controlAccentColor.withAlphaComponent(0.9).setStroke()
         path.lineWidth = 1.5
         path.setLineDash([4, 3], count: 2, phase: 0)
         path.stroke()
+    }
+
+    private func hitTest(_ stroke: AnnotationStroke, at point: CGPoint, in rect: CGRect) -> Bool {
+        switch stroke.tool {
+        case .rectangle, .ellipse, .highlight, .number:
+            return annotationBounds(for: stroke, in: rect).insetBy(dx: -7, dy: -7).contains(point)
+        case .arrow:
+            let displayPoints = stroke.points.map { strokePoint in
+                CGPoint(x: rect.minX + strokePoint.x * rect.width, y: rect.minY + strokePoint.y * rect.height)
+            }
+            guard let first = displayPoints.first, let last = displayPoints.last else { return false }
+            let lineWidth = max(1, stroke.width * min(rect.width, rect.height))
+            let arrowPath = displayPoints.count > 2
+                ? AnnotationGeometry.gestureArrowPath(points: displayPoints, lineWidth: lineWidth)
+                : AnnotationGeometry.taperedArrowPath(from: first, to: last, lineWidth: lineWidth)
+            let hitPath = arrowPath.copy(
+                strokingWithWidth: 10,
+                lineCap: .round,
+                lineJoin: .round,
+                miterLimit: 10
+            )
+            return arrowPath.contains(point) || hitPath.contains(point)
+        case .pen, .mosaic, .line:
+            let displayPoints = stroke.points.map { strokePoint in
+                CGPoint(x: rect.minX + strokePoint.x * rect.width, y: rect.minY + strokePoint.y * rect.height)
+            }
+            let tolerance = max(7, stroke.width * min(rect.width, rect.height) / 2 + 4)
+            if displayPoints.count == 1 {
+                return hypot(point.x - displayPoints[0].x, point.y - displayPoints[0].y) <= tolerance
+            }
+            for index in 0..<(displayPoints.count - 1) {
+                if distance(from: point, toSegmentFrom: displayPoints[index], to: displayPoints[index + 1]) <= tolerance {
+                    return true
+                }
+            }
+            return false
+        case .text, .ocr, .redaction:
+            return false
+        }
+    }
+
+    private func distance(from point: CGPoint, toSegmentFrom start: CGPoint, to end: CGPoint) -> CGFloat {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let lengthSquared = dx * dx + dy * dy
+        guard lengthSquared > 0 else { return hypot(point.x - start.x, point.y - start.y) }
+        let projection = min(max(((point.x - start.x) * dx + (point.y - start.y) * dy) / lengthSquared, 0), 1)
+        let nearest = CGPoint(x: start.x + projection * dx, y: start.y + projection * dy)
+        return hypot(point.x - nearest.x, point.y - nearest.y)
+    }
+
+    private func supportsDirectEditing(_ tool: AnnotationTool) -> Bool {
+        switch tool {
+        case .mosaic, .pen, .rectangle, .highlight, .arrow, .ellipse, .line, .number:
+            return true
+        case .text, .ocr, .redaction:
+            return false
+        }
+    }
+
+    private func notifySelectedAnnotationStyle(at index: Int?) {
+        guard let index,
+              history.strokes.indices.contains(index) else { return }
+        let stroke = history.strokes[index]
+        let selectedWidth = stroke.width * CGFloat(max(1, min(sourceImage.width, sourceImage.height)))
+        isSynchronizingTextStyle = true
+        annotationColor = stroke.color.nsColor
+        brushPixelWidth = selectedWidth
+        isSynchronizingTextStyle = false
+        if stroke.tool == .arrow {
+            arrowDrawingMode = AnnotationArrowMode.mode(for: stroke)
+            onSelectedArrowModeChanged?(arrowDrawingMode)
+        }
+        onSelectedAnnotationStyleChanged?(stroke.tool, stroke.color.nsColor, selectedWidth)
     }
 
     private func drawTextPreview(_ stroke: AnnotationStroke, in rect: CGRect) {
@@ -1077,9 +1223,15 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
                 NSBezierPath(rect: box).stroke()
             }
         } else if stroke.tool == .arrow, let last = points.last {
-            path.line(to: last)
-            let head = AnnotationGeometry.arrowHead(from: first, to: last, length: max(path.lineWidth * 3, 12))
-            path.move(to: head.0); path.line(to: last); path.line(to: head.1); path.stroke()
+            guard let context = NSGraphicsContext.current?.cgContext else { return }
+            let arrowPath = points.count > 2
+                ? AnnotationGeometry.gestureArrowPath(points: points, lineWidth: path.lineWidth)
+                : AnnotationGeometry.taperedArrowPath(from: first, to: last, lineWidth: path.lineWidth)
+            context.saveGState()
+            context.setFillColor(stroke.color.cgColor)
+            context.addPath(arrowPath)
+            context.fillPath()
+            context.restoreGState()
         } else if stroke.tool == .line, let last = points.last {
             path.line(to: last)
             path.stroke()
