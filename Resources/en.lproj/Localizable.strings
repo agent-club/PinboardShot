@@ -177,6 +177,9 @@
 "preferences.shortcutUnsafe" = "Use a function key or include ⌘, ⌥, or ⌃";
 "annotation.tool.arrow" = "Arrow";
 "annotation.tool.text" = "Text";
+"annotation.arrow.mode" = "Arrow Drawing Mode";
+"annotation.arrow.mode.straight" = "Straight Arrow";
+"annotation.arrow.mode.freehand" = "Freehand Arrow";
 "annotation.color" = "Color";
 "annotation.width" = "Width";
 "annotation.undo" = "Undo";

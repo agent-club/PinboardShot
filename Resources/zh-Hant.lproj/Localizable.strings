@@ -177,6 +177,9 @@
 "preferences.shortcutUnsafe" = "需要功能鍵或 ⌘、⌥、⌃ 輔助鍵";
 "annotation.tool.arrow" = "箭頭";
 "annotation.tool.text" = "文字";
+"annotation.arrow.mode" = "箭頭繪製方式";
+"annotation.arrow.mode.straight" = "一般箭頭";
+"annotation.arrow.mode.freehand" = "自由繪製箭頭";
 "annotation.color" = "顏色";
 "annotation.width" = "粗細";
 "annotation.undo" = "復原";

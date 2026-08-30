@@ -177,6 +177,9 @@
 "preferences.shortcutUnsafe" = "需要功能键或 ⌘、⌥、⌃ 修饰键";
 "annotation.tool.arrow" = "箭头";
 "annotation.tool.text" = "文字";
+"annotation.arrow.mode" = "箭头绘制方式";
+"annotation.arrow.mode.straight" = "普通箭头";
+"annotation.arrow.mode.freehand" = "自由绘制箭头";
 "annotation.color" = "颜色";
 "annotation.width" = "粗细";
 "annotation.undo" = "撤销";

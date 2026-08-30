@@ -76,15 +76,12 @@ enum AnnotationRenderer {
             }
         case .arrow:
             guard let last = points.last else { break }
-            context.setStrokeColor(stroke.color.cgColor)
-            context.beginPath()
-            context.move(to: first)
-            context.addLine(to: last)
-            let head = AnnotationGeometry.arrowHead(from: first, to: last, length: max(width * 3, 12))
-            context.move(to: head.0)
-            context.addLine(to: last)
-            context.addLine(to: head.1)
-            context.strokePath()
+            let path = points.count > 2
+                ? AnnotationGeometry.gestureArrowPath(points: points, lineWidth: width)
+                : AnnotationGeometry.taperedArrowPath(from: first, to: last, lineWidth: width)
+            context.setFillColor(stroke.color.cgColor)
+            context.addPath(path)
+            context.fillPath()
         case .line:
             guard let last = points.last else { break }
             context.setStrokeColor(stroke.color.cgColor)
