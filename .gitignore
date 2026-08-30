@@ -6,8 +6,11 @@ DerivedData/
 *.dSYM/
 *.xcuserstate
 .vscode/
-audit/rollback/
+.skill-staging/
+audit/
 AGENTS.md
+PROJECT_HANDOFF.md
+design-qa.md
 .DS_Store
 
 # Local configuration and logs
@@ -22,21 +25,3 @@ AGENTS.md
 *.pem
 *.key
 *.mobileprovision
-
-# Temporary public-repository boundary. Until the native application source is
-# ready to publish, only the public documentation surfaces below may enter the
-# root Git repository. The website keeps its own more specific ignore rules.
-/*
-!/.gitignore
-!/.github/
-!/.github/**
-!/LICENSE
-!/NOTICE.md
-!/README.md
-!/SECURITY.md
-!/scripts/
-!/scripts/**
-!/website/
-!/website/**
-!/docs/
-!/docs/**
