@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="152" y1="116" x2="866" y2="908" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#6C5CE7"/>
+      <stop offset="0.48" stop-color="#4458D8"/>
+      <stop offset="1" stop-color="#182A68"/>
+    </linearGradient>
+    <linearGradient id="screen" x1="302" y1="311" x2="713" y2="702" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F7FBFF"/>
+      <stop offset="1" stop-color="#D8E6FF"/>
+    </linearGradient>
+    <linearGradient id="pin" x1="605" y1="241" x2="738" y2="450" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFDC67"/>
+      <stop offset="0.52" stop-color="#FF9D43"/>
+      <stop offset="1" stop-color="#F15A5A"/>
+    </linearGradient>
+    <filter id="cardShadow" x="190" y="219" width="676" height="650" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="34" stdDeviation="32" flood-color="#081134" flood-opacity="0.38"/>
+    </filter>
+    <filter id="pinShadow" x="555" y="211" width="254" height="312" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="16" stdDeviation="14" flood-color="#10183A" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+
+  <rect x="64" y="64" width="896" height="896" rx="214" fill="url(#background)"/>
+  <path d="M129 644C245 520 309 326 497 178C638 67 814 112 925 240V746C839 876 700 947 531 960H278C146 930 76 826 66 700Z" fill="#1DE2D0" opacity="0.10"/>
+  <circle cx="225" cy="238" r="74" fill="#FFFFFF" opacity="0.08"/>
+  <circle cx="824" cy="754" r="112" fill="#65F1E4" opacity="0.08"/>
+
+  <g filter="url(#cardShadow)" transform="rotate(-5 512 535)">
+    <rect x="230" y="270" width="564" height="520" rx="88" fill="#101A48" opacity="0.92"/>
+    <rect x="254" y="294" width="516" height="472" rx="68" fill="url(#screen)"/>
+    <path d="M254 638L386 505L487 596L601 459L770 626V698C770 735.6 739.6 766 702 766H322C284.4 766 254 735.6 254 698V638Z" fill="#7B91F5" opacity="0.80"/>
+    <path d="M254 676L407 558L527 661L616 581L770 686V698C770 735.6 739.6 766 702 766H322C284.4 766 254 735.6 254 698V676Z" fill="#4057C8"/>
+    <circle cx="390" cy="436" r="54" fill="#FFBC5B"/>
+    <path d="M304 356V324C304 307.4 317.4 294 334 294H370M654 294H690C706.6 294 720 307.4 720 324V360M720 650V696C720 712.6 706.6 726 690 726H650M374 726H334C317.4 726 304 712.6 304 696V654" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" opacity="0.96"/>
+  </g>
+
+  <g filter="url(#pinShadow)" transform="rotate(12 674 351)">
+    <path d="M611 262C611 240 629 222 651 222H705C727 222 745 240 745 262V286C745 310 734 333 715 348L705 356V410H651V356L641 348C622 333 611 310 611 286V262Z" fill="url(#pin)"/>
+    <path d="M668 410H688L678 514L668 410Z" fill="#F6F8FF"/>
+    <path d="M630 268C630 252.5 642.5 240 658 240H699" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" opacity="0.50"/>
+  </g>
+</svg>
