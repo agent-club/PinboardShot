@@ -1,46 +1,46 @@
 {
-  "version": "0.7.0",
-  "build": "41",
-  "date": "2026.08.30",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.7.0",
+  "version": "0.8.0",
+  "build": "42",
+  "date": "2026.08.31",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.8.0",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.7.0-41.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.7.0/PinboardShot-0.7.0-41.dmg",
-      "sha256": "fac5683db50638bca1a97b2e7b5e2b6f9d263528eeaf84c85511384548a991c5"
+      "name": "PinboardShot-0.8.0-42.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.0/PinboardShot-0.8.0-42.dmg",
+      "sha256": "d6c65b286d7390f5aa9ecbab0fab2538b35dcbf75e0dd467bfa213eb20b410e5"
     },
     "zip": {
-      "name": "PinboardShot-0.7.0-41.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.7.0/PinboardShot-0.7.0-41.zip",
-      "sha256": "f78eecb75ba08489d5903125fc54cbbf6f52ce742328b00d4cc397774a9da525"
+      "name": "PinboardShot-0.8.0-42.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.0/PinboardShot-0.8.0-42.zip",
+      "sha256": "7bedf29046fbbde5cd3be252569605b2eea89b280bc8f9bc581e7169c90eff7f"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.7.0/appcast.xml",
-      "sha256": "6032e9a96c1b2ba130aeae7d0058afd24b99a9680b04f40cd200f37a41cd1148"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.0/appcast.xml",
+      "sha256": "67bf112b295ce0a3fa4ec90cd6c712fe8876883f48b38cfc8092ce5e71e71ca4"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "贴图工作区与本机知识管理",
+    "title": "直接标注与自定义工具栏",
     "changes": [
-      "贴图工作区支持搜索、排序、重命名、复制和最近工作区恢复",
-      "贴图右键新增并排、差异和混合对比，备注与标签会随工作区和恢复快照保存",
-      "历史页支持 OCR 搜索、识别状态、复制文本、查看详情和失败重试",
-      "工作区可导出图片、PDF 或 Markdown；会话恢复为默认关闭、最长保留 24 小时的可选能力",
-      "新增按时间清理、存储占用预览和来源 App 排除；所有新增数据仍只保存在本机",
+      "截图选区工具栏直接展示高频标注工具，无需进入额外标注模式；已提交的标注可重新选中、改样式和拖动",
+      "工具下方即时出现二级样式栏，提供五档真实粗细预览、预设颜色和按工具适配的尺寸范围",
+      "偏好设置可控制工具栏显示项与顺序，并可选择按仅保存在本机的使用频次自动排序",
+      "取色器融入正常截图流程，支持跟随预览、单击冻结、双击复制以及右键复制并退出",
+      "箭头支持普通与自由绘制模式；自由箭头跟随手势并采用连续、饱满的软带轮廓",
       "应用、Sparkle 更新 ZIP 和手动安装 DMG 均已签名并通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Pin workspaces and on-device knowledge",
+    "title": "Direct annotation and a configurable toolbar",
     "changes": [
-      "Pin workspaces now support search, sorting, renaming, duplication, and restoring recent workspaces.",
-      "Pin context menus add side-by-side, difference, and blend comparisons; notes and tags persist with workspaces and recovery snapshots.",
-      "History adds OCR search, recognition status, text copying, details, and retry for failed recognition.",
-      "Workspaces export as images, PDF, or Markdown; optional session recovery is off by default and retained for at most 24 hours.",
-      "Adds time-based cleanup, storage previews, and source-app exclusions while keeping all new data on this Mac.",
+      "The selection toolbar now exposes frequent annotation tools directly without a separate mode; committed annotations can be reselected, restyled, and moved.",
+      "A secondary style palette appears below the active tool with five true-width previews, preset colors, and tool-specific size ranges.",
+      "Preferences can control toolbar visibility and order, with optional automatic sorting by usage counts stored only on this Mac.",
+      "The color picker is integrated into the regular capture flow with live preview, click-to-freeze, double-click copy, and right-click copy-and-exit.",
+      "Arrows support straight and freehand modes; freehand arrows follow the gesture with a continuous, balanced ribbon silhouette.",
       "The app, Sparkle update ZIP, and manual-install DMG are signed and notarized by Apple."
     ]
   }
