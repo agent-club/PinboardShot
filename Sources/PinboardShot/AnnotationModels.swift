@@ -39,6 +39,72 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Sendable {
         case .redaction: "eye.slash.fill"
         }
     }
+
+    var customToolbarImage: NSImage? {
+        if self == .mosaic {
+            let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+                let blocks: [(CGRect, CGFloat)] = [
+                    (CGRect(x: 2, y: 9, width: 7, height: 7), 1),
+                    (CGRect(x: 11, y: 12, width: 5, height: 4), 0.55),
+                    (CGRect(x: 11, y: 7, width: 5, height: 3), 1),
+                    (CGRect(x: 2, y: 2, width: 3, height: 5), 0.55),
+                    (CGRect(x: 7, y: 2, width: 4, height: 5), 1),
+                    (CGRect(x: 13, y: 2, width: 3, height: 3), 0.55)
+                ]
+                for (rect, alpha) in blocks {
+                    NSColor.black.withAlphaComponent(alpha).setFill()
+                    NSBezierPath(roundedRect: rect, xRadius: 0.8, yRadius: 0.8).fill()
+                }
+                return true
+            }
+            image.isTemplate = true
+            image.accessibilityDescription = L10n.text(titleKey)
+            return image
+        }
+        guard self == .highlight else { return nil }
+        let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { _ in
+            NSColor.black.setStroke()
+            let barrel = NSBezierPath()
+            barrel.move(to: CGPoint(x: 5, y: 10))
+            barrel.line(to: CGPoint(x: 10.5, y: 15.5))
+            barrel.curve(
+                to: CGPoint(x: 12, y: 15.5),
+                controlPoint1: CGPoint(x: 10.9, y: 15.9),
+                controlPoint2: CGPoint(x: 11.6, y: 15.9)
+            )
+            barrel.line(to: CGPoint(x: 15.5, y: 12))
+            barrel.curve(
+                to: CGPoint(x: 15.5, y: 10.5),
+                controlPoint1: CGPoint(x: 15.9, y: 11.6),
+                controlPoint2: CGPoint(x: 15.9, y: 10.9)
+            )
+            barrel.line(to: CGPoint(x: 10, y: 5))
+            barrel.close()
+            barrel.lineWidth = 1.5
+            barrel.lineJoinStyle = .round
+            barrel.stroke()
+
+            NSColor.black.setFill()
+            let nib = NSBezierPath()
+            nib.move(to: CGPoint(x: 5.5, y: 8.5))
+            nib.line(to: CGPoint(x: 8.5, y: 5.5))
+            nib.line(to: CGPoint(x: 7, y: 4))
+            nib.line(to: CGPoint(x: 3, y: 4))
+            nib.close()
+            nib.fill()
+
+            NSColor.black.withAlphaComponent(0.45).setFill()
+            NSBezierPath(
+                roundedRect: CGRect(x: 2, y: 0.75, width: 14, height: 2),
+                xRadius: 1,
+                yRadius: 1
+            ).fill()
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = L10n.text(titleKey)
+        return image
+    }
 }
 
 enum AnnotationArrowMode: Int, CaseIterable, Sendable {

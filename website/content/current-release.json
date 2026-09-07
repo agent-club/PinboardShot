@@ -1,47 +1,45 @@
 {
-  "version": "0.8.0",
-  "build": "42",
-  "date": "2026.08.31",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.8.0",
+  "version": "0.8.1",
+  "build": "43",
+  "date": "2026.09.08",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.8.1",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.8.0-42.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.0/PinboardShot-0.8.0-42.dmg",
-      "sha256": "d6c65b286d7390f5aa9ecbab0fab2538b35dcbf75e0dd467bfa213eb20b410e5"
+      "name": "PinboardShot-0.8.1-43.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.1/PinboardShot-0.8.1-43.dmg",
+      "sha256": "7da655b47662d35f7a729636e1d1731f53a0d5ed5e38bbfc61f83d100f060569"
     },
     "zip": {
-      "name": "PinboardShot-0.8.0-42.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.0/PinboardShot-0.8.0-42.zip",
-      "sha256": "7bedf29046fbbde5cd3be252569605b2eea89b280bc8f9bc581e7169c90eff7f"
+      "name": "PinboardShot-0.8.1-43.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.1/PinboardShot-0.8.1-43.zip",
+      "sha256": "144663ad481a000d6c9fde7a3ea344748b27d01cf7d4aa73089231df129569b1"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.0/appcast.xml",
-      "sha256": "67bf112b295ce0a3fa4ec90cd6c712fe8876883f48b38cfc8092ce5e71e71ca4"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.1/appcast.xml",
+      "sha256": "725fa48e9c74f648d1367b446095b8ef50e3c972f8279df06c193573da9d2bba"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "直接标注与自定义工具栏",
+    "title": "更清晰的标注图标与即时提示",
     "changes": [
-      "截图选区工具栏直接展示高频标注工具，无需进入额外标注模式；已提交的标注可重新选中、改样式和拖动",
-      "工具下方即时出现二级样式栏，提供五档真实粗细预览、预设颜色和按工具适配的尺寸范围",
-      "偏好设置可控制工具栏显示项与顺序，并可选择按仅保存在本机的使用频次自动排序",
-      "取色器融入正常截图流程，支持跟随预览、单击冻结、双击复制以及右键复制并退出",
-      "箭头支持普通与自由绘制模式；自由箭头跟随手势并采用连续、饱满的软带轮廓",
-      "应用、Sparkle 更新 ZIP 和手动安装 DMG 均已签名并通过 Apple 公证"
+      "重新设计高亮笔与马赛克图标，统一工具栏的尺寸、线条和颜色风格",
+      "文字识别使用扫描框图标，鼠标悬浮时显示“文字识别”，并同步更新繁体中文和英文提示",
+      "截图工具栏的悬浮提示延迟缩短至 16 毫秒；移开鼠标、点击工具或关闭选区时及时消失",
+      "提示框会根据窗口边缘调整位置，不拦截鼠标操作",
+      "提供 Apple Silicon 与 Intel 通用版本，应用和 DMG 通过 Apple 公证，Sparkle 更新包带有签名"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Direct annotation and a configurable toolbar",
+    "title": "Clearer annotation icons and faster tooltips",
     "changes": [
-      "The selection toolbar now exposes frequent annotation tools directly without a separate mode; committed annotations can be reselected, restyled, and moved.",
-      "A secondary style palette appears below the active tool with five true-width previews, preset colors, and tool-specific size ranges.",
-      "Preferences can control toolbar visibility and order, with optional automatic sorting by usage counts stored only on this Mac.",
-      "The color picker is integrated into the regular capture flow with live preview, click-to-freeze, double-click copy, and right-click copy-and-exit.",
-      "Arrows support straight and freehand modes; freehand arrows follow the gesture with a continuous, balanced ribbon silhouette.",
-      "The app, Sparkle update ZIP, and manual-install DMG are signed and notarized by Apple."
+      "Redesigned highlighter and mosaic icons with consistent toolbar sizing, strokes, and colors.",
+      "Text recognition uses a scan-frame icon and a clear hover label, with updated Simplified Chinese, Traditional Chinese, and English text.",
+      "Selection toolbar tooltips now use a 16 ms delay and dismiss when the pointer leaves, a tool is clicked, or the selection closes.",
+      "Tooltips adjust near window edges and let pointer input pass through.",
+      "Includes Apple Silicon and Intel support, an Apple-notarized app and DMG, and a signed Sparkle update package."
     ]
   }
 }

@@ -190,7 +190,7 @@ enum L10n {
         "colorPicker.format.swiftUI": "SwiftUI",
         "colorPicker.format.nsColor": "NSColor",
         "annotation.tool.mosaic": "马赛克",
-        "annotation.tool.ocr": "OCR",
+        "annotation.tool.ocr": "文字识别",
         "annotation.tool.ellipse": "椭圆",
         "annotation.tool.line": "直线",
         "annotation.tool.number": "步骤编号",
