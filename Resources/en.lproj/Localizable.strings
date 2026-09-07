@@ -110,7 +110,7 @@
 "annotation.tool.pen" = "Pen";
 "annotation.tool.rectangle" = "Rectangle";
 "annotation.tool.highlight" = "Highlight";
-"annotation.tool.ocr" = "OCR";
+"annotation.tool.ocr" = "Text Recognition";
 "annotation.tool.ellipse" = "Ellipse";
 "annotation.tool.line" = "Line";
 "annotation.tool.number" = "Step Number";

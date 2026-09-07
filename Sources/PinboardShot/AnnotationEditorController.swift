@@ -54,7 +54,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         tools.selectedSegment = 0
         tools.controlSize = .small
         for (index, tool) in AnnotationTool.editorTools.enumerated() {
-            tools.setImage(NSImage(systemSymbolName: tool.symbolName, accessibilityDescription: L10n.text(tool.titleKey)), forSegment: index)
+            tools.setImage(tool.customToolbarImage ?? NSImage(systemSymbolName: tool.symbolName, accessibilityDescription: L10n.text(tool.titleKey)), forSegment: index)
             tools.setLabel("", forSegment: index)
             tools.setToolTip(L10n.text(tool.titleKey), forSegment: index)
             tools.setWidth(38, forSegment: index)

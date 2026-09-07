@@ -110,7 +110,7 @@
 "annotation.tool.pen" = "畫筆";
 "annotation.tool.rectangle" = "矩形";
 "annotation.tool.highlight" = "醒目提示";
-"annotation.tool.ocr" = "OCR";
+"annotation.tool.ocr" = "文字識別";
 "annotation.tool.ellipse" = "橢圓";
 "annotation.tool.line" = "直線";
 "annotation.tool.number" = "步驟編號";

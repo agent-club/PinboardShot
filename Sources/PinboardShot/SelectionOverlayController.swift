@@ -725,9 +725,27 @@ extension SelectionOverlayViewDelegate {
 }
 
 final class OverlayToolbarButton: NSButton {
+    static let tooltipDelay: Duration = .milliseconds(16)
+
     private var hoverTrackingArea: NSTrackingArea?
     private var isHovered = false
     private var isPressed = false
+    private var tooltipText: String?
+    private var tooltipTask: Task<Void, Never>?
+    private var tooltipView: OverlayToolbarTooltipView?
+
+    // 保留现有文案接口，关闭系统延迟提示，避免与快速提示重复出现。
+    override var toolTip: String? {
+        get { tooltipText }
+        set {
+            tooltipText = newValue
+            super.toolTip = nil
+            setAccessibilityHelp(newValue)
+            dismissTooltip()
+            if isHovered && !isPressed { scheduleTooltip() }
+        }
+    }
+
     var accentColor: NSColor = .controlAccentColor {
         didSet { updateBackground() }
     }
@@ -760,19 +778,104 @@ final class OverlayToolbarButton: NSButton {
     override func mouseEntered(with event: NSEvent) {
         isHovered = true
         updateBackground()
+        scheduleTooltip()
     }
 
     override func mouseExited(with event: NSEvent) {
         isHovered = false
         updateBackground()
+        dismissTooltip()
     }
 
     override func mouseDown(with event: NSEvent) {
+        dismissTooltip()
         isPressed = true
         updateBackground()
         super.mouseDown(with: event)
         isPressed = false
         updateBackground()
+    }
+
+    override func performClick(_ sender: Any?) {
+        dismissTooltip()
+        super.performClick(sender)
+        dismissTooltip()
+    }
+
+    override func viewDidHide() {
+        super.viewDidHide()
+        isHovered = false
+        dismissTooltip()
+    }
+
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        isHovered = false
+        dismissTooltip()
+        for name in [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification, NSWindow.didChangeOcclusionStateNotification] {
+            NotificationCenter.default.removeObserver(self, name: name, object: window)
+        }
+        super.viewWillMove(toWindow: newWindow)
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard let window else { return }
+        for name in [NSWindow.didResignKeyNotification, NSWindow.willCloseNotification, NSWindow.didChangeOcclusionStateNotification] {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(tooltipWindowChanged(_:)),
+                name: name,
+                object: window
+            )
+        }
+    }
+
+    @objc private func tooltipWindowChanged(_ notification: Notification) {
+        if notification.name == NSWindow.didChangeOcclusionStateNotification, window?.isVisible == true { return }
+        isHovered = false
+        dismissTooltip()
+    }
+
+    private func scheduleTooltip() {
+        dismissTooltip()
+        guard let tooltipText, !tooltipText.isEmpty else { return }
+        tooltipTask = Task { @MainActor [weak self] in
+            do {
+                try await Task.sleep(for: Self.tooltipDelay)
+            } catch {
+                return
+            }
+            guard !Task.isCancelled, let self, self.isHovered, !self.isPressed,
+                  !self.isHiddenOrHasHiddenAncestor,
+                  let window = self.window, window.isVisible,
+                  let container = window.contentView else { return }
+            self.tooltipTask = nil
+            let tooltip = OverlayToolbarTooltipView(text: tooltipText)
+            tooltip.appearance = self.effectiveAppearance
+            let anchor = self.convert(self.bounds, to: container)
+            let margin: CGFloat = 8
+            let below = container.isFlipped
+                ? anchor.maxY + margin
+                : anchor.minY - tooltip.frame.height - margin
+            let above = container.isFlipped
+                ? anchor.minY - tooltip.frame.height - margin
+                : anchor.maxY + margin
+            let y = below >= container.bounds.minY + margin && below + tooltip.frame.height <= container.bounds.maxY - margin
+                ? below : above
+            tooltip.setFrameOrigin(CGPoint(
+                x: min(max(anchor.midX - tooltip.frame.width / 2, container.bounds.minX + margin), container.bounds.maxX - tooltip.frame.width - margin),
+                y: min(max(y, container.bounds.minY + margin), container.bounds.maxY - tooltip.frame.height - margin)
+            ))
+            container.addSubview(tooltip, positioned: .above, relativeTo: nil)
+            self.tooltipView = tooltip
+        }
+    }
+
+    private func dismissTooltip() {
+        tooltipTask?.cancel()
+        tooltipTask = nil
+        tooltipView?.removeFromSuperview()
+        tooltipView = nil
     }
 
     func setSymbol(_ symbolName: String, accessibilityLabel: String) {
@@ -815,6 +918,28 @@ final class OverlayToolbarButton: NSButton {
         layer?.borderColor = NSColor.white.withAlphaComponent(borderAlpha).cgColor
         contentTintColor = .labelColor
     }
+}
+
+final class OverlayToolbarTooltipView: NSVisualEffectView {
+    init(text: String) {
+        let label = NSTextField(wrappingLabelWithString: text)
+        label.font = .systemFont(ofSize: 12)
+        label.textColor = .labelColor
+        let size = label.cell!.cellSize(forBounds: CGRect(x: 0, y: 0, width: 240, height: 1000))
+        super.init(frame: CGRect(x: 0, y: 0, width: ceil(size.width) + 16, height: ceil(size.height) + 10))
+        material = .toolTip
+        blendingMode = .withinWindow
+        state = .active
+        wantsLayer = true
+        layer?.cornerRadius = 6
+        label.frame = bounds.insetBy(dx: 8, dy: 5)
+        addSubview(label)
+        setAccessibilityElement(false)
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
 }
 
 enum OverlayToolbarIconPalette {
@@ -2084,6 +2209,9 @@ final class SelectionOverlayView: NSView {
                 accentColor: OverlayToolbarIconPalette.color(for: tool),
                 action: #selector(annotationToolChanged(_:))
             )
+            if let image = tool.customToolbarImage {
+                button.image = image
+            }
             button.tag = index
             return button
         }
