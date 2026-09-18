@@ -50,6 +50,23 @@ final class ShortcutStore: ObservableObject {
     }
 
     private func load() {
+        // Disk records and legacy migrations must obey the same rules as newly recorded bindings.
+        defer {
+            var seenIDs = Set<UUID>()
+            var seenShortcuts = Set<Shortcut>()
+            let validBindings = bindings.filter { binding in
+                guard binding.shortcut.isSafeGlobalShortcut,
+                      !seenIDs.contains(binding.id),
+                      !seenShortcuts.contains(binding.shortcut) else { return false }
+                seenIDs.insert(binding.id)
+                seenShortcuts.insert(binding.shortcut)
+                return true
+            }
+            if validBindings != bindings {
+                bindings = validBindings
+                persist()
+            }
+        }
         if let data = defaults.data(forKey: storageKey),
            let decoded = try? JSONDecoder().decode([ShortcutBinding].self, from: data) {
             bindings = decoded

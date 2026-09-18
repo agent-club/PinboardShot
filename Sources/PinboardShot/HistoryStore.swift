@@ -148,6 +148,7 @@ enum HistorySearchMatcher {
 @MainActor
 final class HistoryStore: ObservableObject {
     @Published private(set) var items: [HistoryItem] = []
+    @Published private(set) var retentionErrorMessage: String?
     private let fileManager: FileManager
     private let defaults: UserDefaults
     private let thumbnailCache = NSCache<NSString, NSImage>()
@@ -158,6 +159,8 @@ final class HistoryStore: ObservableObject {
         self.defaults = defaults
         cleanupStagedRemovals()
         loadIndex()
+        // Failures remain visible in preferences; the removal transaction preserves the images.
+        try? applyRetentionPolicy()
     }
 
     @discardableResult
@@ -226,6 +229,32 @@ final class HistoryStore: ObservableObject {
         NSImage(contentsOf: fileURL(for: item))
     }
 
+    func saveDraft(_ draft: AnnotationDraft, for item: HistoryItem) throws {
+        guard items.contains(where: { $0.id == item.id }) else { throw CaptureFeatureError.invalidDocument }
+        _ = try draft.sourceImage()
+        let data = try JSONEncoder().encode(draft)
+        try data.write(to: draftURL(for: item), options: .atomic)
+        try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: draftURL(for: item).path)
+    }
+
+    func draft(for item: HistoryItem) throws -> AnnotationDraft? {
+        guard items.contains(where: { $0.id == item.id }) else { return nil }
+        let url = draftURL(for: item)
+        guard fileManager.fileExists(atPath: url.path) else { return nil }
+        let values = try url.resourceValues(forKeys: [.isSymbolicLinkKey, .isRegularFileKey, .fileSizeKey])
+        guard values.isRegularFile == true, values.isSymbolicLink != true,
+              (values.fileSize ?? Int.max) <= AnnotationDraft.maximumBytes * 2 else {
+            throw CaptureFeatureError.invalidDocument
+        }
+        let draft = try JSONDecoder().decode(AnnotationDraft.self, from: Data(contentsOf: url))
+        _ = try draft.sourceImage()
+        return draft
+    }
+
+    private func draftURL(for item: HistoryItem) -> URL {
+        historyDirectory.appendingPathComponent("\(item.id.uuidString).draft.json")
+    }
+
     func fileURL(for item: HistoryItem) -> URL {
         let canonicalFilename = "\(item.id.uuidString).png"
         guard item.filename == canonicalFilename else {
@@ -254,6 +283,8 @@ final class HistoryStore: ObservableObject {
             try fileManager.removeItem(at: historyDirectory)
         }
         thumbnailCache.removeAllObjects()
+        activeOCRRequests.removeAll()
+        retentionErrorMessage = nil
         items = []
     }
 
@@ -392,6 +423,7 @@ final class HistoryStore: ObservableObject {
         let candidates = items.filter { $0.createdAt < cutoff }
         let reclaimableBytes = try candidates.reduce(into: Int64(0)) { total, item in
             total += try fileSize(at: fileURL(for: item))
+            total += try fileSizeIfPresent(at: draftURL(for: item))
         }
         return HistoryCleanupPreview(
             cutoff: cutoff,
@@ -411,9 +443,15 @@ final class HistoryStore: ObservableObject {
     }
 
     func applyRetentionPolicy() throws {
-        let retained = retainedItems(from: items)
-        let retainedIDs = Set(retained.map(\.id))
-        _ = try removeItems(withIDs: Set(items.lazy.filter { !retainedIDs.contains($0.id) }.map(\.id)))
+        do {
+            let retained = retainedItems(from: items)
+            let retainedIDs = Set(retained.map(\.id))
+            _ = try removeItems(withIDs: Set(items.lazy.filter { !retainedIDs.contains($0.id) }.map(\.id)))
+            retentionErrorMessage = nil
+        } catch {
+            retentionErrorMessage = L10n.text("preferences.historyPolicyFailed", error.localizedDescription)
+            throw error
+        }
     }
 
     private var historyDirectory: URL {
@@ -480,7 +518,7 @@ final class HistoryStore: ObservableObject {
                 pixelHeight: representation.pixelsHigh
             )
         }.sorted { $0.createdAt > $1.createdAt }
-        items = retainedItems(from: items)
+        // Keep all recovered entries until applyRetentionPolicy can remove both metadata and pixels.
         try? persistIndex()
     }
 
@@ -523,7 +561,9 @@ final class HistoryStore: ObservableObject {
     }
 
     private func stageFiles(for removedItems: [HistoryItem]) throws -> StagedRemoval {
-        let existingItems = removedItems.filter { fileManager.fileExists(atPath: fileURL(for: $0).path) }
+        let existingItems = removedItems.filter {
+            fileManager.fileExists(atPath: fileURL(for: $0).path) || fileManager.fileExists(atPath: draftURL(for: $0).path)
+        }
         guard !existingItems.isEmpty else {
             return StagedRemoval(directory: nil, items: [])
         }
@@ -539,11 +579,10 @@ final class HistoryStore: ObservableObject {
         var stagedItems: [HistoryItem] = []
         do {
             for item in existingItems {
-                try fileManager.moveItem(
-                    at: fileURL(for: item),
-                    to: stagingDirectory.appendingPathComponent(stagedFilename(for: item))
-                )
                 stagedItems.append(item)
+                for source in [fileURL(for: item), draftURL(for: item)] where fileManager.fileExists(atPath: source.path) {
+                    try fileManager.moveItem(at: source, to: stagingDirectory.appendingPathComponent(source.lastPathComponent))
+                }
             }
         } catch {
             restore(StagedRemoval(directory: stagingDirectory, items: stagedItems))
@@ -555,10 +594,12 @@ final class HistoryStore: ObservableObject {
     private func restore(_ stagedRemoval: StagedRemoval) {
         guard let directory = stagedRemoval.directory else { return }
         for item in stagedRemoval.items {
-            let stagedURL = directory.appendingPathComponent(stagedFilename(for: item))
-            guard fileManager.fileExists(atPath: stagedURL.path),
-                  !fileManager.fileExists(atPath: fileURL(for: item).path) else { continue }
-            try? fileManager.moveItem(at: stagedURL, to: fileURL(for: item))
+            for destination in [fileURL(for: item), draftURL(for: item)] {
+                let stagedURL = directory.appendingPathComponent(destination.lastPathComponent)
+                guard fileManager.fileExists(atPath: stagedURL.path),
+                      !fileManager.fileExists(atPath: destination.path) else { continue }
+                try? fileManager.moveItem(at: stagedURL, to: destination)
+            }
         }
         try? fileManager.removeItem(at: directory)
     }
@@ -580,10 +621,6 @@ final class HistoryStore: ObservableObject {
                   values.isSymbolicLink != true else { continue }
             try? fileManager.removeItem(at: url)
         }
-    }
-
-    private func stagedFilename(for item: HistoryItem) -> String {
-        "\(item.id.uuidString).png"
     }
 
     private func fileSize(at url: URL) throws -> Int64 {

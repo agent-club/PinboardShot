@@ -68,6 +68,7 @@ private enum TrayPanelIcon {
     case shortcuts
     case history
     case watermarkSettings
+    case toolbarSettings
     case generalSettings
     case detectWatermark
     case quickStart
@@ -102,6 +103,7 @@ private enum TrayPanelIcon {
         case .shortcuts: "keyboard"
         case .history: "clock"
         case .watermarkSettings: "eye.slash"
+        case .toolbarSettings: "slider.horizontal.2.square"
         case .generalSettings: "slider.horizontal.3"
         case .detectWatermark: "doc.text.magnifyingglass"
         case .quickStart: "book.closed"
@@ -136,13 +138,14 @@ private enum TrayPanelIcon {
             .success
         case .hotKeyError, .closePins, .quit:
             .danger
-        case .shortcuts, .history, .watermarkSettings, .generalSettings, .about, .includeCursor:
+        case .shortcuts, .history, .watermarkSettings, .toolbarSettings, .generalSettings, .about, .includeCursor:
             .neutral
         }
     }
 }
 
 enum TrayPanelCommand {
+    case showCaptureTools
     case capture(CaptureAction)
     case closeAllPins
     case restorePinInteraction
@@ -558,6 +561,10 @@ struct TrayPanelView: View {
 
     private var managementToolsOrbit: some View {
         VStack(spacing: 0) {
+            TrayListRow(title: L10n.text("feature.tools.title"), icon: .toolbarSettings) {
+                onCommand(.showCaptureTools)
+            }
+            TrayDivider()
             TrayListRow(title: PreferencesSection.shortcuts.title, icon: .shortcuts) {
                 onCommand(.showPreferences(.shortcuts))
             }
@@ -568,6 +575,10 @@ struct TrayPanelView: View {
             TrayDivider()
             TrayListRow(title: PreferencesSection.watermark.title, icon: .watermarkSettings) {
                 onCommand(.showPreferences(.watermark))
+            }
+            TrayDivider()
+            TrayListRow(title: L10n.text("tray.customizeToolbar"), icon: .toolbarSettings) {
+                onCommand(.showPreferences(.toolbar))
             }
             TrayDivider()
             TrayListRow(title: PreferencesSection.general.title, icon: .generalSettings) {

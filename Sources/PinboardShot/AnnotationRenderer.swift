@@ -88,6 +88,8 @@ enum AnnotationRenderer {
             context.move(to: first)
             context.addLine(to: last)
             context.strokePath()
+        case .ruler:
+            drawRuler(stroke, in: context, bounds: bounds)
         case .number:
             let radius = max(12, width)
             let circle = CGRect(x: first.x - radius, y: first.y - radius, width: radius * 2, height: radius * 2)
@@ -163,6 +165,37 @@ enum AnnotationRenderer {
         let textPath = CGPath(rect: textRect, transform: nil)
         let frame = CTFramesetterCreateFrame(framesetter, CFRange(location: 0, length: 0), textPath, nil)
         CTFrameDraw(frame, context)
+    }
+
+    static func drawRuler(_ stroke: AnnotationStroke, in context: CGContext, bounds: CGRect) {
+        guard let a = stroke.points.first, let b = stroke.points.last else { return }
+        let start = CGPoint(x: a.x * bounds.width, y: a.y * bounds.height)
+        let end = CGPoint(x: b.x * bounds.width, y: b.y * bounds.height)
+        context.saveGState()
+        defer { context.restoreGState() }
+        context.setStrokeColor(stroke.color.cgColor)
+        context.setLineWidth(max(1, stroke.width * min(bounds.width, bounds.height)))
+        context.move(to: start)
+        context.addLine(to: end)
+        let angle = atan2(end.y - start.y, end.x - start.x)
+        let cap = CGPoint(x: -sin(angle) * 5, y: cos(angle) * 5)
+        for point in [start, end] {
+            context.move(to: CGPoint(x: point.x - cap.x, y: point.y - cap.y))
+            context.addLine(to: CGPoint(x: point.x + cap.x, y: point.y + cap.y))
+        }
+        context.strokePath()
+        guard let text = stroke.text, !text.isEmpty else { return }
+        let font = CTFontCreateWithName("Menlo" as CFString, max(11, min(bounds.width, bounds.height) * 0.016), nil)
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: text, attributes: [
+            .font: font, .foregroundColor: NSColor.white
+        ]))
+        let textBounds = CTLineGetBoundsWithOptions(line, [])
+        let x = max(3, min((start.x + end.x - textBounds.width) / 2, bounds.width - textBounds.width - 6))
+        let y = max(3, min((start.y + end.y) / 2 + 9, bounds.height - textBounds.height - 8))
+        context.setFillColor(NSColor.black.withAlphaComponent(0.82).cgColor)
+        context.fill(CGRect(x: x - 3, y: y - 4, width: textBounds.width + 6, height: textBounds.height + 8))
+        context.textPosition = CGPoint(x: x, y: y)
+        CTLineDraw(line, context)
     }
 
     static func makePixelated(_ image: CGImage) -> CGImage? {

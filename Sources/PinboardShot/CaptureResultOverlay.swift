@@ -39,6 +39,7 @@ struct QuickCaptureOverlayActions {
     let annotate: () -> Void
     let pin: () -> Void
     let dismiss: () -> Void
+    var tools: (() -> Void)? = nil
 }
 
 @MainActor
@@ -51,6 +52,7 @@ final class CaptureResultOverlayController {
 
         let view = QuickCaptureOverlayView(image: image, actions: actions)
         let hostingController = NSHostingController(rootView: view)
+        hostingController.sizingOptions = []
         let panel = NSPanel(
             contentRect: CGRect(x: 0, y: 0, width: 360, height: 112),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -64,6 +66,9 @@ final class CaptureResultOverlayController {
         panel.hasShadow = true
         panel.hidesOnDeactivate = false
         panel.contentViewController = hostingController
+        // Attaching an unlaid-out hosting controller can reset the panel to zero size.
+        // Restore the fixed card size before calculating its bottom-right origin.
+        panel.setContentSize(NSSize(width: 360, height: 112))
 
         let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main
         if let visibleFrame = screen?.visibleFrame {
@@ -114,6 +119,12 @@ private struct QuickCaptureOverlayView: View {
                     Text(L10n.text("quickOverlay.title"))
                         .font(.headline)
                     Spacer()
+                    if let tools = actions.tools {
+                        Button(action: tools) { Image(systemName: "ellipsis.circle") }
+                            .buttonStyle(.plain)
+                            .help(L10n.text("feature.tools.title"))
+                            .accessibilityLabel(L10n.text("feature.tools.title"))
+                    }
                     Button(action: actions.dismiss) {
                         Image(systemName: "xmark")
                     }

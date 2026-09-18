@@ -33,6 +33,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let updateManager = UpdateManager()
     private let watermarkService = InvisibleWatermarkService()
     private let annotationEditorController = AnnotationEditorController()
+    private let captureToolsController = CaptureToolsController()
+    private let shortRecordingController = ShortRecordingController()
     private let pinMetadataEditorController = PinMetadataEditorController()
     private let captureResultOverlay = CaptureResultOverlayController()
     private let compositionStudioController = CompositionStudioController()
@@ -49,9 +51,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var trayIconAnimationFrame = 0
     private var trayIconAnimationTimer: Timer?
     private var statusPopoverOutsideClickMonitor: Any?
-    private var pendingAutomationPin = false
     private var lastExternalApplicationBundleIdentifier: String?
     private var pinSessionRecoverySaveTimer: Timer?
+    private var historyRetentionTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -90,13 +92,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.schedulePinSessionRecoverySave()
         }
         configureStatusItem()
+        captureToolsController.onCaptureStep = { [weak self] in self?.perform(.region) }
+        captureToolsController.onEdit = { [weak self] image, ruler in
+            self?.editCapture(image, ruler: ruler)
+        }
+        captureToolsController.onRecord = { [weak self] in self?.startShortRecording() }
+        captureToolsController.onUseImage = { [weak self] image in
+            self?.completeCapture(image, pin: false, collectStep: false)
+        }
+        shortRecordingController.onError = { [weak self] error in self?.present(error: error) }
         restorePinSessionIfEnabled()
         hotKeyManager.onAction = { [weak self] action in self?.perform(action) }
         registerShortcuts()
         presentFirstLaunchOrRequestPermission()
+        historyRetentionTimer = Timer.scheduledTimer(withTimeInterval: 3_600, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                try? self?.historyStore.applyRetentionPolicy()
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        shortRecordingController.discardPreview()
+        historyRetentionTimer?.invalidate()
+        historyRetentionTimer = nil
         pinSessionRecoverySaveTimer?.invalidate()
         pinSessionRecoverySaveTimer = nil
         flushPinSessionRecovery()
@@ -107,6 +126,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         if UserDefaults.standard.bool(forKey: "clearHistoryOnQuit") {
             try? historyStore.clear()
         }
+    }
+
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if shortRecordingController.isExportingVideo {
+            let alert = NSAlert()
+            alert.messageText = L10n.text("feature.record.exporting")
+            alert.runModal()
+            return .terminateCancel
+        }
+        if captureToolsController.guide.hasUnsavedChanges || shortRecordingController.isBusy || shortRecordingController.hasUnsavedVideo {
+            let alert = NSAlert()
+            alert.messageText = L10n.text("feature.quit.title")
+            alert.informativeText = L10n.text("feature.quit.help")
+            alert.addButton(withTitle: L10n.text("common.cancel"))
+            alert.addButton(withTitle: L10n.text("feature.quit.discard"))
+            guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
+        }
+        if shortRecordingController.isBusy {
+            Task { await shortRecordingController.cancel(); sender.reply(toApplicationShouldTerminate: true) }
+            return .terminateLater
+        }
+        return .terminateNow
     }
 
     func application(_ application: NSApplication, open urls: [URL]) {
@@ -357,6 +398,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func runTrayCommand(_ command: TrayPanelCommand) {
         statusPopover.performClose(nil)
         switch command {
+        case .showCaptureTools: captureToolsController.show()
         case .capture(let action): perform(action)
         case .closeAllPins: closeAllPins()
         case .restorePinInteraction: restoreAllPinInteraction()
@@ -531,37 +573,43 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         alert.runModal()
     }
 
-    private func perform(_ action: CaptureAction) {
+    private func perform(_ action: CaptureAction, pinResult: Bool = false) {
         switch action {
-        case .region:
-            Task { await captureRegion(pin: false) }
-        case .delayedRegion:
-            Task {
-                try? await Task.sleep(for: .seconds(3))
-                guard !Task.isCancelled else { return }
-                await captureRegion(pin: false)
-            }
-        case .repeatRegion:
-            Task { await repeatLastRegion() }
         case .filePin:
             chooseImageFileToPin()
-        case .scrollingRegion:
-            Task { await captureScrollingRegion() }
-        case .regionAndPin:
-            Task { await captureRegion(pin: true) }
-        case .display:
-            Task { await captureDisplay() }
-        case .window:
-            Task { await captureWindow() }
         case .clipboardPin:
             pinClipboardImage()
         case .togglePins:
             pinManager.toggleAll()
+        case .region, .delayedRegion, .repeatRegion, .scrollingRegion, .regionAndPin, .display, .window:
+            // Reserve synchronously, including the delay, so later requests cannot queue or change this result.
+            guard !shortRecordingController.isBusy, capturePipeline.beginCapture(pinWhenReady: pinResult) else { return }
+            captureToolsController.suspendForCapture()
+            captureResultOverlay.dismiss()
+            Task {
+                defer { captureToolsController.resumeAfterCapture() }
+                switch action {
+                case .region: await captureRegion(pin: false)
+                case .delayedRegion:
+                    do {
+                        try await Task.sleep(for: .seconds(3))
+                    } catch {
+                        capturePipeline.cancelCapture()
+                        return
+                    }
+                    await captureRegion(pin: false)
+                case .repeatRegion: await repeatLastRegion()
+                case .scrollingRegion: await captureScrollingRegion()
+                case .regionAndPin: await captureRegion(pin: true)
+                case .display: await captureDisplay()
+                case .window: await captureWindow()
+                case .filePin, .clipboardPin, .togglePins: break
+                }
+            }
         }
     }
 
     private func captureRegion(pin: Bool) async {
-        guard capturePipeline.beginCapture() else { return }
         let privacyContext = currentCapturePrivacyContext()
         CaptureDiagnostics.begin()
         do {
@@ -602,7 +650,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             )
             let image = try await captureService.scaleForExport(nativeImage)
             let shouldPin = capturePipeline.completeCapture(explicitPin: selection.disposition == .pin)
-            completeCapture(image, pin: shouldPin, privacyContext: privacyContext)
+            var draft: AnnotationDraft?
+            var draftError: Error?
+            if EditableDraftSettings.isEnabled() || !selection.annotations.isEmpty {
+                do {
+                    draft = try AnnotationDraft(source: prepared.snapshot.cropped(to: selection.rect),
+                                                logicalSize: selection.rect.size, strokes: selection.annotations)
+                } catch { draftError = error }
+            }
+            completeCapture(image, pin: shouldPin, privacyContext: privacyContext, draft: draft)
+            if let draftError { present(error: draftError) }
             CaptureDiagnostics.recordPhase("completed")
         } catch {
             capturePipeline.cancelCapture()
@@ -613,7 +670,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func repeatLastRegion() async {
-        guard capturePipeline.beginCapture() else { return }
         let privacyContext = currentCapturePrivacyContext()
         CaptureDiagnostics.begin()
         do {
@@ -635,7 +691,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func captureScrollingRegion() async {
-        guard capturePipeline.beginCapture() else { return }
         CaptureDiagnostics.begin()
         do {
             let prepared = try await captureService.prepareRegionCapture()
@@ -681,7 +736,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func captureDisplay() async {
-        guard capturePipeline.beginCapture() else { return }
         let privacyContext = currentCapturePrivacyContext()
         CaptureDiagnostics.begin()
         do {
@@ -699,7 +753,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func captureWindow() async {
-        guard capturePipeline.beginCapture() else { return }
         CaptureDiagnostics.begin()
         do {
             let result = try await captureService.captureWindowUnderPointer()
@@ -725,7 +778,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         _ image: NSImage,
         pin: Bool,
         applyWatermark: Bool = true,
-        privacyContext: CapturePrivacyContext = .unknown
+        privacyContext: CapturePrivacyContext = .unknown,
+        draft: AnnotationDraft? = nil,
+        keepDraft: Bool = EditableDraftSettings.isEnabled(),
+        collectStep: Bool = true
     ) {
         // 所有路径只编码一次 PNG，再复用于剪贴板和历史，控制 4K/8K 峰值内存。
         let capture: WatermarkedCapture
@@ -755,13 +811,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             historyItem = nil
             present(error: error)
         }
+        var editableDraft = draft
+        if keepDraft, let historyItem {
+            do {
+                if editableDraft == nil, let source = image.cgImageValue {
+                    editableDraft = try AnnotationDraft(source: source, logicalSize: image.size, strokes: [])
+                }
+                if let editableDraft { try historyStore.saveDraft(editableDraft, for: historyItem) }
+            } catch { present(error: error) }
+        }
         if let historyItem, HistorySettings.ocrIndexingEnabled() {
             indexHistoryText(for: historyItem, image: capture.image)
         }
-        let shouldPin = pin || pendingAutomationPin
-        pendingAutomationPin = false
-        if shouldPin { pinManager.pin(image: capture.image) }
-        presentQuickCaptureOverlay(capture.image, privacyContext: privacyContext)
+        if pin { pinManager.pin(image: capture.image) }
+        if collectStep, captureToolsController.guide.isCollecting {
+            do { try captureToolsController.guide.append(capture.image) }
+            catch { present(error: error) }
+        } else {
+            presentQuickCaptureOverlay(capture.image, privacyContext: privacyContext, draft: editableDraft,
+                                       keepDraft: keepDraft && historyItem != nil)
+        }
     }
 
     private func indexHistoryText(for item: HistoryItem, image: NSImage) {
@@ -800,7 +869,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func presentQuickCaptureOverlay(
         _ image: NSImage,
-        privacyContext: CapturePrivacyContext
+        privacyContext: CapturePrivacyContext,
+        draft: AnnotationDraft? = nil,
+        keepDraft: Bool = false
     ) {
         guard QuickCaptureOverlaySettings.isEnabled() else { return }
         captureResultOverlay.show(
@@ -829,12 +900,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                     self.captureResultOverlay.dismiss()
                     Task { @MainActor [weak self] in
                         guard let self,
-                              let result = await self.annotationEditorController.edit(image: image) else { return }
+                              let result = await self.annotationEditorController.edit(image: image, draft: draft, keepDraft: keepDraft) else { return }
                         self.completeCapture(
                             result.image,
                             pin: result.disposition == .pin,
-                            applyWatermark: false,
-                            privacyContext: privacyContext
+                            applyWatermark: draft != nil,
+                            privacyContext: privacyContext,
+                            draft: result.draft,
+                            keepDraft: result.draft != nil,
+                            collectStep: false
                         )
                     }
                 },
@@ -843,9 +917,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                     self?.captureResultOverlay.dismiss()
                     self?.refreshTrayPanel()
                 },
-                dismiss: { [weak self] in self?.captureResultOverlay.dismiss() }
+                dismiss: { [weak self] in self?.captureResultOverlay.dismiss() },
+                tools: { [weak self] in
+                    self?.captureResultOverlay.dismiss()
+                    self?.captureToolsController.show(image: image)
+                }
             )
         )
+    }
+
+    private func editCapture(_ image: NSImage, draft: AnnotationDraft? = nil, ruler: Bool = false,
+                             privacyContext: CapturePrivacyContext = .unknown) {
+        Task {
+            guard let result = await annotationEditorController.edit(image: image, draft: draft,
+                initialTool: ruler ? .ruler : .mosaic) else { return }
+            completeCapture(result.image, pin: result.disposition == .pin, applyWatermark: draft != nil,
+                            privacyContext: privacyContext, draft: result.draft,
+                            keepDraft: result.draft != nil, collectStep: false)
+        }
+    }
+
+    private func startShortRecording() {
+        guard !shortRecordingController.isBusy, !capturePipeline.isCapturing,
+              shortRecordingController.prepareNewRecording(), capturePipeline.beginCapture() else { return }
+        captureResultOverlay.dismiss()
+        captureToolsController.suspendForCapture()
+        Task {
+            defer { capturePipeline.cancelCapture() }
+            do {
+                let prepared = try await captureService.prepareRegionCapture()
+                guard let selection = await overlayController.selectRegion(snapshot: prepared.snapshot,
+                    on: prepared.screen, showsToolbar: false, defaultDisposition: .copy),
+                    let screenNumber = prepared.screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
+                    captureToolsController.resumeAfterCapture()
+                    return
+                }
+                let frame = prepared.screen.frame
+                let rect = CGRect(x: selection.rect.minX - frame.minX, y: frame.maxY - selection.rect.maxY,
+                                  width: selection.rect.width, height: selection.rect.height)
+                try await shortRecordingController.start(displayID: CGDirectDisplayID(screenNumber.uint32Value), sourceRect: rect)
+            } catch {
+                captureToolsController.resumeAfterCapture()
+                present(error: error)
+            }
+        }
     }
 
     private func pinClipboardImage() {
@@ -877,29 +992,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func handleAutomationURL(_ url: URL) {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return }
-        var query: [String: String] = [:]
-        for item in components.queryItems ?? [] {
-            if let value = item.value { query[item.name] = value }
-        }
-        if query["after"]?.lowercased() == "pin" {
-            pendingAutomationPin = true
-        }
-        switch (url.host?.lowercased(), query["mode"]?.lowercased()) {
-        case ("capture", "region"): perform(.region)
-        case ("capture", "delayed"): perform(.delayedRegion)
-        case ("capture", "repeat"): perform(.repeatRegion)
-        case ("capture", "scroll"): perform(.scrollingRegion)
-        case ("capture", "display"): perform(.display)
-        case ("capture", "window"): perform(.window)
-        case ("pin", "clipboard"), ("pin-clipboard", _): perform(.clipboardPin)
-        case ("toggle-pins", _): perform(.togglePins)
-        case ("pin-file", _):
-            if let path = query["path"] {
-                pinImageFile(at: URL(fileURLWithPath: path))
-            }
-        default:
-            pendingAutomationPin = false
+        guard let command = AutomationCommand(url: url) else { return }
+        switch command {
+        case .capture(let action, let pinResult): perform(action, pinResult: pinResult)
+        case .pinClipboard: perform(.clipboardPin)
+        case .togglePins: perform(.togglePins)
+        case .pinFile(let url): pinImageFile(at: url)
         }
     }
 
@@ -985,7 +1083,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                     self?.reindexHistoryItem(item)
                 },
                 onRequestScreenCapturePermission: { [weak self] in self?.requestScreenRecordingPermission() },
-                onOpenScreenCaptureSettings: { [weak self] in self?.openScreenRecordingSettings() }
+                onOpenScreenCaptureSettings: { [weak self] in self?.openScreenRecordingSettings() },
+                onEditHistoryItem: { [weak self] item in
+                    guard let self, let image = self.historyStore.image(for: item) else { return }
+                    do {
+                        let draft = try self.historyStore.draft(for: item)
+                        self.editCapture(image, draft: draft,
+                            privacyContext: CapturePrivacyContext(sourceApplicationBundleIdentifier: item.sourceApplicationBundleIdentifier))
+                    } catch { self.present(error: error) }
+                },
+                onHistoryTools: { [weak self] item in
+                    guard let self, let image = self.historyStore.image(for: item) else { return }
+                    self.captureToolsController.show(image: image)
+                }
             )
             let controller = NSWindowController(window: NSWindow(contentViewController: NSHostingController(rootView: view)))
             controller.window?.title = L10n.text("preferences.windowTitle")

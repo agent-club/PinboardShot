@@ -26,17 +26,17 @@ enum ScrollFrameMatcher {
             height: previousSample.height
         ) else { return nil }
 
-        if sampledMatch.verticalShift == 0 {
-            return ScrollFrameMatch(verticalShift: 0, score: sampledMatch.score)
-        }
-
         let sourceShift = Int(
             (CGFloat(sampledMatch.verticalShift) * CGFloat(current.height) / CGFloat(currentSample.height)).rounded()
         )
-        guard sourceShift != 0 else {
-            return ScrollFrameMatch(verticalShift: 0, score: sampledMatch.score)
-        }
-        return ScrollFrameMatch(verticalShift: sourceShift, score: sampledMatch.score)
+        guard let previousRows = ScrollFrameSample(image: previous, preserveVerticalResolution: true),
+              let currentRows = ScrollFrameSample(image: current, preserveVerticalResolution: true) else { return nil }
+        return refinedMatch(
+            previous: previousRows,
+            current: currentRows,
+            approximateShift: sourceShift,
+            searchRadius: Int(ceil(Double(current.height) / Double(currentSample.height))) * 3
+        )
     }
 
     static func match(
@@ -124,32 +124,16 @@ enum ScrollFrameMatcher {
         return ScrollFrameMatch(verticalShift: sourceShift, score: sampledMatch.score)
     }
 
-    fileprivate static func verificationScore(
+    fileprivate static func refinedMatch(
         previous: ScrollFrameSample,
         current: ScrollFrameSample,
-        sourceShift: Int
-    ) -> Double? {
+        approximateShift: Int,
+        searchRadius: Int
+    ) -> ScrollFrameMatch? {
         guard previous.width == current.width,
               previous.height == current.height,
               previous.sourceHeight == current.sourceHeight,
-              sourceShift != 0 else { return nil }
-        let sampledShift = Int(
-            (CGFloat(sourceShift) * CGFloat(current.height) /
-                CGFloat(current.sourceHeight)).rounded()
-        )
-        guard sampledShift != 0, abs(sampledShift) < current.height else { return nil }
-        let overlap = current.height - abs(sampledShift)
-        guard overlap >= max(8, current.height / 6) else { return nil }
-        let previousStartRow = sampledShift > 0 ? sampledShift : 0
-        let currentStartRow = sampledShift < 0 ? -sampledShift : 0
-        let score = robustDifference(
-            previous: previous.pixels,
-            current: current.pixels,
-            width: current.width,
-            previousStartRow: previousStartRow,
-            currentStartRow: currentStartRow,
-            rowCount: overlap
-        )
+              current.height == current.sourceHeight else { return nil }
         let noShiftScore = meanAbsoluteDifference(
             previous: previous.pixels,
             current: current.pixels,
@@ -158,9 +142,93 @@ enum ScrollFrameMatcher {
             currentStartRow: 0,
             rowCount: current.height
         )
-        guard score <= maximumAcceptedScore,
-              score + minimumMatchImprovement / 2 <= noShiftScore else { return nil }
-        return score
+        if noShiftScore == 0 { return ScrollFrameMatch(verticalShift: 0, score: 0) }
+
+        // Keep original rows: rounding a thumbnail displacement compounds at every seam.
+        var candidates: [ScrollFrameMatch] = []
+        for shift in (approximateShift - searchRadius)...(approximateShift + searchRadius) {
+            let overlap = current.height - abs(shift)
+            guard overlap >= max(8, current.height / 6) else { continue }
+            let score = robustDifference(
+                previous: previous.pixels,
+                current: current.pixels,
+                width: current.width,
+                previousStartRow: max(0, shift),
+                currentStartRow: max(0, -shift),
+                rowCount: overlap
+            )
+            candidates.append(ScrollFrameMatch(verticalShift: shift, score: score))
+        }
+        candidates.sort { $0.score < $1.score }
+        guard let best = candidates.first else { return nil }
+        if best.verticalShift == 0 {
+            return noShiftScore <= duplicateFrameScore ? best : nil
+        }
+        guard best.score <= maximumAcceptedScore,
+              best.score + minimumMatchImprovement / 2 <= noShiftScore else { return nil }
+        if let runnerUp = candidates.dropFirst().first,
+           runnerUp.score < best.score + 0.1 { return nil }
+        return best
+    }
+
+    fileprivate static func stationaryEdges(
+        previous: ScrollFrameSample,
+        current: ScrollFrameSample,
+        sourceShift: Int
+    ) -> (top: Int, bottom: Int) {
+        guard previous.width == current.width,
+              previous.height == current.height,
+              current.height == current.sourceHeight else { return (0, 0) }
+        let margin = max(1, current.width / 12)
+        let columns = margin..<(current.width - margin)
+        func edgeHeight(fromTop: Bool) -> Int {
+            var texturedRows = 0
+            let limit = current.height / 3
+            for distance in 0..<limit {
+                let row = fromTop ? distance : current.height - distance - 1
+                let offset = row * current.width
+                var difference = 0
+                var darkest = 255
+                var lightest = 0
+                for x in columns {
+                    let value = Int(current.pixels[offset + x])
+                    difference += abs(Int(previous.pixels[offset + x]) - value)
+                    darkest = min(darkest, value)
+                    lightest = max(lightest, value)
+                }
+                if Double(difference) / Double(columns.count) > 0.5 {
+                    return texturedRows >= 3 ? distance : 0
+                }
+                if lightest - darkest >= 16 { texturedRows += 1 }
+            }
+            // A large unchanged area without a moving boundary is not enough evidence.
+            return 0
+        }
+        func includingOcclusion(_ stableHeight: Int, fromTop: Bool) -> Int {
+            guard stableHeight > 0, abs(sourceShift) < current.height else { return stableHeight }
+            let fixedIsCurrent = fromTop ? sourceShift > 0 : sourceShift < 0
+            let fixed = fixedIsCurrent ? current : previous
+            let other = fixedIsCurrent ? previous : current
+            let offset = fixedIsCurrent ? sourceShift : -sourceShift
+            var height = stableHeight
+            // Shadows and fade masks move over the document even though their solid bar is fixed.
+            // Compare aligned rows to include the obscured pixels, not just the unchanged bar.
+            for distance in stableHeight..<(current.height / 3) {
+                let row = fromTop ? distance : current.height - distance - 1
+                let otherRow = row + offset
+                guard otherRow >= 0, otherRow < current.height else { continue }
+                if columns.contains(where: {
+                    fixed.pixels[row * fixed.width + $0] != other.pixels[otherRow * other.width + $0]
+                }) {
+                    height = min(current.height / 3, distance + 3)
+                }
+            }
+            return height
+        }
+        return (
+            includingOcclusion(edgeHeight(fromTop: true), fromTop: true),
+            includingOcclusion(edgeHeight(fromTop: false), fromTop: false)
+        )
     }
 
     private static func meanAbsoluteDifference(
@@ -313,7 +381,8 @@ private struct ScrollCaptureStoredSlice {
 }
 
 private final class ScrollCaptureBackingStore {
-    static let maximumByteCount = 1_000_000_000
+    // Disk writes determine available capacity; only guard address arithmetic here.
+    static let maximumByteCount = Int.max
 
     private let fileDescriptor: Int32
     private(set) var byteCount = 0
@@ -564,12 +633,14 @@ final class ScrollCaptureAccumulator {
     private var capturedMinimumPosition = 0
     private var capturedMaximumPosition = 0
     private var keyframes: [ScrollCaptureKeyframe] = []
+    private var fixedHeaderHeight = 0
+    private var fixedFooterHeight = 0
 
     var hasContent: Bool { !slices.isEmpty }
 
     func append(_ frame: CGImage) -> ScrollCaptureAppendResult {
         guard let sample = ScrollFrameSample(image: frame),
-              let verificationSample = ScrollFrameSample(image: frame, targetWidthLimit: 480) else {
+              let verificationSample = ScrollFrameSample(image: frame, preserveVerticalResolution: true) else {
             return .unmatched
         }
         guard let trackingSample else {
@@ -595,18 +666,17 @@ final class ScrollCaptureAccumulator {
 
         let localPlacement: ScrollCapturePlacement?
         let localMatch = ScrollFrameMatcher.match(previous: trackingSample, current: sample)
-        if let match = localMatch, match.verticalShift == 0 {
-            localPlacement = ScrollCapturePlacement(position: trackingPosition, score: match.score)
-        } else if let match = localMatch,
+        if let match = localMatch,
                   let trackingVerificationSample,
-                  let verificationScore = ScrollFrameMatcher.verificationScore(
+                  let refinedMatch = ScrollFrameMatcher.refinedMatch(
                     previous: trackingVerificationSample,
                     current: verificationSample,
-                    sourceShift: match.verticalShift
+                    approximateShift: match.verticalShift,
+                    searchRadius: Int(ceil(Double(frame.height) / Double(sample.height))) * 3
                   ) {
             localPlacement = ScrollCapturePlacement(
-                position: trackingPosition + match.verticalShift,
-                score: max(match.score, verificationScore)
+                position: trackingPosition + refinedMatch.verticalShift,
+                score: refinedMatch.score
             )
         } else {
             localPlacement = nil
@@ -650,9 +720,18 @@ final class ScrollCaptureAccumulator {
         }
         guard let placement else { return .unmatched }
         if placement.position == trackingPosition {
-            self.trackingSample = sample
-            trackingVerificationSample = verificationSample
+            // Preserve the reference so sub-threshold movement can accumulate.
             return .duplicate
+        }
+
+        if let trackingVerificationSample {
+            let edges = ScrollFrameMatcher.stationaryEdges(
+                previous: trackingVerificationSample,
+                current: verificationSample,
+                sourceShift: placement.position - trackingPosition
+            )
+            fixedHeaderHeight = max(fixedHeaderHeight, edges.top)
+            fixedFooterHeight = max(fixedFooterHeight, edges.bottom)
         }
 
         let frameMinimum = placement.position
@@ -676,26 +755,32 @@ final class ScrollCaptureAccumulator {
         let appendHeight: Int
         let stripRect: CGRect
         let shouldPrepend: Bool
+        let replacedHeight: Int
         if frameMaximum > capturedMaximumPosition {
             appendHeight = frameMaximum - capturedMaximumPosition
+            replacedHeight = fixedFooterHeight
             stripRect = CGRect(
                 x: 0,
-                y: frame.height - appendHeight,
+                y: frame.height - appendHeight - replacedHeight,
                 width: frame.width,
-                height: appendHeight
+                height: appendHeight + replacedHeight
             )
             shouldPrepend = false
         } else {
             appendHeight = capturedMinimumPosition - frameMinimum
+            replacedHeight = fixedHeaderHeight
             stripRect = CGRect(
                 x: 0,
                 y: 0,
                 width: frame.width,
-                height: appendHeight
+                height: appendHeight + replacedHeight
             )
             shouldPrepend = true
         }
 
+        guard frame.height - appendHeight > fixedHeaderHeight + fixedFooterHeight else {
+            return .unmatched
+        }
         guard appendHeight > 0,
               Self.canAppend(
                 width: pixelWidth,
@@ -705,6 +790,9 @@ final class ScrollCaptureAccumulator {
         guard let strip = frame.cropping(to: stripRect),
               let backingStore,
               let storedSlice = backingStore.append(strip) else { return .limitReached }
+        // Replace the old fixed edge with newly revealed content before keeping the new edge.
+        // Commit slice changes only after the replacement pixels have been stored successfully.
+        removeEdgeRows(replacedHeight, fromStart: shouldPrepend)
         if shouldPrepend {
             slices.insert(storedSlice, at: 0)
             capturedMinimumPosition = frameMinimum
@@ -712,7 +800,7 @@ final class ScrollCaptureAccumulator {
             slices.append(storedSlice)
             capturedMaximumPosition = frameMaximum
         }
-        pixelHeight += storedSlice.height
+        pixelHeight += appendHeight
         trackingPosition = placement.position
         self.trackingSample = sample
         trackingVerificationSample = verificationSample
@@ -721,7 +809,27 @@ final class ScrollCaptureAccumulator {
             verificationSample: verificationSample,
             at: placement.position
         )
-        return .appended(pixelHeight: storedSlice.height, score: placement.score)
+        return .appended(pixelHeight: appendHeight, score: placement.score)
+    }
+
+    private func removeEdgeRows(_ count: Int, fromStart: Bool) {
+        var remaining = count
+        while remaining > 0, !slices.isEmpty {
+            let index = fromStart ? 0 : slices.count - 1
+            let slice = slices[index]
+            if remaining >= slice.height {
+                remaining -= slice.height
+                slices.remove(at: index)
+            } else {
+                slices[index] = ScrollCaptureStoredSlice(
+                    fileOffset: slice.fileOffset + off_t(fromStart ? remaining * slice.bytesPerRow : 0),
+                    width: slice.width,
+                    height: slice.height - remaining,
+                    bytesPerRow: slice.bytesPerRow
+                )
+                remaining = 0
+            }
+        }
     }
 
     func makeImage() -> CGImage? {
@@ -792,18 +900,13 @@ final class ScrollCaptureAccumulator {
             guard let match = ScrollFrameMatcher.match(previous: keyframe.sample, current: sample) else {
                 continue
             }
-            let verificationScore: Double
-            if match.verticalShift == 0 {
-                verificationScore = match.score
-            } else {
-                guard let score = ScrollFrameMatcher.verificationScore(
-                    previous: keyframe.verificationSample,
-                    current: verificationSample,
-                    sourceShift: match.verticalShift
-                ) else { continue }
-                verificationScore = score
-            }
-            let position = keyframe.position + match.verticalShift
+            guard let refinedMatch = ScrollFrameMatcher.refinedMatch(
+                previous: keyframe.verificationSample,
+                current: verificationSample,
+                approximateShift: match.verticalShift,
+                searchRadius: Int(ceil(Double(sample.sourceHeight) / Double(sample.height))) * 3
+            ) else { continue }
+            let position = keyframe.position + refinedMatch.verticalShift
             if let allowedPosition, !allowedPosition.contains(position) {
                 continue
             }
@@ -812,7 +915,7 @@ final class ScrollCaptureAccumulator {
                   position < capturedMaximumPosition else { continue }
             candidates.append(ScrollCapturePlacement(
                 position: position,
-                score: max(match.score, verificationScore)
+                score: refinedMatch.score
             ))
         }
         guard !candidates.isEmpty else { return nil }
@@ -904,10 +1007,11 @@ fileprivate struct ScrollFrameSample {
     let sourceHeight: Int
     let pixels: [UInt8]
 
-    init?(image: CGImage, targetWidthLimit: Int = 180) {
+    init?(image: CGImage, targetWidthLimit: Int = 180, preserveVerticalResolution: Bool = false) {
         let targetWidth = min(targetWidthLimit, image.width)
-        let scale = CGFloat(targetWidth) / CGFloat(image.width)
-        let targetHeight = min(360, max(12, Int((CGFloat(image.height) * scale).rounded())))
+        let targetHeight = preserveVerticalResolution
+            ? image.height
+            : min(360, image.height)
         var pixels = [UInt8](repeating: 0, count: targetWidth * targetHeight)
         let rendered = pixels.withUnsafeMutableBytes { bytes -> Bool in
             guard let context = CGContext(
