@@ -1,44 +1,44 @@
 {
-  "version": "0.8.1",
-  "build": "43",
-  "date": "2026.09.08",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.8.1",
+  "version": "0.9.0",
+  "build": "44",
+  "date": "2026.09.18",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.9.0",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.8.1-43.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.1/PinboardShot-0.8.1-43.dmg",
-      "sha256": "7da655b47662d35f7a729636e1d1731f53a0d5ed5e38bbfc61f83d100f060569"
+      "name": "PinboardShot-0.9.0-44.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.9.0/PinboardShot-0.9.0-44.dmg",
+      "sha256": "cdaa36d2a6f96960f8e735dc83a84cc7a13db4c032e84ff1b22a8dd2e0ef967a"
     },
     "zip": {
-      "name": "PinboardShot-0.8.1-43.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.1/PinboardShot-0.8.1-43.zip",
-      "sha256": "144663ad481a000d6c9fde7a3ea344748b27d01cf7d4aa73089231df129569b1"
+      "name": "PinboardShot-0.9.0-44.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.9.0/PinboardShot-0.9.0-44.zip",
+      "sha256": "5b54a56ad7b8eba0a76e81672a8029191eeec6eae35980b4c20bfbd1c6e24b77"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.8.1/appcast.xml",
-      "sha256": "725fa48e9c74f648d1367b446095b8ef50e3c972f8279df06c193573da9d2bba"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.9.0/appcast.xml",
+      "sha256": "cb339605bae366a67fd5d7b35a0f996d25003ff3ce29f9fe844e9ca93e4b45b4"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "更清晰的标注图标与即时提示",
+    "title": "六项截图工作流与更可靠的标注",
     "changes": [
-      "重新设计高亮笔与马赛克图标，统一工具栏的尺寸、线条和颜色风格",
-      "文字识别使用扫描框图标，鼠标悬浮时显示“文字识别”，并同步更新繁体中文和英文提示",
-      "截图工具栏的悬浮提示延迟缩短至 16 毫秒；移开鼠标、点击工具或关闭选区时及时消失",
-      "提示框会根据窗口边缘调整位置，不拦截鼠标操作",
+      "标注只在明确拖动后落笔，单击和轻微手抖不再留下红点，也不会污染撤销、重做记录",
+      "新增可编辑原稿、长图整理、步骤文档、结构化 OCR、标尺和区域短录屏",
+      "改进历史清理、快捷键恢复与截图结果操作，裁剪和旋转保留已有标注的视觉效果",
+      "所有 OCR 默认在本机处理，短录屏为最长 60 秒的无声 H.264 MP4",
       "提供 Apple Silicon 与 Intel 通用版本，应用和 DMG 通过 Apple 公证，Sparkle 更新包带有签名"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Clearer annotation icons and faster tooltips",
+    "title": "Six capture workflows and more reliable annotations",
     "changes": [
-      "Redesigned highlighter and mosaic icons with consistent toolbar sizing, strokes, and colors.",
-      "Text recognition uses a scan-frame icon and a clear hover label, with updated Simplified Chinese, Traditional Chinese, and English text.",
-      "Selection toolbar tooltips now use a 16 ms delay and dismiss when the pointer leaves, a tool is clicked, or the selection closes.",
-      "Tooltips adjust near window edges and let pointer input pass through.",
+      "Annotations begin only after an intentional drag, so clicks and small pointer jitter leave no stray dots or undo/redo entries.",
+      "Added editable drafts, long-image editing, step guides, structured OCR, ruler annotations, and short region recording.",
+      "Improved history cleanup, shortcut restoration, and capture-result actions while preserving annotation appearance through crop and rotation.",
+      "OCR remains on-device by default, and short recordings are silent H.264 MP4 files limited to 60 seconds.",
       "Includes Apple Silicon and Intel support, an Apple-notarized app and DMG, and a signed Sparkle update package."
     ]
   }
