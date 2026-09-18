@@ -159,10 +159,10 @@ struct CapturePipelineState: Equatable, Sendable {
     private(set) var isCapturing = false
     private(set) var shouldPinWhenReady = false
 
-    mutating func beginCapture() -> Bool {
+    mutating func beginCapture(pinWhenReady: Bool = false) -> Bool {
         guard !isCapturing else { return false }
         isCapturing = true
-        shouldPinWhenReady = false
+        shouldPinWhenReady = pinWhenReady
         return true
     }
 

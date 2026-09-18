@@ -1,6 +1,6 @@
 import AppKit
 
-enum AnnotationTool: String, CaseIterable, Identifiable, Sendable {
+enum AnnotationTool: String, CaseIterable, Identifiable, Codable, Sendable {
     case mosaic
     case pen
     case rectangle
@@ -12,13 +12,14 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Sendable {
     case line
     case number
     case redaction
+    case ruler
 
     static let selectionTools: [AnnotationTool] = [
         .rectangle, .arrow, .pen, .mosaic, .highlight, .text, .ocr
     ]
 
     static let editorTools: [AnnotationTool] = [
-        .mosaic, .pen, .rectangle, .highlight, .ocr, .arrow, .text, .ellipse, .line, .number
+        .mosaic, .pen, .rectangle, .highlight, .ocr, .arrow, .text, .ellipse, .line, .number, .ruler
     ]
 
     var id: String { rawValue }
@@ -37,6 +38,7 @@ enum AnnotationTool: String, CaseIterable, Identifiable, Sendable {
         case .line: "line.diagonal"
         case .number: "1.circle"
         case .redaction: "eye.slash.fill"
+        case .ruler: "ruler"
         }
     }
 
@@ -152,6 +154,7 @@ enum AnnotationStyleSettings {
         case .ellipse, .line: 3
         case .number: 16
         case .redaction: 2
+        case .ruler: 2
         }
     }
 
@@ -194,7 +197,7 @@ enum AnnotationStyleSettings {
     }
 }
 
-struct AnnotationColor: Equatable, Sendable {
+struct AnnotationColor: Codable, Equatable, Sendable {
     let red: CGFloat
     let green: CGFloat
     let blue: CGFloat
@@ -212,7 +215,7 @@ struct AnnotationColor: Equatable, Sendable {
     var cgColor: CGColor { nsColor.cgColor }
 }
 
-struct AnnotationStroke: Equatable, Sendable {
+struct AnnotationStroke: Codable, Equatable, Sendable {
     let tool: AnnotationTool
     var points: [CGPoint]
     var color: AnnotationColor
@@ -239,6 +242,10 @@ struct AnnotationHistory: Sendable {
     // 保存完整快照，让文字替换、改色和改字号与新增笔迹使用同一套可撤销语义。
     private var undoStack: [[AnnotationStroke]] = []
     private var redoStack: [[AnnotationStroke]] = []
+
+    init(strokes: [AnnotationStroke] = []) {
+        self.strokes = strokes
+    }
 
     var canUndo: Bool { !undoStack.isEmpty }
     var canRedo: Bool { !redoStack.isEmpty }

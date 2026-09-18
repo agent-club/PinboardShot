@@ -50,9 +50,9 @@ enum L10n {
         if let code = selected.bundleCode,
            let path = Bundle.main.path(forResource: code, ofType: "lproj"),
            let bundle = Bundle(path: path) {
-            return bundle.localizedString(forKey: key, value: fallback[key] ?? key, table: nil)
+            return bundle.localizedString(forKey: key, value: fallback[key] ?? FeatureLocalizations.fallback[key] ?? key, table: nil)
         }
-        return Bundle.main.localizedString(forKey: key, value: fallback[key] ?? key, table: nil)
+        return Bundle.main.localizedString(forKey: key, value: fallback[key] ?? FeatureLocalizations.fallback[key] ?? key, table: nil)
     }
 
     // 单元测试和 SwiftPM 运行环境没有 .app 本地化资源时仍提供可读的简体中文。
@@ -343,6 +343,7 @@ enum L10n {
         "preferences.selectionToolbarIconsReset": "还原默认图标",
         "preferences.selectionToolbarIconsHelp": "直接选择预设图标；重置后使用默认图标。改动会在下一次框选时生效。",
         "preferences.toolbar": "工具栏",
+        "tray.customizeToolbar": "自定义工具栏",
         "preferences.selectionToolbar.configuration": "显示与顺序",
         "preferences.selectionToolbar.annotationTools": "标注工具组",
         "preferences.selectionToolbar.autoSort": "根据使用频次自动排序",

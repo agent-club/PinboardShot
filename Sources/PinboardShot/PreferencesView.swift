@@ -105,6 +105,10 @@ struct PreferencesView: View {
     let onReindexHistoryItem: (HistoryItem) -> Void
     let onRequestScreenCapturePermission: () -> Void
     let onOpenScreenCaptureSettings: () -> Void
+    var onEditHistoryItem: (HistoryItem) -> Void = { _ in }
+    var onHistoryTools: (HistoryItem) -> Void = { _ in }
+
+    @AppStorage(EditableDraftSettings.enabledKey) private var editableDraftsEnabled = false
 
     @AppStorage("captureCursor") private var captureCursor = false
     @AppStorage(CaptureQuality.userDefaultsKey)
@@ -397,8 +401,11 @@ struct PreferencesView: View {
                 }
                 .help(L10n.text("preferences.pinSessionRecovery.help"))
             Toggle(L10n.text("preferences.historyOCRIndexing"), isOn: $historyOCRIndexingEnabled)
+            Toggle(L10n.text("feature.draft.setting"), isOn: $editableDraftsEnabled)
+                .disabled(!historyEnabled)
+                .help(L10n.text("feature.draft.privacy"))
 
-            if let historyErrorMessage {
+            if let historyErrorMessage = historyErrorMessage ?? historyStore.retentionErrorMessage {
                 Text(historyErrorMessage)
                     .font(.callout)
                     .foregroundStyle(.red)
@@ -557,6 +564,13 @@ struct PreferencesView: View {
                         .buttonStyle(.borderless)
                         .help(L10n.text("pin.save"))
                         .accessibilityLabel(L10n.text("pin.save"))
+                        Menu {
+                            Button(L10n.text("feature.draft.edit")) { onEditHistoryItem(item) }
+                            Button(L10n.text("feature.tools.title")) { onHistoryTools(item) }
+                        } label: { Image(systemName: "ellipsis.circle") }
+                        .menuStyle(.borderlessButton)
+                        .fixedSize()
+                        .help(L10n.text("feature.tools.title"))
                         Button(role: .destructive) {
                             deleteHistoryItem(item)
                         } label: {

@@ -10,7 +10,7 @@ Official website: <https://pinboardshot.agentclub.dev>
 
 ## 中文
 
-PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴图工具。它基于 AppKit、SwiftUI 和 ScreenCaptureKit；除软件更新外不发起网络请求，也不包含分析服务。
+PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴图工具。它基于 AppKit、SwiftUI 和 ScreenCaptureKit；默认仅为软件更新访问网络，不包含分析服务。只有主动配置并使用远程 OCR 插件时，才会将框选区域发送到用户指定的服务。
 
 官网：<https://pinboardshot.agentclub.dev/zh>
 
@@ -48,6 +48,17 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 - 标注结果可直接复制或贴到屏幕
 - 标注先合成到原生裁图，再应用所选输出清晰度
 
+#### 截图工具与文档
+
+从菜单栏的「截图工具」、截图结果的更多菜单或历史记录的更多菜单进入。
+
+- 可编辑原稿：在历史设置中开启，或在标注编辑器中勾选保存。原稿保留底图、标注和逻辑尺寸，可从历史「继续编辑」。关闭历史或排除来源 App 时不保存；含马赛克或脱敏区域时固化整张图，不保留遮盖前的内容。裁剪、旋转会固化已有标注。
+- 长图处理：拖选或输入像素行删除中段，支持撤销、重做，按指定页高导出连续 PNG 或 PDF。
+- 步骤文档：主动截图收集步骤，添加标题与说明、调整顺序，保存可重新打开的 JSON 原稿，导出 Markdown + 图片或 PDF。最多 100 步；不会自动监听点击或自动保存文档。
+- 结构化 OCR：本机识别后生成纯文本、保留布局、TSV 和 Markdown 表格，可修改预览后复制。表格列根据文字位置推断，复杂合并单元格需要核对。
+- 标尺：在独立标注编辑器中测量距离、横向及纵向间距，切换像素或点，绘制水平、垂直参考线。导入图片的点值依赖图片的逻辑尺寸。
+- 区域短录屏：框选后录制最长 60 秒的无声 H.264 MP4，最高 1920 × 1080 / 30 fps，停止后预览、裁剪首尾并保存。PinboardShot 自身窗口不进入视频；关闭预览会丢弃未保存视频。当前不包含 GIF、音频或视频历史。
+
 #### 贴图
 
 - 可同时创建任意多张贴图，并在所有桌面空间和全屏应用上方显示
@@ -68,7 +79,8 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 - 同一动作可以绑定多组快捷键
 - 自动拒绝冲突或不安全的全局快捷键；普通字母组合必须包含 `⌘`、`⌥` 或 `⌃`，也可直接使用功能键
 - 菜单会显示未能注册的快捷键，便于定位系统级冲突
-- 可配置保留 10–250 张截图及 1–90 天保留期；可查看、复制、保存、删除或重新贴屏
+- 可配置保留 10–250 张截图，保留期可选 1、7、30、90 天或不限（默认不限）；可查看、复制、保存、删除或重新贴屏
+- 启动时及运行期间每小时执行历史保留策略，同步清理过期图片和 OCR 索引；清理失败可在历史设置中查看
 - 可在本机为历史截图建立 OCR 索引并搜索识别文字，同时查看状态、复制文字、打开详情或重试失败识别
 - 可从多张历史截图创建横向、纵向或网格拼板，自定义背景、间距、圆角、阴影和标题
 - 可手动清空历史、按时间清理或选择在退出应用时自动清理，并可预览存储占用和排除指定来源 App
@@ -99,7 +111,7 @@ PinboardShot 默认不启用任何全局快捷键，避免占用其他应用的�
 3. 双击选区可立即复制；也可以使用工具栏进行标注、复制或贴屏。
 4. 标注模式下选择工具、颜色和粗细，完成后复制或贴到屏幕。
 
-按 `Esc` 或右键会取消截图。框选阶段在任何情况下都会于 12 秒后强制退出；选区完成并进入工具操作后，兜底时间会延长到 5 分钟，避免遮罩无限覆盖桌面。
+按 `Esc` 取消截图。普通框选时右键不会退出；取色模式下右键会复制颜色并退出。框选阶段连续 12 秒无操作会自动退出，鼠标与键盘操作会续期；选区完成并进入工具操作后，空闲超时延长到 5 分钟，避免遮罩无限覆盖桌面。
 
 #### 滚动截图
 
@@ -140,7 +152,7 @@ PinboardShot 默认不启用任何全局快捷键，避免占用其他应用的�
 - 推荐安装 Apple Development 代码签名证书，以便屏幕录制权限在本地重建后保持稳定
 
 ```bash
-swift test
+swift test --no-parallel
 ./scripts/build-app.sh
 open .build/app/PinboardShot.app
 ```
@@ -236,7 +248,7 @@ PINBOARDSHOT_NOTARY_PROFILE="PinboardShot-notary" \
 
 ## English
 
-PinboardShot is a fully native, local-first screenshot and pinboard utility for macOS. It is built with AppKit, SwiftUI, and ScreenCaptureKit. It makes no network requests except for software updates and contains no analytics services.
+PinboardShot is a fully native, local-first screenshot and pinboard utility for macOS. It is built with AppKit, SwiftUI, and ScreenCaptureKit. By default, it accesses the network only for software updates and contains no analytics services. A selected region is sent to a user-configured service only when a remote OCR plugin is explicitly configured and used.
 
 Official website: <https://pinboardshot.agentclub.dev/en>
 
@@ -274,6 +286,17 @@ After selecting an area, you can enter annotation mode directly without saving a
 - Copy or pin the annotated result directly.
 - Composite annotations onto the native crop before applying the selected output-quality preset.
 
+#### Capture tools and documents
+
+Open **Capture tools** from the menu bar, the capture-result menu, or a history item's menu.
+
+- Editable drafts: enable them in history settings or in the annotation editor. Drafts preserve the source image, annotations, and logical dimensions for **Continue editing** in history. Disabled history and excluded source apps prevent saving drafts. Mosaic or redaction flattens the entire image without retaining concealed content; crop and rotation also bake existing annotations.
+- Long images: drag a band or enter pixel rows to remove a middle section, undo or redo, and export continuous PNG pages or a PDF at a chosen page height.
+- Step guides: capture steps manually, add titles and descriptions, reorder them, save a reopenable JSON draft, and export Markdown with images or PDF. Up to 100 steps; no automatic click monitoring or document autosave.
+- Structured OCR: on-device recognition with editable plain text, layout-preserving text, TSV, and Markdown-table previews. Columns are inferred from text positions, so complex merged cells need review.
+- Ruler: measure distance and horizontal/vertical spacing in pixels or points, and draw horizontal or vertical guides in the standalone annotation editor. Point measurements for imported images depend on their logical size metadata.
+- Region recordings: silent H.264 MP4, up to 60 seconds and 1920 × 1080 at 30 fps, with preview and start/end trimming before saving. PinboardShot windows are excluded. Closing the preview discards unsaved video. GIF, audio, and video history are not included in this version.
+
 #### Pins
 
 - Create any number of pins and keep them visible across all desktop spaces and above full-screen applications.
@@ -294,7 +317,8 @@ After selecting an area, you can enter annotation mode directly without saving a
 - Assign multiple shortcuts to the same action.
 - Reject conflicting or unsafe global shortcuts automatically. Ordinary letter combinations must include `⌘`, `⌥`, or `⌃`; function keys can also be used directly.
 - Show shortcuts that could not be registered in the menu, making system-level conflicts easier to diagnose.
-- Keep 10–250 captures for a configurable 1–90 day retention period, then inspect, copy, save, delete, or pin them again.
+- Keep 10–250 captures for 1, 7, 30, or 90 days, or with no time limit (the default), then inspect, copy, save, delete, or pin them again.
+- Apply history retention at startup and hourly while running, removing expired images and their OCR index together; cleanup failures appear in history settings.
 - Build an on-device OCR index, search recognized text, inspect recognition status, copy text, open details, or retry failed recognition.
 - Combine history items into horizontal, vertical, or grid boards with configurable backgrounds, spacing, corners, shadows, and titles.
 - Clear history manually, by age, or automatically when the app quits; preview storage usage and exclude selected source apps.
@@ -325,7 +349,7 @@ Function keys can be used directly. Ordinary letter combinations must include `�
 3. Double-click the selection to copy it immediately, or use the toolbar to annotate, copy, or pin it.
 4. In annotation mode, choose a tool, color, and stroke width, then copy or pin the result.
 
-Press `Esc` or right-click to cancel. The selection stage always exits after 12 seconds as a safeguard. After a selection is completed and the toolbar becomes active, the fallback timeout extends to five minutes so the overlay cannot remain over the desktop indefinitely.
+Press `Esc` to cancel. Right-clicking does not exit a normal selection; in color-picker mode, it copies the color and exits. The selection stage exits after 12 seconds of inactivity, with mouse and keyboard input renewing the timeout. After a selection is completed and the toolbar becomes active, the idle timeout extends to five minutes so the overlay cannot remain over the desktop indefinitely.
 
 #### Scrolling capture
 
@@ -366,7 +390,7 @@ Selecting 8K output significantly increases memory usage, clipboard size, and PN
 - An Apple Development signing certificate is recommended so screen-recording permission remains stable after local rebuilds.
 
 ```bash
-swift test
+swift test --no-parallel
 ./scripts/build-app.sh
 open .build/app/PinboardShot.app
 ```

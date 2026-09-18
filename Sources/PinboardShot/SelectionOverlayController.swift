@@ -1204,7 +1204,7 @@ final class OverlayWidthControl: NSControl {
         case .mosaic: choices = [10, 14, 18, 24, 32]
         case .pen: choices = [2, 3, 4, 6, 10]
         case .arrow: choices = [2, 3, 4, 6, 8]
-        case .rectangle, .ellipse, .line: choices = [2, 3, 4, 6, 8]
+        case .rectangle, .ellipse, .line, .ruler: choices = [2, 3, 4, 6, 8]
         case .highlight: choices = [6, 9, 12, 16, 22]
         case .text: choices = [6, 8, 10, 12, 16]
         case .number: choices = [10, 13, 16, 20, 26]

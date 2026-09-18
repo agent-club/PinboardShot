@@ -3,6 +3,7 @@ import AppKit
 struct AnnotationEditResult: @unchecked Sendable {
     let image: NSImage
     let disposition: SelectionDisposition
+    var draft: AnnotationDraft? = nil
 }
 
 @MainActor
@@ -14,10 +15,19 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
     private weak var redoButton: NSButton?
     private weak var widthSlider: NSSlider?
     private var selectedTool: AnnotationTool = .mosaic
+    private var draftCheckbox: NSButton?
+    private weak var toolControl: NSSegmentedControl?
 
-    func edit(image: NSImage) async -> AnnotationEditResult? {
-        guard continuation == nil, let source = image.cgImageValue else { return nil }
-        let window = makeWindow(source: source, logicalSize: image.size)
+    func edit(image: NSImage, draft: AnnotationDraft? = nil, initialTool: AnnotationTool = .mosaic,
+              keepDraft: Bool? = nil) async -> AnnotationEditResult? {
+        guard continuation == nil,
+              let source = draft == nil ? image.cgImageValue : try? draft?.sourceImage() else { return nil }
+        let window = makeWindow(source: source, logicalSize: draft?.logicalSize ?? image.size, strokes: draft?.strokes ?? [])
+        draftCheckbox?.state = (keepDraft ?? (draft != nil || EditableDraftSettings.isEnabled())) ? .on : .off
+        if let index = AnnotationTool.editorTools.firstIndex(of: initialTool), let toolControl {
+            toolControl.selectedSegment = index
+            toolChanged(toolControl)
+        }
         return await withCheckedContinuation { continuation in
             self.continuation = continuation
             NSApp.activate(ignoringOtherApps: true)
@@ -27,7 +37,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         }
     }
 
-    private func makeWindow(source: CGImage, logicalSize: CGSize) -> NSWindow {
+    private func makeWindow(source: CGImage, logicalSize: CGSize, strokes: [AnnotationStroke]) -> NSWindow {
         selectedTool = .mosaic
         let window = NSWindow(
             contentRect: CGRect(x: 0, y: 0, width: 920, height: 680),
@@ -36,13 +46,13 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
             defer: false
         )
         window.title = L10n.text("annotation.title")
-        window.minSize = CGSize(width: 680, height: 480)
+        window.minSize = CGSize(width: 840, height: 480)
         window.isReleasedWhenClosed = false
         window.delegate = self
 
         let root = NSView(frame: window.contentLayoutRect)
         root.autoresizingMask = [.width, .height]
-        let canvas = AnnotationCanvasView(sourceImage: source, logicalSize: logicalSize)
+        let canvas = AnnotationCanvasView(sourceImage: source, logicalSize: logicalSize, initialStrokes: strokes)
         canvas.translatesAutoresizingMaskIntoConstraints = false
         canvas.onHistoryChanged = { [weak self] canUndo, canRedo in
             self?.undoButton?.isEnabled = canUndo
@@ -53,6 +63,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         let tools = NSSegmentedControl(labels: AnnotationTool.editorTools.map { L10n.text($0.titleKey) }, trackingMode: .selectOne, target: self, action: #selector(toolChanged(_:)))
         tools.selectedSegment = 0
         tools.controlSize = .small
+        toolControl = tools
         for (index, tool) in AnnotationTool.editorTools.enumerated() {
             tools.setImage(tool.customToolbarImage ?? NSImage(systemSymbolName: tool.symbolName, accessibilityDescription: L10n.text(tool.titleKey)), forSegment: index)
             tools.setLabel("", forSegment: index)
@@ -76,6 +87,16 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         widthSlider.frame.size.width = 110
         widthSlider.toolTip = L10n.text("annotation.width")
         self.widthSlider = widthSlider
+        canvas.onSelectedAnnotationStyleChanged = { [weak self, weak tools, weak colorWell, weak widthSlider] tool, color, width in
+            self?.selectedTool = tool
+            tools?.selectedSegment = AnnotationTool.editorTools.firstIndex(of: tool) ?? 0
+            colorWell?.color = color
+            widthSlider?.doubleValue = Double(width)
+        }
+        canvas.onSelectedTextStyleChanged = { [weak colorWell, weak widthSlider] color, width in
+            colorWell?.color = color
+            widthSlider?.doubleValue = Double(width)
+        }
 
         let undo = button(titleKey: "annotation.undo", symbol: "arrow.uturn.backward", action: #selector(undo))
         let redo = button(titleKey: "annotation.redo", symbol: "arrow.uturn.forward", action: #selector(redo))
@@ -94,29 +115,60 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         topBar.spacing = 10
         topBar.translatesAutoresizingMaskIntoConstraints = false
 
+        let toolbarScroll = NSScrollView()
+        toolbarScroll.translatesAutoresizingMaskIntoConstraints = false
+        toolbarScroll.hasHorizontalScroller = true
+        toolbarScroll.drawsBackground = false
+        toolbarScroll.documentView = topBar
+
+        let draftCheckbox = NSButton(checkboxWithTitle: L10n.text("feature.draft.keep"), target: nil, action: nil)
+        draftCheckbox.toolTip = L10n.text("feature.draft.privacy")
+        self.draftCheckbox = draftCheckbox
+        let rulerUnit = NSPopUpButton()
+        rulerUnit.addItems(withTitles: RulerUnit.allCases.map(\.title))
+        rulerUnit.target = self
+        rulerUnit.action = #selector(rulerUnitChanged(_:))
+        rulerUnit.toolTip = L10n.text("feature.ruler.units")
+        let rulerMode = NSPopUpButton()
+        rulerMode.addItems(withTitles: RulerMode.allCases.map(\.title))
+        rulerMode.target = self
+        rulerMode.action = #selector(rulerModeChanged(_:))
+        rulerMode.toolTip = L10n.text("feature.ruler.modes")
+
         let cancel = NSButton(title: L10n.text("common.cancel"), target: self, action: #selector(cancel))
         let copy = NSButton(title: L10n.text("annotation.copy"), target: self, action: #selector(copyResult))
         let pin = NSButton(title: L10n.text("annotation.pin"), target: self, action: #selector(pinResult))
         copy.keyEquivalent = "\r"
         pin.bezelStyle = .rounded
-        let bottomBar = NSStackView(views: [NSView(), cancel, copy, pin])
+        let rulerBar = NSStackView(views: [NSTextField(labelWithString: L10n.text("annotation.tool.ruler")), rulerUnit, rulerMode])
+        rulerBar.orientation = .horizontal
+        rulerBar.spacing = 10
+        rulerBar.translatesAutoresizingMaskIntoConstraints = false
+        let bottomBar = NSStackView(views: [draftCheckbox, NSView(), cancel, copy, pin])
         bottomBar.orientation = .horizontal
         bottomBar.alignment = .centerY
         bottomBar.spacing = 10
         bottomBar.translatesAutoresizingMaskIntoConstraints = false
 
-        root.addSubview(topBar)
+        root.addSubview(toolbarScroll)
         root.addSubview(canvas)
         root.addSubview(bottomBar)
+        root.addSubview(rulerBar)
         NSLayoutConstraint.activate([
-            topBar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
-            topBar.trailingAnchor.constraint(lessThanOrEqualTo: root.trailingAnchor, constant: -14),
-            topBar.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
+            toolbarScroll.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
+            toolbarScroll.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
+            toolbarScroll.topAnchor.constraint(equalTo: root.topAnchor, constant: 12),
+            toolbarScroll.heightAnchor.constraint(equalToConstant: 50),
+            topBar.leadingAnchor.constraint(equalTo: toolbarScroll.contentView.leadingAnchor),
+            topBar.topAnchor.constraint(equalTo: toolbarScroll.contentView.topAnchor),
             topBar.heightAnchor.constraint(equalToConstant: 34),
             canvas.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
             canvas.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
-            canvas.topAnchor.constraint(equalTo: topBar.bottomAnchor, constant: 10),
-            canvas.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -10),
+            canvas.topAnchor.constraint(equalTo: toolbarScroll.bottomAnchor, constant: 10),
+            canvas.bottomAnchor.constraint(equalTo: rulerBar.topAnchor, constant: -12),
+            rulerBar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
+            rulerBar.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -10),
+            rulerBar.heightAnchor.constraint(equalToConstant: 26),
             bottomBar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
             bottomBar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
             bottomBar.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12),
@@ -164,6 +216,16 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         guard canvas?.cropToSelectedRectangle() == true else { NSSound.beep(); return }
     }
     @objc private func rotateClockwise() { canvas?.rotateClockwise() }
+    @objc private func rulerUnitChanged(_ sender: NSPopUpButton) {
+        canvas?.rulerUnit = RulerUnit.allCases[sender.indexOfSelectedItem]
+    }
+    @objc private func rulerModeChanged(_ sender: NSPopUpButton) {
+        canvas?.rulerMode = RulerMode.allCases[sender.indexOfSelectedItem]
+        if let index = AnnotationTool.editorTools.firstIndex(of: .ruler), let toolControl {
+            toolControl.selectedSegment = index
+            toolChanged(toolControl)
+        }
+    }
     @objc private func smartRedact() {
         guard let source = canvas?.sourceImageForAnalysis else { return }
         let boxed = AnnotationAnalysisSource(image: source)
@@ -187,7 +249,13 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
 
     private func finishResult(disposition: SelectionDisposition) {
         guard let image = canvas?.renderedImage() else { return }
-        finish(AnnotationEditResult(image: image, disposition: disposition))
+        do {
+            let draft = draftCheckbox?.state == .on ? try canvas?.editableDraft() : nil
+            finish(AnnotationEditResult(image: image, disposition: disposition, draft: draft))
+        } catch {
+            let alert = NSAlert(error: error)
+            alert.runModal()
+        }
     }
 
     private func finish(_ result: AnnotationEditResult?, closeWindow: Bool = true) {
@@ -256,6 +324,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     var tool: AnnotationTool = .mosaic {
         didSet {
             guard tool != oldValue else { return }
+            cancelDrawingGesture()
             if oldValue == .text { commitPendingText() }
             finishRectangleDrag(commit: false)
             selectedRectangleIndex = nil
@@ -280,6 +349,21 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         }
     }
     var arrowDrawingMode: AnnotationArrowMode = .straight
+    var rulerUnit: RulerUnit = .pixels {
+        didSet {
+            guard rulerUnit != oldValue, let selectedRectangleIndex,
+                  history.strokes.indices.contains(selectedRectangleIndex) else { return }
+            var stroke = history.strokes[selectedRectangleIndex]
+            guard stroke.tool == .ruler, stroke.text?.isEmpty == false,
+                  let first = stroke.points.first, let last = stroke.points.last else { return }
+            stroke.text = RulerMeasurement.label(from: first, to: last,
+                size: rulerUnit == .pixels ? CGSize(width: sourceImage.width, height: sourceImage.height) : logicalSize,
+                unit: rulerUnit)
+            history.replace(at: selectedRectangleIndex, with: stroke)
+            rebuildCache()
+        }
+    }
+    var rulerMode: RulerMode = .distance
     var onHistoryChanged: ((Bool, Bool) -> Void)?
     var onDoubleClick: (() -> Void)?
     var onSelectedTextStyleChanged: ((NSColor, CGFloat) -> Void)?
@@ -293,12 +377,14 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     private var logicalSize: CGSize
     private let contentInset: CGFloat
     private var history = AnnotationHistory()
+    // 按下只记录起点；跨过视图坐标中的拖动阈值才预览、提交，避免点击和手抖留下点。
+    private static let drawingDragThreshold: CGFloat = 3
+    private var pendingStroke: AnnotationStroke?
     private var currentStroke: AnnotationStroke?
     private var cachedImage: NSImage
     // 预先缓存像素化底图，拖动时只裁切当前笔迹区域，避免每帧重算整张 Retina 图。
     private var pixelatedPreviewImage: NSImage?
     private var doubleClickTracker = SelectionDoubleClickTracker()
-    private var lastCommittedStrokeWasTap = false
     // 输入框只承载临时编辑；索引区分新增与替换，选中索引负责画布反馈和工具栏样式回填。
     private weak var activeTextField: NSTextField?
     private var activeTextAnchor: CGPoint?
@@ -320,10 +406,11 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     // 从已选文字回填颜色和字号时禁止反向写历史，避免一次选中被误记为一次编辑。
     private var isSynchronizingTextStyle = false
 
-    init(sourceImage: CGImage, logicalSize: CGSize, contentInset: CGFloat = 10) {
+    init(sourceImage: CGImage, logicalSize: CGSize, contentInset: CGFloat = 10, initialStrokes: [AnnotationStroke] = []) {
         self.sourceImage = sourceImage
         self.logicalSize = logicalSize
         self.contentInset = contentInset
+        history = AnnotationHistory(strokes: initialStrokes)
         cachedImage = NSImage(cgImage: sourceImage, size: logicalSize)
         pixelatedPreviewImage = AnnotationRenderer.makePixelated(sourceImage).map {
             NSImage(cgImage: $0, size: logicalSize)
@@ -333,6 +420,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
         layer?.cornerRadius = 8
         layer?.masksToBounds = true
+        if !initialStrokes.isEmpty { rebuildCache() }
     }
 
     required init?(coder: NSCoder) { nil }
@@ -342,7 +430,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         super.draw(dirtyRect)
         let rect = imageRect
         cachedImage.draw(in: rect, from: .zero, operation: .copy, fraction: 1, respectFlipped: true, hints: [.interpolation: NSImageInterpolation.high])
-        if let currentStroke { drawPreview(currentStroke, in: rect) }
+        if let currentStroke, hasDrawableGeometry(currentStroke) { drawPreview(currentStroke, in: rect) }
         if let textDragPreviewStroke {
             drawTextPreview(textDragPreviewStroke, in: rect)
             drawTextSelection(for: textDragPreviewStroke, in: rect)
@@ -374,6 +462,8 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseDown(with event: NSEvent) {
+        pendingStroke = nil
+        currentStroke = nil
         let point = convert(event.locationInWindow, from: nil)
         guard imageRect.contains(point) else { return }
         if tool == .text {
@@ -398,13 +488,8 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         }
         if event.clickCount >= 2 ||
             doubleClickTracker.registerClick(timestamp: event.timestamp, point: point) {
-            // 双击第一下形成的点笔迹不应污染最终截图。
-            currentStroke = nil
-            if lastCommittedStrokeWasTap {
-                history.undo()
-                lastCommittedStrokeWasTap = false
-                rebuildCache()
-            }
+            // 单击没有写入历史，双击完成无需撤销补偿，也不会在重做中恢复误点。
+            cancelDrawingGesture()
             onDoubleClick?()
             return
         }
@@ -420,7 +505,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         }
         selectedRectangleIndex = nil
         let normalized = normalizedPoint(point)
-        currentStroke = AnnotationStroke(
+        pendingStroke = AnnotationStroke(
             tool: tool,
             points: [normalized],
             color: AnnotationColor(annotationColor),
@@ -436,24 +521,10 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         }
         if rectangleDragIndex != nil {
             doubleClickTracker.reset()
-            lastCommittedStrokeWasTap = false
             updateRectangleDrag(to: convert(event.locationInWindow, from: nil))
             return
         }
-        guard var stroke = currentStroke else { return }
-        doubleClickTracker.reset()
-        lastCommittedStrokeWasTap = false
-        let point = normalizedPoint(convert(event.locationInWindow, from: nil))
-        if stroke.tool == .pen || stroke.tool == .mosaic ||
-            (stroke.tool == .arrow && arrowDrawingMode == .freehand) {
-            stroke.points.append(point)
-        } else if stroke.points.count == 1 {
-            stroke.points.append(point)
-        } else {
-            stroke.points[1] = point
-        }
-        currentStroke = stroke
-        needsDisplay = true
+        updateDrawingStroke(at: convert(event.locationInWindow, from: nil))
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -465,13 +536,14 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
             finishRectangleDrag(commit: true)
             return
         }
-        guard var stroke = currentStroke else { return }
-        let releasePoint = normalizedPoint(convert(event.locationInWindow, from: nil))
-        lastCommittedStrokeWasTap = stroke.points.count == 1
-        if stroke.points.count == 1 {
-            stroke.points.append(releasePoint)
-        } else if stroke.tool == .arrow, arrowDrawingMode == .freehand {
-            if stroke.points.last != releasePoint { stroke.points.append(releasePoint) }
+        // 松手也参与判定，保留快速拖动的终点，即使系统未发送中间拖动事件。
+        updateDrawingStroke(at: convert(event.locationInWindow, from: nil))
+        let completedStroke = currentStroke ?? (pendingStroke?.tool == .number ? pendingStroke : nil)
+        pendingStroke = nil
+        currentStroke = nil
+        needsDisplay = true
+        guard var stroke = completedStroke, hasDrawableGeometry(stroke) else { return }
+        if stroke.tool == .arrow, arrowDrawingMode == .freehand {
             let rect = imageRect
             let displayPoints = stroke.points.map {
                 CGPoint(x: rect.minX + $0.x * rect.width, y: rect.minY + $0.y * rect.height)
@@ -486,15 +558,16 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
                 )
             }
         }
-        currentStroke = nil
         if stroke.tool == .ocr {
             commitOCRSelection(stroke)
             return
         }
         if stroke.tool == .number {
+            if stroke.points.count == 1, let anchor = stroke.points.first { stroke.points.append(anchor) }
             let next = history.strokes.filter { $0.tool == .number }.count + 1
             stroke.text = String(next)
         }
+        if stroke.tool == .ruler { updateRuler(&stroke) }
         history.append(stroke)
         if supportsDirectEditing(stroke.tool) {
             selectedRectangleIndex = history.strokes.count - 1
@@ -503,7 +576,59 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         rebuildCache()
     }
 
+    private func updateDrawingStroke(at location: CGPoint) {
+        let point = normalizedPoint(location)
+        if currentStroke == nil, let pendingStroke, let start = pendingStroke.points.first {
+            let rect = imageRect
+            let distance = hypot((point.x - start.x) * rect.width, (point.y - start.y) * rect.height)
+            guard distance >= Self.drawingDragThreshold else { return }
+            currentStroke = pendingStroke
+            self.pendingStroke = nil
+            doubleClickTracker.reset()
+        }
+        guard var stroke = currentStroke else { return }
+        if stroke.tool == .pen || stroke.tool == .mosaic ||
+            (stroke.tool == .arrow && arrowDrawingMode == .freehand) {
+            if stroke.points.last != point { stroke.points.append(point) }
+        } else if stroke.points.count == 1 {
+            stroke.points.append(point)
+        } else {
+            stroke.points[1] = point
+        }
+        if stroke.tool == .ruler { updateRuler(&stroke) }
+        currentStroke = stroke
+        needsDisplay = true
+    }
+
+    private func hasDrawableGeometry(_ stroke: AnnotationStroke) -> Bool {
+        guard let first = stroke.points.first, let last = stroke.points.last else { return false }
+        let rect = imageRect
+        let width = abs(last.x - first.x) * rect.width
+        let height = abs(last.y - first.y) * rect.height
+        switch stroke.tool {
+        case .rectangle, .ellipse, .highlight, .ocr, .redaction:
+            return min(width, height) >= Self.drawingDragThreshold
+        case .line, .ruler:
+            return hypot(width, height) >= Self.drawingDragThreshold
+        case .arrow:
+            return stroke.points.count > 2 || hypot(width, height) >= Self.drawingDragThreshold
+        case .pen, .mosaic:
+            // 手绘允许回到起点形成闭合路径；是否有意拖动已在待落笔阶段判定。
+            return stroke.points.count > 1
+        case .text, .number:
+            return true
+        }
+    }
+
+    private func cancelDrawingGesture() {
+        pendingStroke = nil
+        currentStroke = nil
+        doubleClickTracker.reset()
+        needsDisplay = true
+    }
+
     func undo() {
+        cancelDrawingGesture()
         finishRectangleDrag(commit: false)
         selectedRectangleIndex = nil
         finishTextDrag(commit: false)
@@ -514,6 +639,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     }
 
     func redo() {
+        cancelDrawingGesture()
         finishRectangleDrag(commit: false)
         selectedRectangleIndex = nil
         finishTextDrag(commit: false)
@@ -524,6 +650,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     }
 
     func clear() {
+        cancelDrawingGesture()
         finishRectangleDrag(commit: false)
         selectedRectangleIndex = nil
         finishTextDrag(commit: false)
@@ -569,6 +696,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
 
     func updateSourceImage(_ image: CGImage, logicalSize: CGSize) {
         // 选区调整后替换底图，但保留归一化笔迹，使标注随新选区同步缩放。
+        cancelDrawingGesture()
         finishTextDrag(commit: false)
         sourceImage = image
         self.logicalSize = logicalSize
@@ -584,22 +712,53 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         return NSImage(cgImage: rendered, size: logicalSize)
     }
 
+    func editableDraft() throws -> AnnotationDraft {
+        commitPendingText()
+        return try AnnotationDraft(source: sourceImage, logicalSize: logicalSize, strokes: history.strokes)
+    }
+
+    private func updateRuler(_ stroke: inout AnnotationStroke) {
+        guard let first = stroke.points.first, let last = stroke.points.last else { return }
+        switch rulerMode {
+        case .distance:
+            stroke.text = RulerMeasurement.label(
+                from: first, to: last,
+                size: rulerUnit == .pixels ? CGSize(width: sourceImage.width, height: sourceImage.height) : logicalSize,
+                unit: rulerUnit
+            )
+        case .horizontal:
+            stroke.points = [CGPoint(x: 0, y: last.y), CGPoint(x: 1, y: last.y)]
+            stroke.text = ""
+        case .vertical:
+            stroke.points = [CGPoint(x: last.x, y: 0), CGPoint(x: last.x, y: 1)]
+            stroke.text = ""
+        }
+    }
+
     func cropToSelectedRectangle() -> Bool {
+        commitPendingText()
         guard let selectedRectangleIndex,
               history.strokes.indices.contains(selectedRectangleIndex) else { return false }
         let stroke = history.strokes[selectedRectangleIndex]
         guard stroke.tool == .rectangle, stroke.points.count >= 2 else { return false }
         let first = stroke.points[0]
         let last = stroke.points[1]
-        let crop = CGRect(
-            x: min(first.x, last.x) * CGFloat(sourceImage.width),
-            y: min(first.y, last.y) * CGFloat(sourceImage.height),
-            width: abs(last.x - first.x) * CGFloat(sourceImage.width),
-            height: abs(last.y - first.y) * CGFloat(sourceImage.height)
-        ).integral.intersection(CGRect(x: 0, y: 0, width: sourceImage.width, height: sourceImage.height))
-        guard crop.width >= 3, crop.height >= 3, let cropped = sourceImage.cropping(to: crop) else { return false }
+        func snap(_ value: CGFloat) -> CGFloat {
+            abs(value - value.rounded()) < 0.0000001 ? value.rounded() : value
+        }
+        let left = snap(min(first.x, last.x) * CGFloat(sourceImage.width))
+        let right = snap(max(first.x, last.x) * CGFloat(sourceImage.width))
+        let top = snap((1 - max(first.y, last.y)) * CGFloat(sourceImage.height))
+        let bottom = snap((1 - min(first.y, last.y)) * CGFloat(sourceImage.height))
+        let crop = CGRect(x: left, y: top, width: right - left, height: bottom - top)
+            .integral.intersection(CGRect(x: 0, y: 0, width: sourceImage.width, height: sourceImage.height))
+        let remainingStrokes = history.strokes.enumerated().compactMap { $0.offset == selectedRectangleIndex ? nil : $0.element }
+        guard crop.width >= 3, crop.height >= 3,
+              let rendered = try? AnnotationRenderer.render(image: sourceImage, strokes: remainingStrokes),
+              let cropped = rendered.cropping(to: crop) else { return false }
+        logicalSize = CGSize(width: crop.width / CGFloat(sourceImage.width) * logicalSize.width,
+                             height: crop.height / CGFloat(sourceImage.height) * logicalSize.height)
         sourceImage = cropped
-        logicalSize = CGSize(width: crop.width, height: crop.height)
         history = AnnotationHistory()
         self.selectedRectangleIndex = nil
         refreshSourceCaches()
@@ -607,7 +766,9 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     }
 
     func rotateClockwise() {
-        guard let rotated = Self.rotatedClockwise(sourceImage) else { return }
+        commitPendingText()
+        guard let rendered = try? AnnotationRenderer.render(image: sourceImage, strokes: history.strokes),
+              let rotated = Self.rotatedClockwise(rendered) else { return }
         sourceImage = rotated
         logicalSize = CGSize(width: logicalSize.height, height: logicalSize.width)
         history = AnnotationHistory()
@@ -646,8 +807,8 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
             space: image.colorSpace ?? CGColorSpaceCreateDeviceRGB(),
             bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
         ) else { return nil }
-        context.translateBy(x: CGFloat(image.height), y: 0)
-        context.rotate(by: .pi / 2)
+        context.translateBy(x: 0, y: CGFloat(image.width))
+        context.rotate(by: -.pi / 2)
         context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
         return context.makeImage()
     }
@@ -1005,7 +1166,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
                 miterLimit: 10
             )
             return arrowPath.contains(point) || hitPath.contains(point)
-        case .pen, .mosaic, .line:
+        case .pen, .mosaic, .line, .ruler:
             let displayPoints = stroke.points.map { strokePoint in
                 CGPoint(x: rect.minX + strokePoint.x * rect.width, y: rect.minY + strokePoint.y * rect.height)
             }
@@ -1036,7 +1197,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
 
     private func supportsDirectEditing(_ tool: AnnotationTool) -> Bool {
         switch tool {
-        case .mosaic, .pen, .rectangle, .highlight, .arrow, .ellipse, .line, .number:
+        case .mosaic, .pen, .rectangle, .highlight, .arrow, .ellipse, .line, .number, .ruler:
             return true
         case .text, .ocr, .redaction:
             return false
@@ -1232,6 +1393,11 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
             context.addPath(arrowPath)
             context.fillPath()
             context.restoreGState()
+        } else if stroke.tool == .ruler, let context = NSGraphicsContext.current?.cgContext {
+            context.saveGState()
+            context.translateBy(x: rect.minX, y: rect.minY)
+            AnnotationRenderer.drawRuler(stroke, in: context, bounds: CGRect(origin: .zero, size: rect.size))
+            context.restoreGState()
         } else if stroke.tool == .line, let last = points.last {
             path.line(to: last)
             path.stroke()
@@ -1246,7 +1412,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     }
 }
 
-private extension NSImage {
+extension NSImage {
     var cgImageValue: CGImage? {
         var rect = CGRect(origin: .zero, size: size)
         return cgImage(forProposedRect: &rect, context: nil, hints: nil)

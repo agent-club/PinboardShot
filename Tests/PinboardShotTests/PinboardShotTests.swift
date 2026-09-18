@@ -1151,9 +1151,24 @@ func scrollCaptureHasBackingStoreBoundary() {
         currentHeight: 155_000,
         appendedHeight: 1_250
     ))
-    #expect(!ScrollCaptureAccumulator.canAppend(
+    #expect(ScrollCaptureAccumulator.canAppend(
         width: 1_600,
         currentHeight: 156_250,
+        appendedHeight: 1
+    ))
+    #expect(ScrollCaptureAccumulator.canAppend(
+        width: 1_600,
+        currentHeight: 1_000_000,
+        appendedHeight: 1_250
+    ))
+    #expect(!ScrollCaptureAccumulator.canAppend(
+        width: 1_600,
+        currentHeight: Int.max,
+        appendedHeight: 1
+    ))
+    #expect(!ScrollCaptureAccumulator.canAppend(
+        width: Int.max / 4,
+        currentHeight: 1,
         appendedHeight: 1
     ))
 }
