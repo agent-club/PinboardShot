@@ -7,37 +7,39 @@
     "dmg": {
       "name": "PinboardShot-0.11.0-46.dmg",
       "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.11.0/PinboardShot-0.11.0-46.dmg",
-      "sha256": "9f4487e918605d9db081fb2d7124b1e0e124daad570439a0e31094c95346329a"
+      "sha256": "f6d01fd542615412c69e558d6eff82cb767c0e59c70d0ec863ed6092cd12dec7"
     },
     "zip": {
       "name": "PinboardShot-0.11.0-46.zip",
       "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.11.0/PinboardShot-0.11.0-46.zip",
-      "sha256": "034c8f0b765e891031bc33f7e9903e827265bf05f3168f1cf79958c993a06509"
+      "sha256": "b75653abc8dae22110c35042e8a9d193a7847a894fff5d528958f66affb25fee"
     },
     "appcast": {
       "name": "appcast.xml",
       "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.11.0/appcast.xml",
-      "sha256": "6dfa6f9f2df50c87a87cc4e1bfb5bc57c941ddde9809b42927ddaccc85c842f8"
+      "sha256": "2711dc969537e9d10562979ed476205974d7a60dc387edd90b1791786880a18d"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "长截图更顺畅，重要内容可保留",
+    "title": "长截图更顺畅，萤火守护员亮相",
     "changes": [
       "改进长截图的快速上下滚动拼接、超长图预览与完成时的内存占用；出现无法匹配时可继续捕获或保存已拼接部分",
       "历史截图可标记保留，跳过自动数量和期限清理；多张贴图时可获得一次性工作区保存提醒",
       "步骤文档可选择启用本地崩溃恢复；关闭未保存的短录屏预览前会请求确认",
-      "官网修正短录屏能力说明；应用与 DMG 已通过 Apple 公证，Sparkle 更新包带有签名"
+      "新 App 图标、官网中英文首屏和社交分享图统一为萤火守护员视觉形象，并修正短录屏能力说明",
+      "应用与 DMG 已通过 Apple 公证，Sparkle 更新包带有签名"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Smoother scrolling captures and protected work",
+    "title": "Smoother scrolling captures meet the firefly guardian",
     "changes": [
       "Improves fast upward and downward stitching, long-image previews, and memory use when finishing a capture; unmatched content can be retried or the stitched portion saved.",
       "Keep selected history captures outside automatic count and age cleanup; a one-time reminder helps save a workspace with multiple pins.",
       "Optional local crash recovery protects unfinished step guides; closing an unsaved short recording now asks for confirmation.",
-      "The website corrects its short-recording description; the app and DMG are Apple-notarized, and the Sparkle update package is signed."
+      "The new app icon, Chinese and English landing pages, and social preview share the firefly guardian design; the website also corrects its short-recording description.",
+      "The app and DMG are Apple-notarized, and the Sparkle update package is signed."
     ]
   }
 }

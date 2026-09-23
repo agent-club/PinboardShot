@@ -126,6 +126,8 @@ const copy = {
     eyebrow: "为 macOS 精心打造",
     title: "截图，然后\n留在眼前",
     intro: "原生 macOS 截图、标注与贴图工具，从框选到马赛克、文字和贴屏，全程只在本机完成",
+    guardianName: "萤火守护员",
+    guardianStory: "捕捉一闪而过的画面，把重要的参考留在身边。",
     download: "下载 DMG",
     learn: "看看它能做什么",
     requirement: "macOS 14+ · Universal · Apple Silicon 与 Intel · Developer ID 签名 · Apple 公证",
@@ -265,6 +267,8 @@ const copy = {
     eyebrow: "Crafted for macOS",
     title: "Capture it.\nKeep it in sight.",
     intro: "A native capture, annotation, and pinboard tool for macOS. From selection to markup and pinning, everything stays on your Mac.",
+    guardianName: "Your little lightkeeper",
+    guardianStory: "Catch a fleeting moment and keep the useful details close.",
     download: "Download DMG",
     learn: "See what it can do",
     requirement: "macOS 14+ · Universal · Apple Silicon & Intel · Developer ID signed · Apple notarized",
@@ -483,6 +487,10 @@ export function PinboardShotHome({
           <p className="eyebrow"><span />{content.eyebrow}</p>
           <h1>{content.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1>
           <p className="intro">{content.intro}</p>
+          <div className="guardian-note">
+            <span className="guardian-note-icon" aria-hidden="true" />
+            <span><strong>{content.guardianName}</strong><small>{content.guardianStory}</small></span>
+          </div>
           <div className="hero-actions">
             <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
             <a className="button button-secondary" href="#features">{content.learn}<span aria-hidden="true">↘</span></a>
