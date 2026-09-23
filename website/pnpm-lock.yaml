@@ -64,6 +64,9 @@ importers:
       react-server-dom-webpack:
         specifier: 19.2.8
         version: 19.2.8(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(webpack@5.109.0(esbuild@0.28.2))
+      sharp:
+        specifier: 0.35.2
+        version: 0.35.2
       tailwindcss:
         specifier: 4.3.3
         version: 4.3.3

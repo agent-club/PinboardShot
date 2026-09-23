@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     type: "article",
     locale: "en_US",
     alternateLocale: ["zh_CN"],
-    images: [{ url: socialImage, width: 1792, height: 1024, alt: "PinboardShot for macOS" }],
+    images: [{ url: socialImage, width: 1920, height: 990, alt: "PinboardShot for macOS" }],
   },
   twitter: {
     card: "summary_large_image",

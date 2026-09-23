@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./brand.css";
 import {
   GOOGLE_TAG_ID,
   OPENGRAPH_IMAGE_PATH,
@@ -94,7 +95,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "zh_CN",
     alternateLocale: ["en_US"],
-    images: [{ url: socialImage, width: 1792, height: 1024, alt: "PinboardShot for macOS" }],
+    images: [{ url: socialImage, width: 1920, height: 990, alt: "PinboardShot for macOS" }],
   },
   twitter: {
     card: "summary_large_image",
