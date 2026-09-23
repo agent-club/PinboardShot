@@ -58,10 +58,16 @@ function extractStructuredData(html) {
 }
 
 function extractAnalyticsBootstrap(html) {
-  const scripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/gi)];
-  const match = scripts.find(([, source]) => source.includes("window.localStorage.getItem"));
-  assert.ok(match, "expected an inline analytics consent bootstrap");
-  return match[1];
+  const marker = html.indexOf("window.localStorage.getItem");
+  assert.ok(marker >= 0, "expected an inline analytics consent bootstrap");
+  const openStart = html.lastIndexOf("<script", marker);
+  const openEnd = html.indexOf(">", openStart);
+  const closeStart = html.indexOf("</script", marker);
+  const closeEnd = html.indexOf(">", closeStart);
+  assert.ok(openStart >= 0 && openEnd < marker && closeStart > marker && closeEnd > closeStart);
+  // Check the closing tag before executing the extracted script, including tags with whitespace.
+  assert.equal(html.slice(closeStart + 2, closeEnd).trim().toLowerCase(), "script");
+  return html.slice(openEnd + 1, closeStart);
 }
 
 function runAnalyticsBootstrap(source, savedPrivacyConsent, { throwOnRead = false } = {}) {
@@ -106,6 +112,13 @@ function runAnalyticsBootstrap(source, savedPrivacyConsent, { throwOnRead = fals
     window,
   };
 }
+
+test("extracts an inline script with whitespace before its closing bracket", () => {
+  assert.equal(
+    extractAnalyticsBootstrap('<script>window.localStorage.getItem("choice")</script >'),
+    'window.localStorage.getItem("choice")',
+  );
+});
 
 test("server-renders the PinboardShot download page", async () => {
   const response = await render();
