@@ -60,8 +60,8 @@ sign_sparkle() {
   fi
 
   codesign $sign_args "$sparkle_version/XPCServices/Installer.xpc" || return 1
-  codesign $sign_args --preserve-metadata=entitlements \
-    "$sparkle_version/XPCServices/Downloader.xpc" || return 1
+  # Preserving absent entitlements corrupts Downloader's arm64 slice with the current codesign.
+  codesign $sign_args "$sparkle_version/XPCServices/Downloader.xpc" || return 1
   codesign $sign_args "$sparkle_version/Autoupdate" || return 1
   codesign $sign_args "$sparkle_version/Updater.app" || return 1
   codesign $sign_args "$embedded_sparkle" || return 1

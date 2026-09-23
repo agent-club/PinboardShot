@@ -48,6 +48,12 @@ struct WatermarkedCapture {
     let pngData: Data
 }
 
+private struct ScrollCaptureImageWork: @unchecked Sendable {
+    let image: NSImage
+    let pngData: Data?
+    let imageSHA256: String?
+}
+
 @MainActor
 /// 保存“随机截图 ID → 用户填写信息”的本地映射；密钥仅在首次签名或验签时从钥匙串加载。
 final class InvisibleWatermarkStore: ObservableObject {
@@ -193,6 +199,37 @@ final class InvisibleWatermarkService {
         guard let pngData = markedImage.pngData else { throw PinboardShotError.imageEncodingFailed }
         let hash = SHA256.hash(data: pngData).map { String(format: "%02x", $0) }.joined()
         _ = try store.add(id: id, createdAt: createdAt, settings: settings, imageSHA256: hash)
+        return WatermarkedCapture(
+            image: try compressedImage(from: pngData, logicalSize: image.size),
+            pngData: pngData
+        )
+    }
+
+    func prepareScrollingCapture(_ image: NSImage) async throws -> WatermarkedCapture {
+        let settings = InvisibleWatermarkSettings.current(defaults: defaults)
+        let id = UUID()
+        let createdAt = Date()
+        let input = ScrollCaptureImageWork(image: image, pngData: nil, imageSHA256: nil)
+        // Encoding and optional pixel watermarking scale with the full document.
+        // Keep this work off the main actor so a very long capture stays responsive.
+        let prepared = try await Task.detached(priority: .userInitiated) {
+            let output = settings.enabled
+                ? try InvisibleWatermarkCodec.embed(id: id, in: input.image)
+                : input.image
+            guard let pngData = output.mappedPNGData else { throw PinboardShotError.imageEncodingFailed }
+            let hash = settings.enabled
+                ? SHA256.hash(data: pngData).map { String(format: "%02x", $0) }.joined()
+                : nil
+            return ScrollCaptureImageWork(image: output, pngData: pngData, imageSHA256: hash)
+        }.value
+        guard let pngData = prepared.pngData else { throw PinboardShotError.imageEncodingFailed }
+        if let hash = prepared.imageSHA256 {
+            _ = try store.add(id: id, createdAt: createdAt, settings: settings, imageSHA256: hash)
+            return WatermarkedCapture(
+                image: try compressedImage(from: pngData, logicalSize: image.size),
+                pngData: pngData
+            )
+        }
         return WatermarkedCapture(
             image: try compressedImage(from: pngData, logicalSize: image.size),
             pngData: pngData

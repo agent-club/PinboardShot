@@ -1,45 +1,43 @@
 {
-  "version": "0.10.0",
-  "build": "45",
+  "version": "0.11.0",
+  "build": "46",
   "date": "2026.09.24",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.10.0",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.11.0",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.10.0-45.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.10.0/PinboardShot-0.10.0-45.dmg",
-      "sha256": "49815f38907c43a69a056afc89ec5e6b68126630d79d413cc7635bce34ae5599"
+      "name": "PinboardShot-0.11.0-46.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.11.0/PinboardShot-0.11.0-46.dmg",
+      "sha256": "9f4487e918605d9db081fb2d7124b1e0e124daad570439a0e31094c95346329a"
     },
     "zip": {
-      "name": "PinboardShot-0.10.0-45.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.10.0/PinboardShot-0.10.0-45.zip",
-      "sha256": "2434c6bf749581dd79ec0fe992990541f533610e7943abe2192e9d3074144361"
+      "name": "PinboardShot-0.11.0-46.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.11.0/PinboardShot-0.11.0-46.zip",
+      "sha256": "034c8f0b765e891031bc33f7e9903e827265bf05f3168f1cf79958c993a06509"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.10.0/appcast.xml",
-      "sha256": "39ffe6b57d77bbd7a953098f82a3987f2b6427bde6e2db47722e38ec7330c9e2"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.11.0/appcast.xml",
+      "sha256": "6dfa6f9f2df50c87a87cc4e1bfb5bc57c941ddde9809b42927ddaccc85c842f8"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "截图与贴图支持直接选择文字",
+    "title": "长截图更顺畅，重要内容可保留",
     "changes": [
-      "在截图选区和贴图中使用本机 Live Text 选择文字；拖动空白区域仍可移动，边缘把手仍可调整大小",
-      "贴图支持复制已选文字；未选择文字时保留复制图片操作，放大时移动把手仅在靠近顶部时显示",
-      "官网新增功能、使用场景和产品对比页面，并完善站点地图与结构化信息",
-      "官网默认启用基础访问统计，并提供可持久关闭的选项；应用内文字识别继续在本机处理",
-      "提供 Apple Silicon 与 Intel 通用版本，应用和 DMG 通过 Apple 公证，Sparkle 更新包带有签名"
+      "改进长截图的快速上下滚动拼接、超长图预览与完成时的内存占用；出现无法匹配时可继续捕获或保存已拼接部分",
+      "历史截图可标记保留，跳过自动数量和期限清理；多张贴图时可获得一次性工作区保存提醒",
+      "步骤文档可选择启用本地崩溃恢复；关闭未保存的短录屏预览前会请求确认",
+      "官网修正短录屏能力说明；应用与 DMG 已通过 Apple 公证，Sparkle 更新包带有签名"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Select text directly in captures and pinned images",
+    "title": "Smoother scrolling captures and protected work",
     "changes": [
-      "Use on-device Live Text to select text in capture selections and pinned images; dragging blank areas and edge resizing remain available.",
-      "Copy selected text from a pinned image, or copy the image when no text is selected; the move handle appears only when approached on enlarged pins.",
-      "The website adds feature, use-case, and product-comparison pages with improved sitemap and structured data.",
-      "The website enables basic visit analytics by default with a persistent opt-out; in-app text recognition remains on-device.",
-      "Includes Apple Silicon and Intel support, an Apple-notarized app and DMG, and a signed Sparkle update package."
+      "Improves fast upward and downward stitching, long-image previews, and memory use when finishing a capture; unmatched content can be retried or the stitched portion saved.",
+      "Keep selected history captures outside automatic count and age cleanup; a one-time reminder helps save a workspace with multiple pins.",
+      "Optional local crash recovery protects unfinished step guides; closing an unsaved short recording now asks for confirmation.",
+      "The website corrects its short-recording description; the app and DMG are Apple-notarized, and the Sparkle update package is signed."
     ]
   }
 }

@@ -1,5 +1,6 @@
 import AppKit
 import CoreText
+import ImageIO
 import Testing
 @testable import PinboardShot
 
@@ -67,6 +68,67 @@ struct ScrollCapturePrecisionTests {
         #expect(match.verticalShift == shift)
     }
 
+    @Test("Fast scroll with a narrow overlap is still stitched", arguments: [false, true])
+    func fastScroll(backward: Bool) throws {
+        let image = try document(width: 600, height: 2_400)
+        let firstY = backward ? 960 : 0
+        let secondY = backward ? 0 : 960
+        let first = try #require(image.cropping(to: CGRect(x: 0, y: firstY, width: 600, height: 1_200)))
+        let second = try #require(image.cropping(to: CGRect(x: 0, y: secondY, width: 600, height: 1_200)))
+        #expect(ScrollFrameMatcher.match(previous: first, current: second)?.verticalShift == (backward ? -960 : 960))
+        let accumulator = ScrollCaptureAccumulator()
+        #expect(accumulator.append(first) == .initial)
+        guard case .appended(let height, _) = accumulator.append(second) else {
+            Issue.record("Fast scroll was not appended")
+            return
+        }
+        #expect(height == 960)
+        let stitched = try #require(accumulator.makeImage())
+        let expected = try #require(image.cropping(to: CGRect(x: 0, y: 0, width: 600, height: 2_160)))
+        #expect(try pixels(stitched) == pixels(expected))
+    }
+
+    @Test("Scrolling upward backfills the complete top half")
+    func reverseBackfill() throws {
+        let width = 240
+        let image = try document(width: width, height: 6_600)
+        let accumulator = ScrollCaptureAccumulator()
+        for position in stride(from: 6_000, through: 0, by: -200) {
+            let frame = try #require(image.cropping(to: CGRect(
+                x: 0, y: position, width: width, height: 600
+            )))
+            let result = accumulator.append(frame)
+            if position == 6_000 { #expect(result == .initial) }
+            else if case .appended = result { continue }
+            else { Issue.record("Reverse capture stopped at \(position): \(result)"); return }
+        }
+        let stitched = try #require(accumulator.makeImage())
+        #expect(stitched.height == 6_600)
+        #expect(try pixels(stitched) == pixels(image))
+    }
+
+    @Test("Reversing direction fills rows above the starting viewport")
+    func reverseAfterForward() throws {
+        let width = 240
+        let image = try document(width: width, height: 4_000)
+        let accumulator = ScrollCaptureAccumulator()
+        let positions = [3_000, 3_200, 3_400, 3_200, 3_000] +
+            Array(stride(from: 2_800, through: 0, by: -200))
+        for (index, position) in positions.enumerated() {
+            let frame = try #require(image.cropping(to: CGRect(
+                x: 0, y: position, width: width, height: 600
+            )))
+            let result = accumulator.append(frame)
+            if index == 0 { #expect(result == .initial) }
+            else if case .appended = result { continue }
+            else if case .revisited = result { continue }
+            else { Issue.record("Direction reversal stopped at \(position): \(result)"); return }
+        }
+        let stitched = try #require(accumulator.makeImage())
+        #expect(stitched.height == 4_000)
+        #expect(try pixels(stitched) == pixels(image))
+    }
+
     @Test("Many narrow slices preserve every source pixel without seams")
     func consecutiveFrames() throws {
         let image = try document()
@@ -123,8 +185,49 @@ struct ScrollCapturePrecisionTests {
         }
         let stitched = try #require(accumulator.makeImage())
         #expect(stitched.height == 7060)
+        let preview = try #require(accumulator.makePreviewImage(maximumWidth: 120, maximumHeight: 256))
+        #expect(preview.width <= 120 && preview.height == 256)
         let expected = try #require(image.cropping(to: CGRect(x: 0, y: 0, width: 240, height: 7060)))
         #expect(try pixels(stitched) == pixels(expected))
+    }
+
+    @Test("Capture beyond 32768 rows remains readable at both ends")
+    func veryLongCapture() throws {
+        let width = 240
+        let image = try document(width: width, height: 36_000)
+        let accumulator = ScrollCaptureAccumulator()
+        for index in 0...177 {
+            let frame = try #require(image.cropping(to: CGRect(
+                x: 0, y: index * 200, width: width, height: 600
+            )))
+            let result = accumulator.append(frame)
+            if index > 0, case .appended = result { continue }
+            if index > 0 {
+                let prior = try #require(image.cropping(to: CGRect(
+                    x: 0, y: (index - 1) * 200, width: width, height: 600
+                )))
+                let previousOverlap = try #require(prior.cropping(to: CGRect(x: 0, y: 200, width: width, height: 400)))
+                let currentOverlap = try #require(frame.cropping(to: CGRect(x: 0, y: 0, width: width, height: 400)))
+                Issue.record("Long capture stopped at frame \(index): \(result), local match: \(String(describing: ScrollFrameMatcher.match(previous: prior, current: frame))), overlap equal: \(try pixels(previousOverlap) == pixels(currentOverlap))")
+                return
+            }
+        }
+        let stitched = try #require(accumulator.makeImage())
+        #expect(stitched.height == 36_000)
+        let png = try #require(NSImage(
+            cgImage: stitched, size: CGSize(width: width, height: 36_000)
+        ).mappedPNGData)
+        let encodedSource = try #require(CGImageSourceCreateWithData(png as CFData, nil))
+        let encodedProperties = try #require(
+            CGImageSourceCopyPropertiesAtIndex(encodedSource, 0, nil) as? [CFString: Any]
+        )
+        #expect(encodedProperties[kCGImagePropertyPixelHeight] as? Int == 36_000)
+        for y in [0, 35_400] {
+            let rect = CGRect(x: 0, y: y, width: width, height: 600)
+            let actual = try #require(stitched.cropping(to: rect))
+            let expected = try #require(image.cropping(to: rect))
+            #expect(try pixels(actual) == pixels(expected))
+        }
     }
 
     @Test("Fixed header and footer appear once without hiding scrolling content", arguments: [false, true], [false, true])

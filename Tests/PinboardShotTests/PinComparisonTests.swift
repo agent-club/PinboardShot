@@ -126,8 +126,21 @@ func pinComparisonDiscoveryHintIsShownOnce() {
 
     #expect(!PinComparisonDiscoveryPolicy.shouldShow(pinCount: 1, defaults: defaults))
     #expect(PinComparisonDiscoveryPolicy.shouldShow(pinCount: 2, defaults: defaults))
-    #expect(!PinComparisonDiscoveryPolicy.shouldShow(pinCount: 3, defaults: defaults))
+    #expect(PinComparisonDiscoveryPolicy.shouldShow(pinCount: 3, defaults: defaults))
 
     PinComparisonDiscoveryPolicy.markShown(defaults: defaults)
     #expect(!PinComparisonDiscoveryPolicy.shouldShow(pinCount: 2, defaults: defaults))
+}
+
+@Test func workspaceDiscoveryOnlyAppearsForTwoPinsWithoutRecovery() {
+    let suiteName = "PinWorkspaceDiscoveryPolicyTests-\(UUID())"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    defer { defaults.removePersistentDomain(forName: suiteName) }
+    #expect(!PinWorkspaceDiscoveryPolicy.shouldShow(pinCount: 1, defaults: defaults))
+    #expect(PinWorkspaceDiscoveryPolicy.shouldShow(pinCount: 2, defaults: defaults))
+    defaults.set(true, forKey: PinSessionRecoverySettings.defaultsKey)
+    #expect(!PinWorkspaceDiscoveryPolicy.shouldShow(pinCount: 2, defaults: defaults))
+    defaults.set(false, forKey: PinSessionRecoverySettings.defaultsKey)
+    PinWorkspaceDiscoveryPolicy.markShown(defaults: defaults)
+    #expect(!PinWorkspaceDiscoveryPolicy.shouldShow(pinCount: 2, defaults: defaults))
 }

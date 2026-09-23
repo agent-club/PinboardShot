@@ -14,11 +14,15 @@ struct CaptureGuide: Codable, Sendable {
     var steps: [CaptureGuideStep] = []
 
     func validate() throws {
+        try validateStructure()
+        for step in steps { _ = try CaptureDocumentExport.decodeImage(step.pngData) }
+    }
+
+    func validateStructure() throws {
         guard version == 1, steps.count <= 100, title.count <= 10_000,
               steps.allSatisfy({ $0.pngData.count <= 128 * 1_024 * 1_024 && $0.title.count <= 10_000 && $0.detail.count <= 100_000 }),
               steps.reduce(0, { $0 + $1.pngData.count }) <= 160 * 1_024 * 1_024,
               Set(steps.map(\.id)).count == steps.count else { throw CaptureFeatureError.invalidDocument }
-        for step in steps { _ = try CaptureDocumentExport.decodeImage(step.pngData) }
     }
 
     mutating func move(id: UUID, by offset: Int) {

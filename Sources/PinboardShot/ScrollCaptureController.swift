@@ -47,6 +47,7 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
               let frame = croppedFrame(from: pixelBuffer) else { return }
 
         let result = accumulator.append(frame)
+        let wasUnmatched = consecutiveUnmatchedFrames >= 5
         switch result {
         case .initial:
             consecutiveUnmatchedFrames = 0
@@ -55,7 +56,7 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
             consecutiveUnmatchedFrames = 0
         case .duplicate:
             consecutiveUnmatchedFrames = 0
-            return
+            if !wasUnmatched { return }
         case .revisited:
             consecutiveUnmatchedFrames = 0
         case .unmatched:
@@ -127,6 +128,7 @@ final class ScrollCaptureController {
     private var output: ScrollCaptureStreamOutput?
     private var target: ScrollCaptureTarget?
     private var isStopping = false
+    private var hasUnmatchedFrames = false
 
     func capture(target: ScrollCaptureTarget) async throws -> NSImage? {
         guard continuation == nil else { throw PinboardShotError.captureBusy }
@@ -157,7 +159,10 @@ final class ScrollCaptureController {
                 Task { @MainActor in self?.handle(progress) }
             },
             onError: { [weak self] error in
-                Task { @MainActor in self?.complete(throwing: error) }
+                Task { @MainActor in
+                    guard let self, !self.isStopping else { return }
+                    self.complete(throwing: error)
+                }
             }
         )
         let filter = SCContentFilter(desktopIndependentWindow: target.window)
@@ -168,8 +173,8 @@ final class ScrollCaptureController {
         )
         configuration.width = dimensions.width
         configuration.height = dimensions.height
-        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 12)
-        configuration.queueDepth = 3
+        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+        configuration.queueDepth = 5
         configuration.showsCursor = false
         configuration.capturesAudio = false
         configuration.ignoreShadowsSingleWindow = true
@@ -181,6 +186,11 @@ final class ScrollCaptureController {
         self.stream = stream
         try await stream.startCapture()
 
+        guard continuation != nil, !isStopping else {
+            try? await stream.stopCapture()
+            return
+        }
+
         if let processID = target.window.owningApplication?.processID,
            let application = NSRunningApplication(processIdentifier: processID) {
             application.activate()
@@ -189,6 +199,11 @@ final class ScrollCaptureController {
 
     private func handle(_ progress: ScrollCaptureProgress) {
         guard continuation != nil else { return }
+        switch progress.result {
+        case .unmatched: hasUnmatchedFrames = true
+        case .initial, .appended, .duplicate, .revisited: hasUnmatchedFrames = false
+        case .limitReached: break
+        }
         previewController.update(progress)
         if progress.result == .limitReached {
             previewController.showLimitReached()
@@ -197,6 +212,15 @@ final class ScrollCaptureController {
 
     private func finishCapture() async {
         guard !isStopping, continuation != nil else { return }
+        if hasUnmatchedFrames {
+            // Preserve the valid partial image while offering a way to regain overlap before finalizing.
+            let alert = NSAlert()
+            alert.messageText = L10n.text("scrollCapture.unmatchedFinish.title")
+            alert.informativeText = L10n.text("scrollCapture.unmatchedFinish.help")
+            alert.addButton(withTitle: L10n.text("scrollCapture.unmatchedFinish.continue"))
+            alert.addButton(withTitle: L10n.text("scrollCapture.unmatchedFinish.savePartial"))
+            guard alert.runModal() == .alertSecondButtonReturn else { return }
+        }
         isStopping = true
         if let stream { try? await stream.stopCapture() }
         guard let output, output.hasAppendedContent() else {
@@ -242,6 +266,7 @@ final class ScrollCaptureController {
         output = nil
         target = nil
         isStopping = false
+        hasUnmatchedFrames = false
     }
 }
 
