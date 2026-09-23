@@ -2,20 +2,63 @@
 
 import { useEffect, useState } from "react";
 import currentRelease from "@/content/current-release.json";
-import { DOWNLOAD_PATH, GOOGLE_TAG_ID, geoContent, structuredData, type SeoLanguage } from "./seo";
+import {
+  DOWNLOAD_PATH,
+  GOOGLE_TAG_ID,
+  PRIVACY_CONSENT_STORAGE_KEY,
+  geoContent,
+  structuredData,
+  type SeoLanguage,
+} from "./seo";
 
 type Language = SeoLanguage;
 
 const releaseUrl = currentRelease.releaseUrl;
 const primaryDownloadUrl = DOWNLOAD_PATH;
 const githubUrl = "https://github.com/agent-club/PinboardShot";
-const privacyConsentStorageKey = "pinboardshot-privacy-consent-v1";
 const showcaseImages = [
   { src: "/showcase/snow-mountain.jpg" },
   { src: "/showcase/blossoms.jpg" },
   { src: "/showcase/sunset.jpg" },
   { src: "/showcase/lakeside-panel.jpg" },
 ];
+
+const featureGuideLinks = [
+  {
+    href: "/features/scrolling-screenshot",
+    zhTitle: "滚动截图",
+    enTitle: "Scrolling screenshot",
+    zhBody: "手动滚动、实时预览和本地重叠拼接。",
+    enBody: "Manual scrolling, live preview, and local overlap stitching.",
+  },
+  {
+    href: "/features/screen-pinning",
+    zhTitle: "屏幕贴图",
+    enTitle: "Screen pinning",
+    zhBody: "透明度、鼠标穿透、工作区和成对比较。",
+    enBody: "Opacity, click-through, workspaces, and paired comparison.",
+  },
+  {
+    href: "/features/local-ocr-history",
+    zhTitle: "本地 OCR 历史",
+    enTitle: "Local OCR history",
+    zhBody: "10–250 条、1–90 天可配置的本地搜索历史。",
+    enBody: "Configurable local search history: 10–250 items for 1–90 days.",
+  },
+  {
+    href: "/use-cases/design-review",
+    zhTitle: "设计评审工作流",
+    enTitle: "Design review workflow",
+    zhBody: "从捕捉、标注和贴图，到比较与导出。",
+    enBody: "From capture and annotation to pinning, comparison, and export.",
+  },
+] as const;
+
+const comparisonGuideLinks = [
+  { href: "/compare/pinboardshot-vs-shottr", name: "Shottr" },
+  { href: "/compare/pinboardshot-vs-snipaste", name: "Snipaste" },
+  { href: "/compare/pinboardshot-vs-cleanshot-x", name: "CleanShot X" },
+] as const;
 
 function GitHubIcon() {
   return (
@@ -130,7 +173,7 @@ const copy = {
     pinStatus: ["正在框选", "正在标注", "已贴到桌面", "鼠标穿透已开启"],
     comparisonEyebrow: "PRODUCT PRINCIPLES",
     comparisonTitle: "不是更多按钮，\n而是更清楚的取舍",
-    comparisonBody: "PinboardShot 选择更窄的 Mac 工作流：截图、标注、贴住参考，并把外部网络和数据流转保持到最低。页面不借其他产品做对照营销，只说明自己的边界。",
+    comparisonBody: "PinboardShot 选择更窄的 Mac 工作流：截图、标注、贴住参考，并把外部网络和数据流转保持到最低。独立对比页只采用各产品官方公开资料，标明核对日期，也把未知项保留为未知。",
     comparisonCards: [
       {
         name: "Local-first",
@@ -211,7 +254,7 @@ const copy = {
       "Mac、macOS、Retina、Apple、Apple Silicon、Developer ID 和 Apple 公证为 Apple Inc. 在美国及其他国家和地区的商标或服务标记。PinboardShot 与 Apple Inc. 无隶属、赞助或背书关系。GitHub 名称与标识归 GitHub, Inc. 所有，本站仅用于链接项目仓库。",
     privacyConsent: {
       title: "隐私选择",
-      body: "本站默认使用 Google tag 做基础访问衡量，不启用广告个性化。你可以关闭分析；我们会保存语言偏好和这次选择，托管、更新与下载服务可能处理必要访问日志。",
+      body: "本站默认使用 Google tag 做基础访问衡量，不启用广告个性化。你可以关闭分析；我们会保存这次选择，托管、更新与下载服务可能处理必要访问日志。",
       privacy: "查看隐私条款",
       essential: "关闭分析",
       accept: "保持开启",
@@ -269,7 +312,7 @@ const copy = {
     pinStatus: ["Selecting area", "Annotating", "Pinned to desktop", "Click-through enabled"],
     comparisonEyebrow: "PRODUCT PRINCIPLES",
     comparisonTitle: "Not more buttons.\nClearer tradeoffs.",
-    comparisonBody: "PinboardShot chooses a narrower Mac workflow: capture, annotate, keep references visible, and keep network and data movement minimal. This page avoids positioning the app as another product's replacement and describes its own boundaries instead.",
+    comparisonBody: "PinboardShot chooses a narrower Mac workflow: capture, annotate, keep references visible, and keep network and data movement minimal. Detailed comparisons use official public sources, include a review date, and leave unknowns as unknowns.",
     comparisonCards: [
       {
         name: "Local-first",
@@ -350,7 +393,7 @@ const copy = {
       "Mac, macOS, Retina, Apple, Apple Silicon, Developer ID, and Apple notarization are trademarks or service marks of Apple Inc., registered in the U.S. and other countries and regions. PinboardShot is not affiliated with, sponsored by, or endorsed by Apple Inc. The GitHub name and mark belong to GitHub, Inc. and are used only to link to the project repository.",
     privacyConsent: {
       title: "Privacy choices",
-      body: "This site uses Google tag for basic visit measurement by default and does not enable ad personalization. You can turn analytics off; we store your language preference and this choice, and hosting, update, and download services may process necessary access logs.",
+      body: "This site uses Google tag for basic visit measurement by default and does not enable ad personalization. You can turn analytics off; we store this choice, and hosting, update, and download services may process necessary access logs.",
       privacy: "Read the privacy policy",
       essential: "Turn analytics off",
       accept: "Keep on",
@@ -360,12 +403,10 @@ const copy = {
 
 export function PinboardShotHome({
   initialLanguage = "zh",
-  lockInitialLanguage = false,
 }: {
   initialLanguage?: Language;
-  lockInitialLanguage?: boolean;
 }) {
-  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const language = initialLanguage;
   const [demoStep, setDemoStep] = useState(0);
   const [demoPaused, setDemoPaused] = useState(false);
   const [showPrivacyConsent, setShowPrivacyConsent] = useState(true);
@@ -373,19 +414,10 @@ export function PinboardShotHome({
   const geo = geoContent[language];
   const jsonLd = structuredData(language);
 
-  /** Hydrate the visitor's local language preference after the server-rendered Chinese default. */
+  /** Keep the document language aligned with the URL, including client-side navigation. */
   useEffect(() => {
     document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
-    if (lockInitialLanguage) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      const saved = window.localStorage.getItem("pinboardshot-language") as Language | null;
-      const detected: Language = navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
-      setLanguage(saved === "zh" || saved === "en" ? saved : detected);
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [language, lockInitialLanguage]);
+  }, [language]);
 
   /** Advance the product story unless the visitor is interacting or prefers reduced motion. */
   useEffect(() => {
@@ -396,22 +428,15 @@ export function PinboardShotHome({
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      const saved = window.localStorage.getItem(privacyConsentStorageKey);
+      const saved = window.localStorage.getItem(PRIVACY_CONSENT_STORAGE_KEY);
       setShowPrivacyConsent(saved !== "accepted" && saved !== "essential");
     });
 
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  /** Keep explicit language choices stable across return visits. */
-  const selectLanguage = (next: Language) => {
-    setLanguage(next);
-    window.localStorage.setItem("pinboardshot-language", next);
-    document.documentElement.lang = next === "zh" ? "zh-CN" : "en";
-  };
-
   const savePrivacyConsent = (choice: "accepted" | "essential") => {
-    window.localStorage.setItem(privacyConsentStorageKey, choice);
+    window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, choice);
     const analyticsWindow = window as typeof window & { [key: string]: boolean; gtag?: (...args: unknown[]) => void };
     analyticsWindow[`ga-disable-${GOOGLE_TAG_ID}`] = choice === "essential";
     const gtag = analyticsWindow.gtag;
@@ -442,9 +467,9 @@ export function PinboardShotHome({
         </nav>
         <div className="header-actions">
           <div className="language-switch" aria-label={language === "zh" ? "语言" : "Language"}>
-            <button className={language === "zh" ? "active" : ""} onClick={() => selectLanguage("zh")} aria-pressed={language === "zh"}>中文</button>
+            <a className={language === "zh" ? "active" : ""} href="/zh" hrefLang="zh-CN" lang="zh-CN" aria-current={language === "zh" ? "page" : undefined}>中文</a>
             <span aria-hidden="true">/</span>
-            <button className={language === "en" ? "active" : ""} onClick={() => selectLanguage("en")} aria-pressed={language === "en"}>EN</button>
+            <a className={language === "en" ? "active" : ""} href="/en" hrefLang="en" lang="en" aria-current={language === "en" ? "page" : undefined}>EN</a>
           </div>
           <a className="icon-link" href={githubUrl} target="_blank" rel="noreferrer" aria-label={content.repo}>
             <GitHubIcon />
@@ -542,6 +567,16 @@ export function PinboardShotHome({
             <article key={title}><span>0{index + 5}</span><h3>{title}</h3><p>{body}</p></article>
           ))}
         </div>
+        <div className="topic-link-grid" aria-label={language === "zh" ? "功能专题" : "Feature guides in Chinese"}>
+          {featureGuideLinks.map((guide) => (
+            <a href={guide.href} key={guide.href}>
+              <small>{language === "zh" ? "功能专题" : "Chinese guide"}</small>
+              <strong>{language === "zh" ? guide.zhTitle : guide.enTitle}</strong>
+              <p>{language === "zh" ? guide.zhBody : guide.enBody}</p>
+              <span>{language === "zh" ? "查看详情 →" : "Read the guide →"}</span>
+            </a>
+          ))}
+        </div>
       </section>
 
       <section className={`workflow section pin-scene-${demoStep}`} id="workflow">
@@ -588,6 +623,16 @@ export function PinboardShotHome({
         </div>
         <div className="comparison-summary">
           {content.comparisonSummary.map((item) => <span key={item}>{item}</span>)}
+        </div>
+        <div className="topic-link-grid comparison-links" aria-label={language === "zh" ? "产品对比" : "Product comparisons in Chinese"}>
+          {comparisonGuideLinks.map((guide) => (
+            <a href={guide.href} key={guide.href}>
+              <small>{language === "zh" ? "官方资料对比" : "Chinese comparison"}</small>
+              <strong>PinboardShot vs {guide.name}</strong>
+              <p>{language === "zh" ? "按功能、许可、隐私和产品边界逐项核对。" : "A sourced review of features, licensing, privacy, and product boundaries."}</p>
+              <span>{language === "zh" ? "查看对比 →" : "Read the comparison →"}</span>
+            </a>
+          ))}
         </div>
       </section>
 
