@@ -2,6 +2,7 @@ import AppKit
 import Carbon.HIToolbox
 import ImageIO
 import UniformTypeIdentifiers
+import VisionKit
 
 enum PinImageSaveFormat: CaseIterable {
     case png
@@ -75,6 +76,17 @@ enum PinImageSaveFormat: CaseIterable {
 }
 
 struct PinWindowDragGeometry {
+    static let activationDistance: CGFloat = 4
+
+    static func hasActivated(
+        from initialMouseLocation: CGPoint,
+        to currentMouseLocation: CGPoint
+    ) -> Bool {
+        let dx = currentMouseLocation.x - initialMouseLocation.x
+        let dy = currentMouseLocation.y - initialMouseLocation.y
+        return dx * dx + dy * dy >= activationDistance * activationDistance
+    }
+
     static func origin(
         initialWindowOrigin: CGPoint,
         initialMouseLocation: CGPoint,
@@ -84,6 +96,26 @@ struct PinWindowDragGeometry {
             x: initialWindowOrigin.x + currentMouseLocation.x - initialMouseLocation.x,
             y: initialWindowOrigin.y + currentMouseLocation.y - initialMouseLocation.y
         )
+    }
+}
+
+enum PinWindowPointerIntent: Equatable {
+    case resize
+    case move
+    case textSelection
+}
+
+enum PinWindowInteractionPolicy {
+    static func intent(
+        isResizeInteraction: Bool,
+        isForcedMove: Bool,
+        isMoveHandle: Bool,
+        hasTextAtPoint: Bool
+    ) -> PinWindowPointerIntent {
+        if isResizeInteraction { return .resize }
+        if isForcedMove || isMoveHandle { return .move }
+        if hasTextAtPoint { return .textSelection }
+        return .move
     }
 }
 
@@ -360,17 +392,92 @@ struct PinWindowResizeChromeGeometry {
     }
 }
 
+struct PinWindowMoveHandleGeometry {
+    private static let size = CGSize(width: 38, height: 10)
+    private static let topInset: CGFloat = 17
+    private static let hitInset: CGFloat = 6
+
+    static func handleRect(in bounds: CGRect) -> CGRect {
+        guard bounds.width >= size.width, bounds.height >= size.height + topInset else { return .zero }
+        return CGRect(
+            x: bounds.midX - size.width / 2,
+            y: bounds.maxY - topInset - size.height,
+            width: size.width,
+            height: size.height
+        )
+    }
+
+    static func hitRect(in bounds: CGRect) -> CGRect {
+        handleRect(in: bounds).insetBy(dx: -hitInset, dy: -hitInset)
+    }
+
+    static func shouldReveal(at point: CGPoint, in bounds: CGRect) -> Bool {
+        let handle = handleRect(in: bounds)
+        guard !handle.isEmpty else { return false }
+        return handle.insetBy(dx: -28, dy: -12).contains(point)
+    }
+}
+
 @MainActor
 final class PinPanel: NSPanel {
     var onCloseShortcut: (() -> Void)?
-    var onCopyShortcut: (() -> Void)?
+    var onCopyShortcut: ((NSEvent) -> Bool)?
     var onSaveShortcut: (() -> Void)?
     var onScaleShortcut: ((CGFloat) -> Void)?
     var onRestoreShortcut: (() -> Void)?
     var onNudge: ((CGPoint) -> Void)?
+    var onContextMenuRequested: ((NSEvent) -> Void)?
+    private(set) var isSpaceMoveActive = false
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
+
+    override func sendEvent(_ event: NSEvent) {
+        if let imageView = contentView as? PinImageView {
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            switch event.type {
+            case .leftMouseDown where !flags.contains(.command):
+                imageView.mouseDown(with: event)
+                return
+            case .leftMouseDragged where !flags.contains(.command):
+                imageView.mouseDragged(with: event)
+                return
+            case .leftMouseUp where !flags.contains(.command):
+                imageView.mouseUp(with: event)
+                return
+            case .rightMouseDown:
+                if let onContextMenuRequested {
+                    onContextMenuRequested(event)
+                } else {
+                    imageView.presentContextMenu(with: event)
+                }
+                return
+            default:
+                break
+            }
+        }
+        if event.type == .leftMouseDown {
+            makeKey()
+        }
+        if Int(event.keyCode) == kVK_Space {
+            switch event.type {
+            case .keyDown:
+                setSpaceMoveActive(true)
+                return
+            case .keyUp:
+                setSpaceMoveActive(false)
+                return
+            default:
+                break
+            }
+        }
+        super.sendEvent(event)
+    }
+
+    override func resignKey() {
+        setSpaceMoveActive(false)
+        super.resignKey()
+    }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
@@ -379,7 +486,10 @@ final class PinPanel: NSPanel {
         }
         switch Int(event.keyCode) {
         case kVK_ANSI_W: onCloseShortcut?()
-        case kVK_ANSI_C: onCopyShortcut?()
+        case kVK_ANSI_C:
+            guard onCopyShortcut?(event) == true else {
+                return super.performKeyEquivalent(with: event)
+            }
         case kVK_ANSI_S: onSaveShortcut?()
         case kVK_ANSI_Equal: onScaleShortcut?(1.1)
         case kVK_ANSI_Minus: onScaleShortcut?(1 / 1.1)
@@ -399,6 +509,15 @@ final class PinPanel: NSPanel {
         default: break
         }
         super.keyDown(with: event)
+    }
+
+    private func setSpaceMoveActive(_ active: Bool) {
+        guard isSpaceMoveActive != active else { return }
+        isSpaceMoveActive = active
+        if let contentView {
+            invalidateCursorRects(for: contentView)
+            contentView.needsDisplay = true
+        }
     }
 }
 
@@ -694,7 +813,9 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
 
         super.init(window: panel)
         panel.onCloseShortcut = { [weak self] in self?.close() }
-        panel.onCopyShortcut = { [weak self] in self?.copyImage() }
+        panel.onCopyShortcut = { [weak self] _ in
+            self?.copySelectionOrImage() ?? false
+        }
         panel.onSaveShortcut = { [weak self] in self?.saveImage() }
         panel.onScaleShortcut = { [weak self] factor in self?.scale(by: factor) }
         panel.onRestoreShortcut = { [weak self] in self?.restoreInitialState() }
@@ -728,6 +849,7 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
 
     func showWithoutActivating() {
         guard shouldBeVisibleForFrontmostApplication else { return }
+        (window?.contentView as? PinImageView)?.prepareLiveTextIfNeeded()
         window?.orderFrontRegardless()
     }
     func hide() { window?.orderOut(nil) }
@@ -736,6 +858,15 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
         pasteboard.writeObjects([image])
+    }
+
+    private func copySelectionOrImage() -> Bool {
+        if let imageView = window?.contentView as? PinImageView,
+           imageView.copySelectedText() {
+            return true
+        }
+        copyImage()
+        return true
     }
 
     func saveImage() {
@@ -758,6 +889,7 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
             minimumSize: window.minSize
         )
         window.setFrame(frame, display: true)
+        (window.contentView as? PinImageView)?.refreshPointerChromeForCurrentPointer()
         onStateChanged()
     }
 
@@ -971,13 +1103,18 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
     }
 }
 
-final class PinImageView: NSImageView {
+final class PinImageView: NSImageView, ImageAnalysisOverlayViewDelegate {
     private weak var pinController: PinWindowController?
-    private var dragStart: (mouseLocation: CGPoint, windowOrigin: CGPoint)?
+    private var dragStart: (mouseLocation: CGPoint, windowOrigin: CGPoint, hasActivated: Bool)?
     private var resizeStart: (handle: PinWindowResizeHandle, mouseLocation: CGPoint, frame: CGRect)?
     private var pointerTrackingArea: NSTrackingArea?
     private var hoveredResizeHandle: PinWindowResizeHandle?
     private var showsResizeChrome = false
+    private var showsMoveHandle = false
+    private let liveTextOverlay = ImageAnalysisOverlayView(frame: .zero)
+    private var liveTextTask: Task<Void, Never>?
+    private var liveTextSelectionRefiner: LiveTextCharacterSelectionRefiner?
+    private var liveTextCharacterLayout = LiveTextCharacterLayout.empty
 
     private static let diagonalNorthWestSouthEastCursor = diagonalCursor(
         symbolName: "arrow.up.left.and.arrow.down.right"
@@ -999,6 +1136,15 @@ final class PinImageView: NSImageView {
         setAccessibilityRole(.image)
         setAccessibilityLabel(L10n.text("pin.accessibility.image"))
         updateMetadataAccessibility(controller.workspaceCapture.metadata)
+        configureLiveTextOverlay()
+        liveTextSelectionRefiner = LiveTextCharacterSelectionRefiner(
+            containerView: self,
+            overlayView: liveTextOverlay,
+            preservesSelectionOnRejectedGesture: true
+        ) { [weak self] point, event in
+            guard let self else { return false }
+            return pointerIntent(at: point, event: event) == .textSelection
+        }
     }
 
     required init?(coder: NSCoder) { nil }
@@ -1006,7 +1152,29 @@ final class PinImageView: NSImageView {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
     override var acceptsFirstResponder: Bool { true }
 
+    override func viewWillMove(toWindow newWindow: NSWindow?) {
+        super.viewWillMove(toWindow: newWindow)
+        if newWindow == nil {
+            liveTextTask?.cancel()
+            liveTextTask = nil
+            liveTextSelectionRefiner?.reset()
+        }
+    }
+
     override func menu(for event: NSEvent) -> NSMenu? { buildMenu() }
+
+    func presentContextMenu(with event: NSEvent) {
+        window?.makeKey()
+        window?.makeFirstResponder(self)
+        NSMenu.popUpContextMenu(buildMenu(), with: event, for: self)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard bounds.contains(point) else { return nil }
+        guard pointerIntent(at: point) == .textSelection else { return self }
+        let overlayPoint = convert(point, to: liveTextOverlay)
+        return liveTextOverlay.hitTest(overlayPoint) ?? liveTextOverlay
+    }
 
     override func updateTrackingAreas() {
         if let pointerTrackingArea {
@@ -1037,6 +1205,9 @@ final class PinImageView: NSImageView {
                 at: CGPoint(x: markerRect.minX + 7, y: markerRect.minY + 3),
                 withAttributes: [.foregroundColor: NSColor.white, .font: NSFont.boldSystemFont(ofSize: 13)]
             )
+        }
+        if showsMoveHandle, pinController?.isPositionLocked != true {
+            drawMoveHandle()
         }
         guard showsResizeChrome else { return }
 
@@ -1071,18 +1242,19 @@ final class PinImageView: NSImageView {
 
     override func mouseEntered(with event: NSEvent) {
         pinController?.updateHover(true)
-        updateResizeChrome(at: convert(event.locationInWindow, from: nil))
+        updatePointerChrome(at: convert(event.locationInWindow, from: nil))
     }
 
     override func mouseMoved(with event: NSEvent) {
-        updateResizeChrome(at: convert(event.locationInWindow, from: nil))
+        updatePointerChrome(at: convert(event.locationInWindow, from: nil))
     }
 
     override func mouseExited(with event: NSEvent) {
         pinController?.updateHover(false)
-        guard resizeStart == nil else { return }
+        guard resizeStart == nil, dragStart == nil else { return }
         hoveredResizeHandle = nil
         showsResizeChrome = false
+        showsMoveHandle = false
         needsDisplay = true
     }
 
@@ -1091,6 +1263,10 @@ final class PinImageView: NSImageView {
         let interior = bounds.insetBy(dx: PinWindowResizeGeometry.hitSlop, dy: PinWindowResizeGeometry.hitSlop)
         if !interior.isEmpty {
             addCursorRect(interior, cursor: .openHand)
+        }
+        let moveHandle = PinWindowMoveHandleGeometry.hitRect(in: bounds)
+        if !moveHandle.isEmpty, pinController?.isPositionLocked != true {
+            addCursorRect(moveHandle, cursor: .openHand)
         }
         for handle in PinWindowResizeHandle.allCases {
             let rect = PinWindowResizeGeometry.cursorRect(for: handle, in: bounds)
@@ -1106,8 +1282,9 @@ final class PinImageView: NSImageView {
         window.makeFirstResponder(self)
         guard pinController?.isPositionLocked != true else { return }
         let point = convert(event.locationInWindow, from: nil)
+        let mouseLocation = window.convertPoint(toScreen: event.locationInWindow)
         if let handle = PinWindowResizeGeometry.handle(at: point, in: bounds) {
-            resizeStart = (handle, NSEvent.mouseLocation, window.frame)
+            resizeStart = (handle, mouseLocation, window.frame)
             dragStart = nil
             hoveredResizeHandle = handle
             showsResizeChrome = true
@@ -1116,39 +1293,85 @@ final class PinImageView: NSImageView {
             return
         }
         // 图片视图覆盖整个无边框窗口，因此由它显式转发拖动，而不是依赖 window background。
-        dragStart = (NSEvent.mouseLocation, window.frame.origin)
-        NSCursor.closedHand.set()
+        dragStart = (mouseLocation, window.frame.origin, false)
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard let window else { return }
+        let mouseLocation = window.convertPoint(toScreen: event.locationInWindow)
         if let resizeStart {
             let frame = PinWindowResizeGeometry.resizedFrame(
                 resizeStart.frame,
                 using: resizeStart.handle,
                 from: resizeStart.mouseLocation,
-                to: NSEvent.mouseLocation,
+                to: mouseLocation,
                 minimumSize: window.minSize
             )
             window.setFrame(frame, display: true)
             resizeCursor(for: resizeStart.handle).set()
             return
         }
-        guard let dragStart else { return }
+        guard var dragStart else { return }
+        if !dragStart.hasActivated {
+            guard PinWindowDragGeometry.hasActivated(
+                from: dragStart.mouseLocation,
+                to: mouseLocation
+            ) else { return }
+            dragStart.hasActivated = true
+            self.dragStart = dragStart
+            NSCursor.closedHand.set()
+        }
         let origin = PinWindowDragGeometry.origin(
             initialWindowOrigin: dragStart.windowOrigin,
             initialMouseLocation: dragStart.mouseLocation,
-            currentMouseLocation: NSEvent.mouseLocation
+            currentMouseLocation: mouseLocation
         )
         window.setFrameOrigin(origin)
     }
 
     override func mouseUp(with event: NSEvent) {
+        let didChangeGeometry = resizeStart != nil || dragStart?.hasActivated == true
         dragStart = nil
         resizeStart = nil
-        updateResizeChrome(at: convert(event.locationInWindow, from: nil))
+        updatePointerChrome(at: convert(event.locationInWindow, from: nil))
         window?.invalidateCursorRects(for: self)
-        pinController?.didFinishGeometryChange()
+        if didChangeGeometry {
+            pinController?.didFinishGeometryChange()
+        }
+    }
+
+    func copySelectedText() -> Bool {
+        if liveTextSelectionRefiner?.copyRefinedSelection() == true {
+            return true
+        }
+        guard liveTextOverlay.hasActiveTextSelection else { return false }
+        let text = liveTextOverlay.selectedText
+        guard !text.isEmpty else { return false }
+        let pasteboard = NSPasteboard.general
+        pasteboard.clearContents()
+        return pasteboard.setString(text, forType: .string)
+    }
+
+    func prepareLiveTextIfNeeded() {
+        guard liveTextOverlay.analysis == nil,
+              liveTextTask == nil,
+              let image else { return }
+        analyzeImageForLiveText(image)
+    }
+
+    func overlayView(
+        _ overlayView: ImageAnalysisOverlayView,
+        shouldBeginAt point: CGPoint,
+        forAnalysisType analysisType: ImageAnalysisOverlayView.InteractionTypes
+    ) -> Bool {
+        LiveTextInteractionPolicy.routesToText(
+            hasInteractiveItem: liveTextCharacterLayout.containsCharacter(
+                at: point,
+                contentBounds: overlayView.bounds
+            ) || overlayView.hasInteractiveItem(at: point),
+            hasActiveSelection: false,
+            isResizeInteraction: false
+        )
     }
 
     func updateMetadataAccessibility(_ metadata: PinMetadata) {
@@ -1159,13 +1382,102 @@ final class PinImageView: NSImageView {
         )
     }
 
-    private func updateResizeChrome(at point: CGPoint) {
+    private func configureLiveTextOverlay() {
+        liveTextOverlay.frame = bounds
+        liveTextOverlay.autoresizingMask = [.width, .height]
+        liveTextOverlay.delegate = self
+        liveTextOverlay.trackingImageView = self
+        liveTextOverlay.preferredInteractionTypes = []
+        liveTextOverlay.setSupplementaryInterfaceHidden(true, animated: false)
+        addSubview(liveTextOverlay)
+    }
+
+    private func analyzeImageForLiveText(_ image: NSImage) {
+        liveTextTask?.cancel()
+        liveTextOverlay.analysis = nil
+        liveTextOverlay.preferredInteractionTypes = []
+        liveTextCharacterLayout = .empty
+        liveTextSelectionRefiner?.reset()
+        liveTextTask = Task { @MainActor [weak self] in
+            do {
+                let result = try await LiveTextAnalysisService.shared.analyze(image)
+                guard let self, !Task.isCancelled, let result else { return }
+                liveTextOverlay.analysis = result.analysis
+                liveTextOverlay.preferredInteractionTypes = [.textSelection]
+                liveTextOverlay.setSupplementaryInterfaceHidden(true, animated: false)
+                liveTextCharacterLayout = result.characterLayout
+                liveTextSelectionRefiner?.update(characterLayout: result.characterLayout)
+                liveTextTask = nil
+                window?.invalidateCursorRects(for: self)
+            } catch {
+                guard let self, !Task.isCancelled else { return }
+                liveTextOverlay.analysis = nil
+                liveTextOverlay.preferredInteractionTypes = []
+                liveTextCharacterLayout = .empty
+                liveTextSelectionRefiner?.reset()
+                liveTextTask = nil
+            }
+        }
+    }
+
+    private func updatePointerChrome(at point: CGPoint) {
         let nextHandle = PinWindowResizeGeometry.handle(at: point, in: bounds)
         let nextVisibility = resizeStart != nil || PinWindowResizeChromeGeometry.isNearEdge(point, in: bounds)
-        guard hoveredResizeHandle != nextHandle || showsResizeChrome != nextVisibility else { return }
+        // 放大贴图可能覆盖整个屏幕，只有靠近把手时才显示，避免常驻遮住图片内容。
+        let nextMoveHandleVisibility = PinWindowMoveHandleGeometry.shouldReveal(at: point, in: bounds)
+            || dragStart != nil
+        guard hoveredResizeHandle != nextHandle
+                || showsResizeChrome != nextVisibility
+                || showsMoveHandle != nextMoveHandleVisibility else { return }
         hoveredResizeHandle = nextHandle
         showsResizeChrome = nextVisibility
+        showsMoveHandle = nextMoveHandleVisibility
         needsDisplay = true
+    }
+
+    func refreshPointerChromeForCurrentPointer() {
+        guard let window else { return }
+        let point = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        updatePointerChrome(at: point)
+    }
+
+    private func pointerIntent(at point: CGPoint, event: NSEvent? = nil) -> PinWindowPointerIntent {
+        let overlayPoint = convert(point, to: liveTextOverlay)
+        let isMovementLocked = pinController?.isPositionLocked == true
+        let resolvedEvent = event ?? NSApp.currentEvent
+        let isTextSelectionRequested = resolvedEvent?.modifierFlags.contains(.command) == true
+        return PinWindowInteractionPolicy.intent(
+            isResizeInteraction: PinWindowResizeGeometry.handle(at: point, in: bounds) != nil,
+            isForcedMove: !isMovementLocked && isForcedMoveActive(for: event),
+            isMoveHandle: !isMovementLocked && PinWindowMoveHandleGeometry.hitRect(in: bounds).contains(point),
+            hasTextAtPoint: isTextSelectionRequested && (
+                liveTextCharacterLayout.containsCharacter(
+                    at: overlayPoint,
+                    contentBounds: liveTextOverlay.bounds
+                ) || liveTextOverlay.hasInteractiveItem(at: overlayPoint)
+            )
+        )
+    }
+
+    private func isForcedMoveActive(for event: NSEvent?) -> Bool {
+        let optionIsPressed = (event ?? NSApp.currentEvent)?.modifierFlags.contains(.option) == true
+        return optionIsPressed || (window as? PinPanel)?.isSpaceMoveActive == true
+    }
+
+    private func drawMoveHandle() {
+        let rect = PinWindowMoveHandleGeometry.handleRect(in: bounds)
+        guard !rect.isEmpty else { return }
+        let path = NSBezierPath(roundedRect: rect, xRadius: rect.height / 2, yRadius: rect.height / 2)
+        NSColor.black.withAlphaComponent(0.52).setFill()
+        path.fill()
+        NSColor.white.withAlphaComponent(0.9).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+
+        NSColor.white.withAlphaComponent(0.9).setFill()
+        for offset in [-6, 0, 6] as [CGFloat] {
+            NSBezierPath(ovalIn: CGRect(x: rect.midX + offset - 1, y: rect.midY - 1, width: 2, height: 2)).fill()
+        }
     }
 
     private func resizeCursor(for handle: PinWindowResizeHandle) -> NSCursor {

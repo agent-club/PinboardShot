@@ -53,7 +53,8 @@ spctl --assess --type execute --verbose=2 "$app_path"
 feed_staging_dir="$staging_dir/feed"
 mkdir -p "$feed_staging_dir"
 staged_archive="$feed_staging_dir/$archive_name"
-/usr/bin/ditto -c -k --sequesterRsrc --keepParent "$app_path" "$staged_archive"
+# The public update ZIP contains only the app; AppleDouble metadata adds an extra top-level folder.
+/usr/bin/ditto -c -k --norsrc --keepParent "$app_path" "$staged_archive"
 .build/artifacts/sparkle/Sparkle/bin/generate_appcast \
   --account agent-club \
   --versions "$build" \

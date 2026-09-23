@@ -3298,6 +3298,21 @@ func pinnedImageResizeChromeGeometry() {
     #expect(PinWindowResizeChromeGeometry.handleRect(for: .right, in: bounds) == CGRect(x: 393, y: 93, width: 5, height: 14))
 }
 
+@Test("贴图放大到覆盖屏幕后仅在靠近顶部把手时显示拖拽栏")
+func pinnedImageMoveHandleVisibility() {
+    let enlargedBounds = CGRect(x: 0, y: 0, width: 4000, height: 2400)
+    let handle = PinWindowMoveHandleGeometry.handleRect(in: enlargedBounds)
+
+    #expect(PinWindowMoveHandleGeometry.shouldReveal(
+        at: CGPoint(x: handle.midX, y: handle.midY),
+        in: enlargedBounds
+    ))
+    #expect(!PinWindowMoveHandleGeometry.shouldReveal(
+        at: CGPoint(x: enlargedBounds.midX, y: enlargedBounds.midY),
+        in: enlargedBounds
+    ))
+}
+
 @Test("贴图描边拖拽围绕对边等比例缩放")
 func pinnedImageBorderResizeGeometry() {
     let frame = CGRect(x: 100, y: 200, width: 400, height: 200)

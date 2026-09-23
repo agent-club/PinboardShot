@@ -5,5 +5,5 @@ import { localizedMetadata } from "../seo";
 export const metadata: Metadata = localizedMetadata("en");
 
 export default function EnglishPage() {
-  return <PinboardShotHome initialLanguage="en" lockInitialLanguage />;
+  return <PinboardShotHome initialLanguage="en" />;
 }
