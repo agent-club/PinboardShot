@@ -41,7 +41,12 @@ enum FeatureLocalizations {
         "feature.guide.documentTitle": "文档标题",
         "feature.guide.stepTitle": "步骤标题",
         "feature.guide.step": "步骤 %d",
-        "feature.guide.help": "主动截图并填写操作或问题说明，可调整顺序。最多 100 步；文档不会自动落盘，请保存原稿以便下次继续。关闭窗口会暂停收集，已收集步骤保留到退出应用。",
+        "feature.guide.help": "主动截图并填写操作或问题说明，可调整顺序。最多 100 步；请保存原稿以便下次继续。关闭窗口会暂停收集，已收集步骤保留到退出应用。",
+        "feature.guide.recoveryToggle": "启用本地崩溃恢复",
+        "feature.guide.recoveryHelp": "开启后，未保存原稿临时保存在本机，供意外退出后恢复；正常退出会清除，24 小时后自动过期。截图可能包含敏感信息。",
+        "feature.guide.restoreRecovery": "恢复临时原稿",
+        "feature.guide.deleteRecovery": "删除临时原稿",
+        "feature.guide.recoveryFailed": "临时原稿保存或恢复失败；请手动保存原稿。",
         "feature.guide.collect": "收集后续截图",
         "feature.guide.capture": "截图添加一步",
         "feature.guide.addCurrent": "添加当前图片",
@@ -82,6 +87,8 @@ enum FeatureLocalizations {
         "feature.error.noVideoFrames": "没有收到可用画面，请保持录制区域可见后重试。",
         "feature.record.discardTitle": "丢弃未保存的录屏并开始新录制？",
         "feature.record.discardHelp": "取消后可在预览窗口保存当前视频。",
+        "feature.record.closeDiscardTitle": "关闭并丢弃未保存的录屏？",
+        "feature.record.closeDiscardHelp": "取消后可返回预览窗口保存当前视频。",
         "feature.record.exporting": "视频正在保存，请完成后再退出。",
     ]
 }

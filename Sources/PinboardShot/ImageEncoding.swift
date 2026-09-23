@@ -1,4 +1,5 @@
 import AppKit
+import Darwin
 import ImageIO
 import UniformTypeIdentifiers
 
@@ -30,6 +31,30 @@ extension NSImage {
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { return nil }
         return data as Data
+    }
+
+    var mappedPNGData: Data? {
+        guard let image = cgImageForEncoding else { return nil }
+        var template = Array((NSTemporaryDirectory() + "PinboardShot-scroll-png.XXXXXX").utf8CString)
+        let descriptor = template.withUnsafeMutableBufferPointer { buffer in
+            mkstemp(buffer.baseAddress!)
+        }
+        guard descriptor >= 0 else { return nil }
+        close(descriptor)
+        let path = String(decoding: template.dropLast().map { UInt8(bitPattern: $0) }, as: UTF8.self)
+        defer { _ = unlink(path) }
+        let url = URL(fileURLWithPath: path)
+        guard let destination = CGImageDestinationCreateWithURL(
+            url as CFURL,
+            UTType.png.identifier as CFString,
+            1,
+            nil
+        ) else { return nil }
+        CGImageDestinationAddImage(destination, image, nil)
+        guard CGImageDestinationFinalize(destination) else { return nil }
+        // Mapping keeps the encoded document out of the heap after the temporary
+        // path is unlinked; the returned Data retains the mapping until released.
+        return try? Data(contentsOf: url, options: .alwaysMapped)
     }
 
     private var cgImageForEncoding: CGImage? {

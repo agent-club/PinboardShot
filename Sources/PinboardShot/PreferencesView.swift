@@ -429,6 +429,10 @@ struct PreferencesView: View {
                 .frame(width: 160)
             }
 
+            Text(L10n.text("history.keepHelp"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
             TextField(L10n.text("preferences.historySearch"), text: $historySearch)
                 .textFieldStyle(.roundedBorder)
                 .help(L10n.text("history.searchHelp"))
@@ -540,6 +544,14 @@ struct PreferencesView: View {
                                 .foregroundStyle(.secondary)
                         }
                         Spacer()
+                        Button {
+                            setHistoryItemKept(item, kept: !item.isKept)
+                        } label: {
+                            Image(systemName: item.isKept ? "star.fill" : "star")
+                        }
+                        .buttonStyle(.borderless)
+                        .help(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
+                        .accessibilityLabel(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
                         Button {
                             onCopyHistoryItem(item)
                         } label: {
@@ -1098,6 +1110,15 @@ struct PreferencesView: View {
             historyErrorMessage = nil
         } catch {
             historyErrorMessage = L10n.text("preferences.deleteHistoryItemFailed", error.localizedDescription)
+        }
+    }
+
+    private func setHistoryItemKept(_ item: HistoryItem, kept: Bool) {
+        do {
+            try historyStore.setKept(kept, for: item.id)
+            historyErrorMessage = nil
+        } catch {
+            historyErrorMessage = L10n.text("history.keepFailed", error.localizedDescription)
         }
     }
 

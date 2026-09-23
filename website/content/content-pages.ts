@@ -62,8 +62,8 @@ export const CONTENT_PAGES = [
       {
         heading: "一次滚动截图怎样完成",
         paragraphs: [
-          "启动滚动截图后，先选择实际会发生滚动的内容区域。开始捕捉后，用触控板、鼠标或键盘手动向下滚动；每次移动都保留上一屏的一部分内容，拼接器才能找到稳定重叠。",
-          "实时预览用于在结束前发现错位、重复或缺口。确认结果后，长图可直接复制，也会按历史设置保存在本机，方便后续搜索、标注或重新使用。",
+          "启动滚动截图后，先选择实际会发生滚动的内容区域。开始捕捉后，用触控板、鼠标或键盘手动向上或向下滚动；聊天记录可从底部向上截取。每次移动都保留上一屏的一部分内容，拼接器才能找到稳定重叠。",
+          "实时预览用于在结束前发现错位、重复或缺口。若提示无法匹配，可回滚到已拼接内容后继续；此时直接完成会提醒你只保留已拼接部分。确认结果后，长图可直接复制，也会按历史设置保存在本机。",
         ],
       },
       {
@@ -465,7 +465,7 @@ export const CONTENT_PAGES = [
     description:
       "基于 PinboardShot 源码与 CleanShot 官方页面，对比 Mac 截图、滚动长图、录屏、OCR、浮动截图、历史、Cloud、价格与安全边界。",
     intro:
-      "CleanShot X 是覆盖截图、录屏与可选 Cloud 分享的完整商业套件；PinboardShot 则把范围收在开源、本地优先的截图、标注、贴图、历史和比较。选择取决于你是否需要录屏和托管分享。",
+      "CleanShot X 是覆盖截图、完整录屏与可选 Cloud 分享的商业套件；PinboardShot 则以开源、本地优先的截图、标注和贴图为主，并提供最长 60 秒的无声区域短录屏。选择取决于你需要的录屏范围和分享方式。",
     lastReviewed: "2026-08-30",
     facts: [
       { label: "共同能力", value: "Mac 截图、滚动长图、标注、OCR 与浮动参考" },
@@ -477,7 +477,7 @@ export const CONTENT_PAGES = [
       {
         heading: "先看结论",
         paragraphs: [
-          "如果你需要屏幕录制、GIF、摄像头/系统音频、Quick Access，以及可选的托管分享、品牌和团队能力，CleanShot X 的覆盖范围明显更大。",
+          "如果你需要长时间录屏、GIF、摄像头/系统音频、Quick Access，以及可选的托管分享、品牌和团队能力，CleanShot X 的覆盖范围明显更大。",
           "如果你只需要截图、标注、滚动长图、贴图、可搜索本地历史和比较工作区，并希望使用 MIT 开源、免费且不含账号/云同步/遥测的 Mac 应用，PinboardShot 的边界更简单。",
         ],
       },
@@ -492,7 +492,7 @@ export const CONTENT_PAGES = [
         heading: "本地处理与公开资料边界",
         paragraphs: [
           "CleanShot 官方明确 OCR 在设备端处理，并公开 Developer ID、Apple 公证、Hardened Runtime 与更新签名等安全信息。它的桌面使用遥测和崩溃报告数据流在现有公开页中没有完整说明，因此本页保持未知，不据此断言有或没有。",
-          "PinboardShot 的源码、隐私政策和安全策略公开可查，Mac 应用明确无遥测；它没有录屏与内建 Cloud，因此也不提供 CleanShot Cloud 的分享和团队能力。",
+          "PinboardShot 的源码、隐私政策和安全策略公开可查，Mac 应用明确无遥测；它提供无声区域短录屏，但没有内建 Cloud 分享或团队能力。",
         ],
       },
     ],
@@ -502,7 +502,7 @@ export const CONTENT_PAGES = [
         { topic: "平台", pinboardShot: "macOS 14+；Universal", other: "macOS 10.15+；无 Windows 版" },
         { topic: "源码与价格", pinboardShot: "公开源码；MIT 许可；免费", other: "未公开源码；一次性 App 许可与 Cloud Pro 订阅，价格以官网为准" },
         { topic: "截图与滚动", pinboardShot: "区域、窗口、屏幕、延时、重复区域、手动滚动拼接", other: "区域、窗口、全屏、定时与滚动截图，官方称几乎适用于每个 App" },
-        { topic: "录屏", pinboardShot: "当前定位不包含录屏", other: "MP4/GIF、麦克风、系统音频、摄像头、按键与视频编辑" },
+        { topic: "录屏", pinboardShot: "最长 60 秒的无声区域 MP4，可预览并裁剪首尾；不支持 GIF 或音频", other: "MP4/GIF、麦克风、系统音频、摄像头、按键与视频编辑" },
         { topic: "OCR", pinboardShot: "默认设备端；可选远程插件", other: "官方明确在设备端处理" },
         { topic: "浮动参考", pinboardShot: "多贴图、穿透、工作区、备注/标签与成对比较", other: "Floating Screenshots、透明度、定位与 Lock Mode" },
         { topic: "历史", pinboardShot: "10–250 条、1–90 天；本地 OCR 搜索", other: "Capture History 最多一个月；公开页未完整说明存储与同步边界" },

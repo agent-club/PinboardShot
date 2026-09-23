@@ -167,6 +167,7 @@ final class ShortRecordingController: NSObject, SCStreamDelegate, NSWindowDelega
     private var startedAt: Date?
     private var isExporting = false
     private var previewHasUnsavedChanges = false
+    private var isDiscardingPreview = false
     var hasUnsavedVideo: Bool { previewHasUnsavedChanges && folder != nil }
     var isExportingVideo: Bool { isExporting }
     var onError: ((Error) -> Void)?
@@ -281,7 +282,9 @@ final class ShortRecordingController: NSObject, SCStreamDelegate, NSWindowDelega
 
     func discardPreview() {
         guard !isExporting else { return }
+        isDiscardingPreview = true
         preview?.close()
+        isDiscardingPreview = false
         preview = nil
         if let folder { try? FileManager.default.removeItem(at: folder) }
         folder = nil
@@ -290,6 +293,15 @@ final class ShortRecordingController: NSObject, SCStreamDelegate, NSWindowDelega
 
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         if sender === preview, isExporting { NSSound.beep(); return false }
+        if sender === preview, previewHasUnsavedChanges, !isDiscardingPreview {
+            // Closing the preview is otherwise the only path that silently deletes an unsaved recording.
+            let alert = NSAlert()
+            alert.messageText = L10n.text("feature.record.closeDiscardTitle")
+            alert.informativeText = L10n.text("feature.record.closeDiscardHelp")
+            alert.addButton(withTitle: L10n.text("common.cancel"))
+            alert.addButton(withTitle: L10n.text("feature.guide.discard"))
+            return alert.runModal() == .alertSecondButtonReturn
+        }
         return true
     }
 

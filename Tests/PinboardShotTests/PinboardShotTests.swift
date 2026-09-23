@@ -3700,6 +3700,16 @@ func pinnedImageSaveFormatMappingAndEncoding() throws {
     #expect(PinImageSaveFormat.png.encodedData(for: image)?.isEmpty == false)
     #expect(PinImageSaveFormat.jpeg.encodedData(for: image)?.isEmpty == false)
     #expect(PinImageSaveFormat.tiff.encodedData(for: image)?.isEmpty == false)
+
+    let url = FileManager.default.temporaryDirectory
+        .appendingPathComponent("PinboardShot-SaveFormat-\(UUID().uuidString).png")
+    defer { try? FileManager.default.removeItem(at: url) }
+    try PinImageSaveFormat.png.write(image, to: url)
+    #expect(NSBitmapImageRep(data: try Data(contentsOf: url))?.pixelsWide == 12)
+    try PinImageSaveFormat.png.write(
+        solidImage(size: CGSize(width: 4, height: 3), color: .systemRed), to: url
+    )
+    #expect(NSBitmapImageRep(data: try Data(contentsOf: url))?.pixelsWide == 4)
 }
 
 @Test("开机自启系统状态映射完整")
@@ -4113,6 +4123,30 @@ func preparedCaptureUsesCompressedImageBacking() throws {
     #expect(capture.image.pixelDimensions?.width == 80)
     #expect(capture.image.pixelDimensions?.height == 48)
     #expect(!capture.pngData.isEmpty)
+}
+
+@Test("长截图后台编码仍保留隐形水印")
+@MainActor
+func scrollingCapturePreparationPreservesWatermark() async throws {
+    let suiteName = "PinboardShotScrollWatermarkTests.\(UUID().uuidString)"
+    let defaults = UserDefaults(suiteName: suiteName)!
+    let directory = FileManager.default.temporaryDirectory
+        .appendingPathComponent("PinboardShotScrollWatermarkTests-\(UUID().uuidString)")
+    defer {
+        defaults.removePersistentDomain(forName: suiteName)
+        try? FileManager.default.removeItem(at: directory)
+    }
+    defaults.set(true, forKey: InvisibleWatermarkSettings.enabledDefaultsKey)
+    let store = InvisibleWatermarkStore(
+        directoryURL: directory,
+        signingKeyData: Data(repeating: 7, count: 32)
+    )
+    let service = InvisibleWatermarkService(store: store, defaults: defaults)
+    let capture = try await service.prepareScrollingCapture(watermarkTestImage(width: 960, height: 600))
+    guard case .verified(_, exactImage: true) = service.detect(in: capture.pngData) else {
+        Issue.record("Background encoding lost the watermark or its signed record")
+        return
+    }
 }
 
 @Test("隐形水印可从 PNG 像素和缩放图片中恢复")

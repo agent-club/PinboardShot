@@ -65,6 +65,30 @@ enum PinImageSaveFormat: CaseIterable {
         return data as Data
     }
 
+    func write(_ image: NSImage, to url: URL) throws {
+        var proposedRect = CGRect(origin: .zero, size: image.size)
+        guard let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
+            throw PinboardShotError.imageEncodingFailed
+        }
+        let temporaryURL = url.deletingLastPathComponent()
+            .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        defer { try? FileManager.default.removeItem(at: temporaryURL) }
+        guard let destination = CGImageDestinationCreateWithURL(
+            temporaryURL as CFURL,
+            contentType.identifier as CFString,
+            1,
+            nil
+        ) else { throw PinboardShotError.imageEncodingFailed }
+        let options = encodingOptions.map { $0 as CFDictionary }
+        CGImageDestinationAddImage(destination, cgImage, options)
+        guard CGImageDestinationFinalize(destination) else { throw PinboardShotError.imageEncodingFailed }
+        if FileManager.default.fileExists(atPath: url.path) {
+            _ = try FileManager.default.replaceItemAt(url, withItemAt: temporaryURL)
+        } else {
+            try FileManager.default.moveItem(at: temporaryURL, to: url)
+        }
+    }
+
     private var encodingOptions: [CFString: Any]? {
         switch self {
         case .jpeg, .heic:
@@ -129,7 +153,20 @@ enum PinComparisonDiscoveryPolicy {
     static let shownDefaultsKey = "pinComparisonDiscoveryHintShown-v1"
 
     static func shouldShow(pinCount: Int, defaults: UserDefaults = .standard) -> Bool {
-        pinCount == 2 && !defaults.bool(forKey: shownDefaultsKey)
+        pinCount >= 2 && !defaults.bool(forKey: shownDefaultsKey)
+    }
+
+    static func markShown(defaults: UserDefaults = .standard) {
+        defaults.set(true, forKey: shownDefaultsKey)
+    }
+}
+
+enum PinWorkspaceDiscoveryPolicy {
+    static let shownDefaultsKey = "pinWorkspaceSaveHintShown-v1"
+
+    static func shouldShow(pinCount: Int, defaults: UserDefaults = .standard) -> Bool {
+        pinCount == 2 && !PinSessionRecoverySettings(defaults: defaults).isEnabled &&
+            !defaults.bool(forKey: shownDefaultsKey)
     }
 
     static func markShown(defaults: UserDefaults = .standard) {
@@ -532,6 +569,7 @@ final class PinWindowManager: NSObject {
     private var comparisonReferenceID: UUID?
     private var comparisonWindowController: PinComparisonWindowController?
     private let comparisonDiscoveryTipController = PinComparisonDiscoveryTipController()
+    private let workspaceDiscoveryTipController = PinComparisonDiscoveryTipController()
 
     var onRequestSaveWorkspace: (() -> Void)?
     var onRequestEditMetadata: ((UUID, PinMetadata) -> Void)?
@@ -555,7 +593,9 @@ final class PinWindowManager: NSObject {
         controller.show(near: CGPoint(x: anchor.x + cascadeOffset, y: anchor.y - cascadeOffset))
         cascadeIndex += 1
         pinsAreVisible = true
-        showComparisonDiscoveryTipIfNeeded(near: controller.window?.frame)
+        if !showWorkspaceDiscoveryTipIfNeeded(near: controller.window?.frame) {
+            showComparisonDiscoveryTipIfNeeded(near: controller.window?.frame)
+        }
         onSessionChanged?()
     }
 
@@ -622,6 +662,7 @@ final class PinWindowManager: NSObject {
         cascadeIndex = 0
         comparisonReferenceID = nil
         comparisonDiscoveryTipController.dismiss()
+        workspaceDiscoveryTipController.dismiss()
         active.forEach { $0.close() }
         onSessionChanged?()
     }
@@ -730,10 +771,23 @@ final class PinWindowManager: NSObject {
         guard PinComparisonDiscoveryPolicy.shouldShow(pinCount: controllers.count),
               let pinFrame else { return }
         PinComparisonDiscoveryPolicy.markShown()
+        workspaceDiscoveryTipController.dismiss()
         comparisonDiscoveryTipController.show(
             near: CGPoint(x: pinFrame.midX, y: pinFrame.minY),
             message: L10n.text("pin.compare.discoveryHint")
         )
+    }
+
+    @discardableResult
+    private func showWorkspaceDiscoveryTipIfNeeded(near pinFrame: CGRect?) -> Bool {
+        guard PinWorkspaceDiscoveryPolicy.shouldShow(pinCount: controllers.count),
+              let pinFrame else { return false }
+        PinWorkspaceDiscoveryPolicy.markShown()
+        workspaceDiscoveryTipController.show(
+            near: CGPoint(x: pinFrame.midX, y: pinFrame.minY),
+            message: L10n.text("pinWorkspace.discoveryHint")
+        )
+        return true
     }
 
     private func updateComparisonReferenceIndicators() {

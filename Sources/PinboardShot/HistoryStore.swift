@@ -178,7 +178,11 @@ final class HistoryStore: ObservableObject {
         guard !privacySettings.hasExclusions || normalizedBundleIdentifier != nil else { return nil }
         guard !privacySettings.isExcluded(bundleIdentifier: normalizedBundleIdentifier) else { return nil }
         guard let data = suppliedPNG ?? image.pngData,
-              let representation = NSBitmapImageRep(data: data) else {
+              let source = CGImageSourceCreateWithData(data as CFData, nil),
+              let properties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [CFString: Any],
+              let pixelWidth = properties[kCGImagePropertyPixelWidth] as? Int,
+              let pixelHeight = properties[kCGImagePropertyPixelHeight] as? Int,
+              pixelWidth > 0, pixelHeight > 0 else {
             throw PinboardShotError.imageEncodingFailed
         }
         let id = UUID()
@@ -194,8 +198,8 @@ final class HistoryStore: ObservableObject {
             id: id,
             createdAt: Date(),
             filename: filename,
-            pixelWidth: representation.pixelsWide,
-            pixelHeight: representation.pixelsHigh,
+            pixelWidth: pixelWidth,
+            pixelHeight: pixelHeight,
             sourceApplicationBundleIdentifier: normalizedBundleIdentifier
         )
         let previousItems = items
@@ -290,6 +294,19 @@ final class HistoryStore: ObservableObject {
 
     func delete(_ item: HistoryItem) throws {
         _ = try removeItems(withIDs: [item.id])
+    }
+
+    func setKept(_ kept: Bool, for itemID: UUID) throws {
+        guard let index = items.firstIndex(where: { $0.id == itemID }) else { return }
+        let previous = items[index]
+        items[index].isKept = kept
+        do {
+            try persistIndex()
+        } catch {
+            items[index] = previous
+            try? persistIndex()
+            throw error
+        }
     }
 
     func updateRecognizedText(itemID: UUID, text: String) throws {
@@ -527,11 +544,12 @@ final class HistoryStore: ObservableObject {
         let cutoff = retentionDays > 0
             ? Calendar.current.date(byAdding: .day, value: -retentionDays, to: Date())
             : nil
-        return Array(
-            candidates
-                .filter { item in cutoff.map { item.createdAt >= $0 } ?? true }
-                .prefix(HistorySettings.maximumItems(defaults: defaults))
-        )
+        // Explicitly kept captures stay outside automatic count and age limits; manual deletion remains available.
+        let recentIDs = Set(candidates.lazy
+            .filter { item in !item.isKept && (cutoff.map { item.createdAt >= $0 } ?? true) }
+            .prefix(HistorySettings.maximumItems(defaults: defaults))
+            .map(\.id))
+        return candidates.filter { $0.isKept || recentIDs.contains($0.id) }
     }
 
     private struct StagedRemoval {

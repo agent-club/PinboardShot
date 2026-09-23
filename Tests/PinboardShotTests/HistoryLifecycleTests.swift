@@ -85,6 +85,32 @@ struct HistoryLifecycleTests {
         }
     }
 
+    @Test("显式保留的截图跳过自动清理，仍可手动删除")
+    func keptCaptureSurvivesAutomaticRetention() throws {
+        try withFixture { root, defaults, fileManager in
+            let history = root.appendingPathComponent("PinboardShot/History")
+            var kept = try seedImage(in: history, ageInDays: 30)
+            kept.isKept = true
+            let recent = try (0..<12).map { try seedImage(in: history, ageInDays: $0) }
+            try JSONEncoder().encode(recent + [kept]).write(to: history.appendingPathComponent("index.json"))
+            defaults.set(10, forKey: HistorySettings.maximumItemsDefaultsKey)
+
+            let store = HistoryStore(fileManager: fileManager, defaults: defaults)
+            #expect(store.items.count == 11)
+            #expect(store.items.contains(where: { $0.id == kept.id && $0.isKept }))
+
+            defaults.set(7, forKey: HistorySettings.retentionDaysDefaultsKey)
+            try store.applyRetentionPolicy()
+            #expect(store.items.count == 8)
+            #expect(store.items.contains(where: { $0.id == kept.id }))
+
+            let reloaded = HistoryStore(fileManager: fileManager, defaults: defaults)
+            #expect(reloaded.items.contains(where: { $0.id == kept.id && $0.isKept }))
+            try reloaded.delete(kept)
+            #expect(!FileManager.default.fileExists(atPath: reloaded.fileURL(for: kept).path))
+        }
+    }
+
     @Test("清理失败保留图片并给出可见错误，重试成功后清除错误")
     func retentionFailurePreservesImagesAndCanRetry() throws {
         try withFixture { root, defaults, fileManager in

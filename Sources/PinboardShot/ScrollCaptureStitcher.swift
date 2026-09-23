@@ -63,20 +63,57 @@ enum ScrollFrameMatcher {
 
         let minimumShift = max(2, height / 120)
         let minimumTrackingShift = max(3, height / 120)
-        let maximumShift = max(minimumShift, height * 3 / 4)
-        var candidates: [ScrollFrameMatch] = []
+        let maximumShift = max(minimumShift, height * 5 / 6)
+        var coarseCandidates: [ScrollFrameMatch] = []
 
         for shift in (-maximumShift)...maximumShift where abs(shift) >= minimumShift {
             let overlap = height - abs(shift)
             guard overlap >= max(8, height / 6) else { continue }
             let previousStartRow = shift > 0 ? shift : 0
             let currentStartRow = shift < 0 ? -shift : 0
-            let score = robustDifference(
+            let score = coarseDifference(
                 previous: previous,
                 current: current,
                 width: width,
                 previousStartRow: previousStartRow,
                 currentStartRow: currentStartRow,
+                rowCount: overlap
+            )
+            coarseCandidates.append(ScrollFrameMatch(verticalShift: shift, score: score))
+        }
+
+        coarseCandidates.sort { $0.score < $1.score }
+        // Refine a spread of plausible shifts; scanning every shift at full resolution
+        // makes the stream callback fall behind fast scrolling.
+        var candidates: [ScrollFrameMatch] = []
+        var selectedShifts: [Int] = []
+        for candidate in coarseCandidates {
+            guard selectedShifts.count < 32 else { break }
+            guard selectedShifts.allSatisfy({ abs($0 - candidate.verticalShift) > 1 }) else { continue }
+            let shift = candidate.verticalShift
+            let overlap = height - abs(shift)
+            let score = robustDifference(
+                previous: previous,
+                current: current,
+                width: width,
+                previousStartRow: max(0, shift),
+                currentStartRow: max(0, -shift),
+                rowCount: overlap
+            )
+            selectedShifts.append(shift)
+            candidates.append(ScrollFrameMatch(verticalShift: shift, score: score))
+        }
+        // Stationary toolbars can dominate sparse samples; always inspect the
+        // nearby shifts where ordinary wheel scrolling is most likely to land.
+        for shift in (-height / 10)...(height / 10)
+        where abs(shift) >= minimumShift && !selectedShifts.contains(shift) {
+            let overlap = height - abs(shift)
+            let score = robustDifference(
+                previous: previous,
+                current: current,
+                width: width,
+                previousStartRow: max(0, shift),
+                currentStartRow: max(0, -shift),
                 rowCount: overlap
             )
             candidates.append(ScrollFrameMatch(verticalShift: shift, score: score))
@@ -122,6 +159,56 @@ enum ScrollFrameMatcher {
                 CGFloat(current.sourceHeight) / CGFloat(current.height)).rounded()
         )
         return ScrollFrameMatch(verticalShift: sourceShift, score: sampledMatch.score)
+    }
+
+    fileprivate static func exactRowShift(
+        previous: ScrollFrameSample,
+        current: ScrollFrameSample
+    ) -> Int? {
+        guard previous.width == current.width,
+              previous.height == current.height,
+              previous.height == previous.sourceHeight,
+              current.height == current.sourceHeight else { return nil }
+
+        var uniqueRows: [UInt64: Int] = [:]
+        var repeatedRows: Set<UInt64> = []
+        for row in 0..<previous.height {
+            guard let fingerprint = rowFingerprint(previous, row: row) else { continue }
+            if uniqueRows.updateValue(row, forKey: fingerprint) != nil {
+                repeatedRows.insert(fingerprint)
+            }
+        }
+        var votes: [Int: Int] = [:]
+        for row in 0..<current.height {
+            guard let fingerprint = rowFingerprint(current, row: row),
+                  !repeatedRows.contains(fingerprint),
+                  let previousRow = uniqueRows[fingerprint] else { continue }
+            votes[previousRow - row, default: 0] += 1
+        }
+        let ranked = votes.sorted { $0.value > $1.value }
+        guard let best = ranked.first,
+              best.value >= max(8, previous.height / 40),
+              ranked.dropFirst().first.map({ $0.value * 2 < best.value }) ?? true else {
+            return nil
+        }
+        return best.key
+    }
+
+    private static func rowFingerprint(_ sample: ScrollFrameSample, row: Int) -> UInt64? {
+        let margin = max(1, sample.width / 12)
+        let span = sample.width - margin * 2
+        var darkest = 255
+        var lightest = 0
+        var hash: UInt64 = 14_695_981_039_346_656_037
+        let offset = row * sample.width
+        for index in 0..<32 {
+            let x = margin + (index * 2 + 1) * span / 64
+            let value = Int(sample.pixels[offset + x])
+            darkest = min(darkest, value)
+            lightest = max(lightest, value)
+            hash = (hash ^ UInt64(value)) &* 1_099_511_628_211
+        }
+        return lightest - darkest >= 16 ? hash : nil
     }
 
     fileprivate static func refinedMatch(
@@ -306,6 +393,30 @@ enum ScrollFrameMatcher {
         let trimmedMean = retained.reduce(0, +) / Double(retained.count)
         let median = blockScores[blockScores.count / 2]
         return trimmedMean * 0.55 + median * 0.45
+    }
+
+    private static func coarseDifference(
+        previous: [UInt8],
+        current: [UInt8],
+        width: Int,
+        previousStartRow: Int,
+        currentStartRow: Int,
+        rowCount: Int
+    ) -> Double {
+        let margin = max(1, width / 12)
+        let availableWidth = width - margin * 2
+        var total = 0
+        let rowSamples = min(48, rowCount)
+        for band in 0..<rowSamples {
+            let row = (band * 2 + 1) * rowCount / (rowSamples * 2)
+            let previousOffset = (previousStartRow + row) * width
+            let currentOffset = (currentStartRow + row) * width
+            for column in 0..<16 {
+                let x = margin + (column * 2 + 1) * availableWidth / 32
+                total += abs(Int(previous[previousOffset + x]) - Int(current[currentOffset + x]))
+            }
+        }
+        return Double(total) / Double(rowSamples * 16)
     }
 }
 
@@ -665,15 +776,36 @@ final class ScrollCaptureAccumulator {
         }
 
         let localPlacement: ScrollCapturePlacement?
-        let localMatch = ScrollFrameMatcher.match(previous: trackingSample, current: sample)
-        if let match = localMatch,
-                  let trackingVerificationSample,
-                  let refinedMatch = ScrollFrameMatcher.refinedMatch(
-                    previous: trackingVerificationSample,
+        let exactShift = trackingVerificationSample.flatMap {
+            ScrollFrameMatcher.exactRowShift(previous: $0, current: verificationSample)
+        }
+        let exactMatch = exactShift.flatMap { shift in
+            trackingVerificationSample.flatMap {
+                ScrollFrameMatcher.refinedMatch(
+                    previous: $0,
+                    current: verificationSample,
+                    approximateShift: shift,
+                    searchRadius: 1
+                )
+            }
+        }
+        let sampledMatch: ScrollFrameMatch?
+        if exactMatch == nil {
+            sampledMatch = ScrollFrameMatcher.match(previous: trackingSample, current: sample)
+        } else {
+            sampledMatch = nil
+        }
+        let refinedMatch = exactMatch ?? sampledMatch.flatMap { match in
+            trackingVerificationSample.flatMap {
+                ScrollFrameMatcher.refinedMatch(
+                    previous: $0,
                     current: verificationSample,
                     approximateShift: match.verticalShift,
                     searchRadius: Int(ceil(Double(frame.height) / Double(sample.height))) * 3
-                  ) {
+                )
+            }
+        }
+        if let refinedMatch {
             localPlacement = ScrollCapturePlacement(
                 position: trackingPosition + refinedMatch.verticalShift,
                 score: refinedMatch.score
@@ -842,7 +974,7 @@ final class ScrollCaptureAccumulator {
     }
 
     func makePreviewImage(maximumWidth: Int = 260, maximumHeight: Int = 4_096) -> CGImage? {
-        guard pixelWidth > 0, pixelHeight > 0 else { return nil }
+        guard pixelWidth > 0, pixelHeight > 0, let backingStore else { return nil }
         let scale = min(
             CGFloat(maximumWidth) / CGFloat(pixelWidth),
             CGFloat(maximumHeight) / CGFloat(pixelHeight),
@@ -850,29 +982,66 @@ final class ScrollCaptureAccumulator {
         )
         let previewWidth = max(1, Int((CGFloat(pixelWidth) * scale).rounded()))
         let previewHeight = max(1, Int((CGFloat(pixelHeight) * scale).rounded()))
-        guard let context = CGContext(
-            data: nil,
+        if previewWidth == pixelWidth, previewHeight == pixelHeight { return makeImage() }
+
+        // Read only the rows represented in the bounded preview. Repainting every
+        // stored slice would make each update proportional to the full capture size.
+        let rowBytes = pixelWidth * 4
+        let previewRowBytes = previewWidth * 4
+        var sourceRow = [UInt8](repeating: 0, count: rowBytes)
+        var preview = Data(count: previewRowBytes * previewHeight)
+        let filled = preview.withUnsafeMutableBytes { output -> Bool in
+            guard let outputBytes = output.baseAddress?.assumingMemoryBound(to: UInt8.self) else { return false }
+            var sliceIndex = 0
+            var sliceStart = 0
+            for y in 0..<previewHeight {
+                let sourceY = min(pixelHeight - 1, Int(
+                    ((Double(y) + 0.5) * Double(pixelHeight) / Double(previewHeight)).rounded(.down)
+                ))
+                while sliceIndex < slices.count,
+                      sourceY >= sliceStart + slices[sliceIndex].height {
+                    sliceStart += slices[sliceIndex].height
+                    sliceIndex += 1
+                }
+                guard sliceIndex < slices.count else { return false }
+                let slice = slices[sliceIndex]
+                let bytesRead = sourceRow.withUnsafeMutableBytes { bytes in
+                    backingStore.read(
+                        into: bytes.baseAddress!,
+                        fileOffset: slice.fileOffset + off_t((sourceY - sliceStart) * rowBytes),
+                        count: rowBytes
+                    )
+                }
+                guard bytesRead == rowBytes else { return false }
+                for x in 0..<previewWidth {
+                    let sourceX = min(pixelWidth - 1, Int(
+                        ((Double(x) + 0.5) * Double(pixelWidth) / Double(previewWidth)).rounded(.down)
+                    ))
+                    let sourceOffset = sourceX * 4
+                    let destinationOffset = y * previewRowBytes + x * 4
+                    outputBytes[destinationOffset] = sourceRow[sourceOffset]
+                    outputBytes[destinationOffset + 1] = sourceRow[sourceOffset + 1]
+                    outputBytes[destinationOffset + 2] = sourceRow[sourceOffset + 2]
+                    outputBytes[destinationOffset + 3] = sourceRow[sourceOffset + 3]
+                }
+            }
+            return true
+        }
+        guard filled, let provider = CGDataProvider(data: preview as CFData) else { return nil }
+        return CGImage(
             width: previewWidth,
             height: previewHeight,
             bitsPerComponent: 8,
-            bytesPerRow: 0,
+            bitsPerPixel: 32,
+            bytesPerRow: previewRowBytes,
             space: CGColorSpaceCreateDeviceRGB(),
-            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
-        ) else { return nil }
-        context.interpolationQuality = .medium
-
-        var top = CGFloat(previewHeight)
-        for slice in slices {
-            guard let backingStore,
-                  let sliceImage = backingStore.image(for: slice) else { return nil }
-            let sliceHeight = CGFloat(slice.height) * scale
-            top -= sliceHeight
-            context.draw(
-                sliceImage,
-                in: CGRect(x: 0, y: top, width: CGFloat(previewWidth), height: sliceHeight)
-            )
-        }
-        return context.makeImage()
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue |
+                CGBitmapInfo.byteOrder32Big.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )
     }
 
     static func canAppend(width: Int, currentHeight: Int, appendedHeight: Int) -> Bool {

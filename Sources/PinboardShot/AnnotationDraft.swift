@@ -49,6 +49,15 @@ struct AnnotationDraft: Codable, Sendable {
         redactionWasFlattened = containsRedaction
     }
 
+    init(sourcePNG: Data, logicalSize: CGSize) throws {
+        guard sourcePNG.count <= Self.maximumBytes else { throw CaptureFeatureError.imageTooLarge }
+        version = 1
+        self.sourcePNG = sourcePNG
+        self.logicalSize = logicalSize
+        strokes = []
+        redactionWasFlattened = false
+    }
+
     func sourceImage() throws -> CGImage {
         guard version == 1, sourcePNG.count <= Self.maximumBytes,
               logicalSize.width.isFinite, logicalSize.height.isFinite,
