@@ -38,7 +38,7 @@
       "minimatch@3.1.5>brace-expansion": "1.1.16",
       "minimatch@10.2.5>brace-expansion": "5.0.8",
       "postcss": "8.5.22",
-      "sharp": "0.35.2"
+      "sharp": "0.35.4"
     },
     "onlyBuiltDependencies": [
       "esbuild@0.25.12 || 0.28.1",
@@ -59,7 +59,7 @@
     "eslint": "9.39.5",
     "eslint-config-next": "16.3.3",
     "react-server-dom-webpack": "19.2.8",
-    "sharp": "0.35.2",
+    "sharp": "0.35.4",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
     "vinext": "0.2.1",
