@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import "./brand.css";
+import "./spatial.css";
+import "./pin-workbench.css";
 import {
   GOOGLE_TAG_ID,
   OPENGRAPH_IMAGE_PATH,

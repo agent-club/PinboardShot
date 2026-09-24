@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SpatialShowcase } from "./_components/spatial-showcase";
+import { PinWorkbench } from "./_components/pin-workbench";
 import currentRelease from "@/content/current-release.json";
 import {
   DOWNLOAD_PATH,
@@ -123,11 +125,9 @@ function CaptureDemoScene({
 const copy = {
   zh: {
     nav: { features: "功能", workflow: "使用方式", compare: "原则", privacy: "隐私", faq: "问答", changelog: "更新日志", download: "下载" },
-    eyebrow: "为 macOS 精心打造",
-    title: "截图，然后\n留在眼前",
+    eyebrow: "CAPTURE. ANNOTATE. LEVITATE.",
+    title: "打破屏幕\n边界。",
     intro: "原生 macOS 截图、标注与贴图工具，从框选到马赛克、文字和贴屏，全程只在本机完成",
-    guardianName: "萤火守护员",
-    guardianStory: "捕捉一闪而过的画面，把重要的参考留在身边。",
     download: "下载 DMG",
     learn: "看看它能做什么",
     requirement: "macOS 14+ · Universal · Apple Silicon 与 Intel · Developer ID 签名 · Apple 公证",
@@ -264,11 +264,9 @@ const copy = {
   },
   en: {
     nav: { features: "Features", workflow: "How it works", compare: "Principles", privacy: "Privacy", faq: "FAQ", changelog: "Changelog", download: "Download" },
-    eyebrow: "Crafted for macOS",
-    title: "Capture it.\nKeep it in sight.",
+    eyebrow: "CAPTURE. ANNOTATE. LEVITATE.",
+    title: "Beyond the\nscreen.",
     intro: "A native capture, annotation, and pinboard tool for macOS. From selection to markup and pinning, everything stays on your Mac.",
-    guardianName: "Your little lightkeeper",
-    guardianStory: "Catch a fleeting moment and keep the useful details close.",
     download: "Download DMG",
     learn: "See what it can do",
     requirement: "macOS 14+ · Universal · Apple Silicon & Intel · Developer ID signed · Apple notarized",
@@ -441,7 +439,7 @@ export function PinboardShotHome({
 
   const savePrivacyConsent = (choice: "accepted" | "essential") => {
     window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, choice);
-    const analyticsWindow = window as typeof window & { [key: string]: boolean; gtag?: (...args: unknown[]) => void };
+    const analyticsWindow = window as typeof window & { [key: `ga-disable-${string}`]: boolean; gtag?: (...args: unknown[]) => void };
     analyticsWindow[`ga-disable-${GOOGLE_TAG_ID}`] = choice === "essential";
     const gtag = analyticsWindow.gtag;
     gtag?.("consent", "update", {
@@ -487,10 +485,6 @@ export function PinboardShotHome({
           <p className="eyebrow"><span />{content.eyebrow}</p>
           <h1>{content.title.split("\n").map((line) => <span key={line}>{line}</span>)}</h1>
           <p className="intro">{content.intro}</p>
-          <div className="guardian-note">
-            <span className="guardian-note-icon" aria-hidden="true" />
-            <span><strong>{content.guardianName}</strong><small>{content.guardianStory}</small></span>
-          </div>
           <div className="hero-actions">
             <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
             <a className="button button-secondary" href="#features">{content.learn}<span aria-hidden="true">↘</span></a>
@@ -498,46 +492,17 @@ export function PinboardShotHome({
           <p className="requirement">{content.requirement}</p>
         </div>
 
-        <div
-          className={`hero-showcase demo-step-${demoStep}`}
-          onMouseEnter={() => setDemoPaused(true)}
-          onMouseLeave={() => setDemoPaused(false)}
-          onFocus={() => setDemoPaused(true)}
-          onBlur={() => setDemoPaused(false)}
-        >
-          <div className="hero-step-nav" role="tablist" aria-label={language === "zh" ? "主操作步骤" : "Main interaction steps"}>
-            {content.workflow.map(([number, title], index) => (
-              <button
-                key={number}
-                type="button"
-                role="tab"
-                aria-selected={demoStep === index}
-                className={demoStep === index ? "active" : ""}
-                onClick={() => setDemoStep(index)}
-              >
-                <span>{number}</span><strong>{title}</strong>
-              </button>
-            ))}
-          </div>
-          <CaptureDemoScene demoStep={demoStep} content={content} compact />
-        </div>
+        <SpatialShowcase language={language} />
+        <div className="hero-scroll"><span>SCROLL TO EXPLORE</span><span aria-hidden="true">↓</span><span>BUILT FOR FOCUS. DESIGNED TO FLOAT.</span></div>
       </section>
 
-      <section className="distribution section" aria-labelledby="distribution-title">
-        <div className="distribution-copy">
-          <p className="eyebrow"><span />{content.distributionEyebrow}</p>
-          <h2 id="distribution-title">{content.distributionTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
-          <p>{content.distributionBody}</p>
-          <div className="distribution-links">
-            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.checksum}</a>
-            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.source}</a>
-          </div>
+      <section className="workflow section" id="workflow">
+        <div className="workflow-heading">
+          <div><p className="eyebrow"><span />{content.pinEyebrow}</p><h2>{language === "zh" ? <>你的桌面。<span>重新定义。</span></> : <>Your desktop.<span>Redefined.</span></>}</h2></div>
+          <p>{content.pinBody}</p>
         </div>
-        <div className="install-card">
-          <strong>{content.previewBadge}</strong>
-          <ol>{content.distributionSteps.map((step) => <li key={step}>{step}</li>)}</ol>
-          <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
-        </div>
+        <PinWorkbench language={language} />
+        <div className="pin-stats">{content.pinStats.map(([label, value]) => <span key={label}><small>{label}</small><strong>{value}</strong></span>)}</div>
       </section>
 
       <section className="features section" id="features">
@@ -584,24 +549,6 @@ export function PinboardShotHome({
               <span>{language === "zh" ? "查看详情 →" : "Read the guide →"}</span>
             </a>
           ))}
-        </div>
-      </section>
-
-      <section className={`workflow section pin-scene-${demoStep}`} id="workflow">
-        <div className="workflow-copy">
-          <p className="eyebrow light"><span />{content.pinEyebrow}</p>
-          <h2>{content.pinTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
-          <p className="workflow-intro">{content.pinBody}</p>
-          <div className="pin-stats">{content.pinStats.map(([label, value]) => <span key={label}><small>{label}</small><strong>{value}</strong></span>)}</div>
-        </div>
-        <div className="pin-playground" role="img" aria-label={language === "zh" ? "多张贴图、透明度和鼠标穿透动态演示" : "Animated demo of multiple pins, opacity, and click-through"}>
-          <div className="playground-grid" />
-          <div className="floating-pin pin-one"><div className="mini-bar"><i /><i /><i /></div><div className="pin-gradient pin-gradient-a"><ShowcasePhoto src={showcaseImages[2].src} /></div></div>
-          <div className="floating-pin pin-two"><div className="mini-bar"><i /><i /><i /></div><div className="pin-lines"><ShowcasePhoto src={showcaseImages[1].src} /></div></div>
-          <div className="floating-pin pin-three"><div className="mini-bar"><i /><i /><i /></div><div className="pin-gradient pin-gradient-b"><ShowcasePhoto src={showcaseImages[3].src} /></div></div>
-          <div className="opacity-control"><span>{language === "zh" ? "透明度" : "Opacity"}</span><div><i /></div><strong>64%</strong></div>
-          <div className="passthrough-badge"><i>↗</i><span>{language === "zh" ? "鼠标穿透" : "Click-through"}</span><strong>{language === "zh" ? "已开启" : "On"}</strong></div>
-          <div className="playground-cursor">↖</div>
         </div>
       </section>
 
@@ -729,6 +676,23 @@ export function PinboardShotHome({
               </a>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="distribution section" aria-labelledby="distribution-title">
+        <div className="distribution-copy">
+          <p className="eyebrow"><span />{content.distributionEyebrow}</p>
+          <h2 id="distribution-title">{content.distributionTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
+          <p>{content.distributionBody}</p>
+          <div className="distribution-links">
+            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.checksum}</a>
+            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.source}</a>
+          </div>
+        </div>
+        <div className="install-card">
+          <strong>{content.previewBadge}</strong>
+          <ol>{content.distributionSteps.map((step) => <li key={step}>{step}</li>)}</ol>
+          <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
         </div>
       </section>
 
