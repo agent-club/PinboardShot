@@ -143,8 +143,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             alert.addButton(withTitle: L10n.text("feature.quit.discard"))
             guard alert.runModal() == .alertSecondButtonReturn else { return .terminateCancel }
         }
-        if shortRecordingController.isBusy {
-            Task { await shortRecordingController.cancel(); sender.reply(toApplicationShouldTerminate: true) }
+        if shortRecordingController.isBusy || captureToolsController.guide.recoveryEnabled {
+            Task {
+                if shortRecordingController.isBusy { await shortRecordingController.cancel() }
+                if captureToolsController.guide.recoveryEnabled {
+                    await captureToolsController.guide.clearRecovery()
+                }
+                sender.reply(toApplicationShouldTerminate: true)
+            }
             return .terminateLater
         }
         return .terminateNow
@@ -711,8 +717,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 CaptureDiagnostics.recordPhase("scrollCaptureCancelled")
                 return
             }
+            let preparedCapture = try await watermarkService.prepareScrollingCapture(result.image)
             let shouldPin = capturePipeline.completeCapture(explicitPin: false)
-            completeCapture(result.image, pin: shouldPin, privacyContext: result.privacyContext)
+            completeCapture(result.image, pin: shouldPin, privacyContext: result.privacyContext,
+                            preparedCapture: preparedCapture)
             CaptureDiagnostics.recordPhase("scrollCaptureCompleted")
             refreshTrayPanel()
         } catch {
@@ -779,6 +787,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         pin: Bool,
         applyWatermark: Bool = true,
         privacyContext: CapturePrivacyContext = .unknown,
+        preparedCapture: WatermarkedCapture? = nil,
         draft: AnnotationDraft? = nil,
         keepDraft: Bool = EditableDraftSettings.isEnabled(),
         collectStep: Bool = true
@@ -786,7 +795,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         // 所有路径只编码一次 PNG，再复用于剪贴板和历史，控制 4K/8K 峰值内存。
         let capture: WatermarkedCapture
         do {
-            if applyWatermark {
+            if let preparedCapture {
+                capture = preparedCapture
+            } else if applyWatermark {
                 capture = try watermarkService.prepareCapture(image)
             } else if let pngData = image.pngData {
                 capture = WatermarkedCapture(image: image, pngData: pngData)
@@ -814,8 +825,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         var editableDraft = draft
         if keepDraft, let historyItem {
             do {
-                if editableDraft == nil, let source = image.cgImageValue {
-                    editableDraft = try AnnotationDraft(source: source, logicalSize: image.size, strokes: [])
+                if editableDraft == nil {
+                    editableDraft = try AnnotationDraft(sourcePNG: capture.pngData, logicalSize: image.size)
                 }
                 if let editableDraft { try historyStore.saveDraft(editableDraft, for: historyItem) }
             } catch { present(error: error) }

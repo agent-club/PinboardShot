@@ -21,7 +21,7 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 #### 截图
 
 - 区域截图、当前屏幕截图、光标所在窗口截图
-- 滚动截图：框选窗口内的可滚动区域，手动向下滚动时自动识别重叠内容并拼成长图
+- 滚动截图：框选窗口内的可滚动区域，手动向上或向下滚动时自动识别重叠内容并拼成长图
 - 滚动截图期间在目标窗口右侧实时显示长图预览；预览窗口不会进入成品
 - 区域截图后直接贴屏，以及从剪贴板创建贴图
 - 3 秒延迟区域截图
@@ -54,7 +54,7 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 
 - 可编辑原稿：在历史设置中开启，或在标注编辑器中勾选保存。原稿保留底图、标注和逻辑尺寸，可从历史「继续编辑」。关闭历史或排除来源 App 时不保存；含马赛克或脱敏区域时固化整张图，不保留遮盖前的内容。裁剪、旋转会固化已有标注。
 - 长图处理：拖选或输入像素行删除中段，支持撤销、重做，按指定页高导出连续 PNG 或 PDF。
-- 步骤文档：主动截图收集步骤，添加标题与说明、调整顺序，保存可重新打开的 JSON 原稿，导出 Markdown + 图片或 PDF。最多 100 步；不会自动监听点击或自动保存文档。
+- 步骤文档：主动截图收集步骤，添加标题与说明、调整顺序，保存可重新打开的 JSON 原稿，导出 Markdown + 图片或 PDF。最多 100 步；不会自动监听点击。可选择启用本地崩溃恢复，临时保存未完成原稿；仍需手动保存正式文档。
 - 结构化 OCR：本机识别后生成纯文本、保留布局、TSV 和 Markdown 表格，可修改预览后复制。表格列根据文字位置推断，复杂合并单元格需要核对。
 - 标尺：在独立标注编辑器中测量距离、横向及纵向间距，切换像素或点，绘制水平、垂直参考线。导入图片的点值依赖图片的逻辑尺寸。
 - 区域短录屏：框选后录制最长 60 秒的无声 H.264 MP4，最高 1920 × 1080 / 30 fps，停止后预览、裁剪首尾并保存。PinboardShot 自身窗口不进入视频；关闭预览会丢弃未保存视频。当前不包含 GIF、音频或视频历史。
@@ -116,7 +116,7 @@ PinboardShot 默认不启用任何全局快捷键，避免占用其他应用的�
 #### 滚动截图
 
 1. 从菜单栏选择“滚动截图”，然后框选某个窗口内部实际会随内容滚动的区域。
-2. 框选结束后在原窗口内使用滚轮或触控板向下滚动；建议每次保留一部分可见内容，避免一次跨过整个画面。
+2. 框选结束后在原窗口内使用滚轮或触控板向上或向下滚动；聊天记录可从底部向上截取。建议每次保留一部分可见内容，避免一次跨过整个画面。
 3. 在右侧预览中确认拼接结果，完成后点击“完成”；结果会复制到剪贴板并保留到截图历史。
 
 滚动截图适合网页、文档、聊天记录和代码等纵向内容。固定悬浮栏、视频、动画或快速跨页滚动可能妨碍重叠识别；出现匹配提示时请放慢滚动。拼接像素使用自动清理的临时磁盘后备存储，避免长图在内存中保留两份；为避免占满临时磁盘，单张长图最多生成 2.5 亿像素（原始后备数据约 1 GB）。
@@ -259,7 +259,7 @@ Its core workflow is simple: capture content from the screen, annotate it when n
 #### Capture
 
 - Capture a selected area, the current display, or the window under the pointer.
-- Scrolling capture: select a scrollable region inside a window, then scroll down manually while PinboardShot detects overlapping content and stitches it into a long image.
+- Scrolling capture: select a scrollable region inside a window, then scroll up or down manually while PinboardShot detects overlapping content and stitches it into a long image.
 - Show a live long-image preview to the right of the target window during scrolling capture; the preview window is excluded from the result.
 - Pin an area capture immediately, or create a pin from an image on the clipboard.
 - Start an area capture after a three-second delay.
@@ -292,7 +292,7 @@ Open **Capture tools** from the menu bar, the capture-result menu, or a history 
 
 - Editable drafts: enable them in history settings or in the annotation editor. Drafts preserve the source image, annotations, and logical dimensions for **Continue editing** in history. Disabled history and excluded source apps prevent saving drafts. Mosaic or redaction flattens the entire image without retaining concealed content; crop and rotation also bake existing annotations.
 - Long images: drag a band or enter pixel rows to remove a middle section, undo or redo, and export continuous PNG pages or a PDF at a chosen page height.
-- Step guides: capture steps manually, add titles and descriptions, reorder them, save a reopenable JSON draft, and export Markdown with images or PDF. Up to 100 steps; no automatic click monitoring or document autosave.
+- Step guides: capture steps manually, add titles and descriptions, reorder them, save a reopenable JSON draft, and export Markdown with images or PDF. Up to 100 steps; no automatic click monitoring. Optional local crash recovery keeps a temporary unfinished draft; save the document manually for long-term use.
 - Structured OCR: on-device recognition with editable plain text, layout-preserving text, TSV, and Markdown-table previews. Columns are inferred from text positions, so complex merged cells need review.
 - Ruler: measure distance and horizontal/vertical spacing in pixels or points, and draw horizontal or vertical guides in the standalone annotation editor. Point measurements for imported images depend on their logical size metadata.
 - Region recordings: silent H.264 MP4, up to 60 seconds and 1920 × 1080 at 30 fps, with preview and start/end trimming before saving. PinboardShot windows are excluded. Closing the preview discards unsaved video. GIF, audio, and video history are not included in this version.

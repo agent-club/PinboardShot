@@ -1,45 +1,45 @@
 {
-  "version": "0.9.0",
-  "build": "44",
-  "date": "2026.09.18",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.9.0",
+  "version": "0.12.0",
+  "build": "47",
+  "date": "2026.09.24",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.12.0",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.9.0-44.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.9.0/PinboardShot-0.9.0-44.dmg",
-      "sha256": "cdaa36d2a6f96960f8e735dc83a84cc7a13db4c032e84ff1b22a8dd2e0ef967a"
+      "name": "PinboardShot-0.12.0-47.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.12.0/PinboardShot-0.12.0-47.dmg",
+      "sha256": "7eea4f9459867e9531318f2909caca37bee036bb8dc87a75de51be71b210eb3c"
     },
     "zip": {
-      "name": "PinboardShot-0.9.0-44.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.9.0/PinboardShot-0.9.0-44.zip",
-      "sha256": "5b54a56ad7b8eba0a76e81672a8029191eeec6eae35980b4c20bfbd1c6e24b77"
+      "name": "PinboardShot-0.12.0-47.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.12.0/PinboardShot-0.12.0-47.zip",
+      "sha256": "a37f019756a44ce01c8bf41566a537165df9cd06bc8ffc27bc134b6fe8bfaa70"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.9.0/appcast.xml",
-      "sha256": "cb339605bae366a67fd5d7b35a0f996d25003ff3ce29f9fe844e9ca93e4b45b4"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.12.0/appcast.xml",
+      "sha256": "cbc5b95b3b2aac24d801d466651a6d31fe643f48c9bb3e6e88c334d9b961dadb"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "六项截图工作流与更可靠的标注",
+    "title": "托盘更清爽，官网焕新",
     "changes": [
-      "标注只在明确拖动后落笔，单击和轻微手抖不再留下红点，也不会污染撤销、重做记录",
-      "新增可编辑原稿、长图整理、步骤文档、结构化 OCR、标尺和区域短录屏",
-      "改进历史清理、快捷键恢复与截图结果操作，裁剪和旋转保留已有标注的视觉效果",
-      "所有 OCR 默认在本机处理，短录屏为最长 60 秒的无声 H.264 MP4",
-      "提供 Apple Silicon 与 Intel 通用版本，应用和 DMG 通过 Apple 公证，Sparkle 更新包带有签名"
+      "菜单栏托盘改为紧凑分组布局，输出清晰度可直接点选，贴图板预览与截图设置更易查找",
+      "“更多”默认收起帮助与声明；“检查更新”和“关于”始终直接可见",
+      "应用图标和官网更新为蓝色视觉；中英文首页加入空间画布与可操作的贴图演示",
+      "官网演示在 WebGL 不可用时仍显示静态作品，并支持减少动态效果设置",
+      "应用与 DMG 已通过 Apple 公证，Sparkle 更新包带有签名"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Six capture workflows and more reliable annotations",
+    "title": "A cleaner menu and a refreshed website",
     "changes": [
-      "Annotations begin only after an intentional drag, so clicks and small pointer jitter leave no stray dots or undo/redo entries.",
-      "Added editable drafts, long-image editing, step guides, structured OCR, ruler annotations, and short region recording.",
-      "Improved history cleanup, shortcut restoration, and capture-result actions while preserving annotation appearance through crop and rotation.",
-      "OCR remains on-device by default, and short recordings are silent H.264 MP4 files limited to 60 seconds.",
-      "Includes Apple Silicon and Intel support, an Apple-notarized app and DMG, and a signed Sparkle update package."
+      "The menu bar panel now uses compact groups, direct output-quality choices, and clearer pinboard previews and capture settings.",
+      "More keeps help and notices collapsed by default, while Check for Updates and About remain directly visible.",
+      "The app icon and website adopt a blue visual style; the Chinese and English homepages add a spatial canvas and interactive pin demo.",
+      "The website demo keeps static artwork visible without WebGL and respects reduced-motion settings.",
+      "The app and DMG are Apple-notarized, and the Sparkle update package is signed."
     ]
   }
 }

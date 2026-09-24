@@ -19,10 +19,7 @@ enum ImageFileExporter {
         panel.nameFieldStringValue = suggestedName ?? defaultFilename()
         guard panel.runModal() == .OK, let url = panel.url else { return false }
         let format = PinImageSaveFormat.format(for: url)
-        guard let data = format.encodedData(for: image) else {
-            throw PinboardShotError.imageEncodingFailed
-        }
-        try data.write(to: url, options: .atomic)
+        try format.write(image, to: url)
         return true
     }
 

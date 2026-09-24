@@ -1,5 +1,6 @@
 import AppKit
 import Carbon.HIToolbox
+import VisionKit
 
 enum OverlaySafetyPolicy {
     static let timeout: Duration = .seconds(12)
@@ -1738,7 +1739,7 @@ final class SelectionSizeEditorCoordinator: NSObject, NSTextFieldDelegate, NSWin
     }
 }
 
-final class SelectionOverlayView: NSView {
+final class SelectionOverlayView: NSView, ImageAnalysisOverlayViewDelegate {
     weak var delegate: SelectionOverlayViewDelegate?
     // 与最终裁图共用同一次冻结画面，既保持视觉一致，也隔离下层应用交互。
     var previewImage: NSImage?
@@ -1824,6 +1825,11 @@ final class SelectionOverlayView: NSView {
     private var moveStartRect: CGRect?
     private var moveStartPoint: CGPoint?
     private var isSuppressingToolbarGesture = false
+    private var liveTextOverlay: ImageAnalysisOverlayView?
+    private var liveTextTask: Task<Void, Never>?
+    private var liveTextSelectionRefiner: LiveTextCharacterSelectionRefiner?
+    private var liveTextCharacterLayout = LiveTextCharacterLayout.empty
+    private var liveTextGeneration = 0
 
     var isPresentingScrollingCaptureOutline: Bool { isScrollingCaptureOutline }
 
@@ -1842,6 +1848,7 @@ final class SelectionOverlayView: NSView {
         )
         selectedColorSampleFormat = ColorSampleFormat.current(defaults: colorPickerDefaults)
         configureToolbar()
+        configureLiveTextOverlay()
         configureAccessibility()
     }
 
@@ -1853,6 +1860,7 @@ final class SelectionOverlayView: NSView {
         )
         selectedColorSampleFormat = ColorSampleFormat.current(defaults: colorPickerDefaults)
         configureToolbar()
+        configureLiveTextOverlay()
         configureAccessibility()
     }
 
@@ -1874,6 +1882,26 @@ final class SelectionOverlayView: NSView {
         if !colorPreview.isHidden, colorPreview.frame.contains(point) {
             return super.hitTest(point)
         }
+        if let liveTextOverlay,
+           !liveTextOverlay.isHidden,
+           isAwaitingAction,
+           !isAnnotationMode,
+           !isColorPickerMode,
+           liveTextOverlay.frame.contains(point) {
+            let overlayPoint = convert(point, to: liveTextOverlay)
+            let routesToText = LiveTextInteractionPolicy.routesToText(
+                hasInteractiveItem: liveTextCharacterLayout.containsCharacter(
+                    at: overlayPoint,
+                    contentBounds: liveTextOverlay.bounds
+                ) || liveTextOverlay.hasInteractiveItem(at: overlayPoint)
+                    || liveTextOverlay.analysisHasText(at: overlayPoint),
+                hasActiveSelection: liveTextOverlay.hasActiveTextSelection,
+                isResizeInteraction: SelectionResizeGeometry.handle(at: point, in: selectionRect) != nil
+            )
+            if routesToText {
+                return liveTextOverlay.hitTest(overlayPoint) ?? liveTextOverlay
+            }
+        }
         if isAnnotationMode,
            let annotationCanvas,
            !annotationCanvas.isHidden,
@@ -1885,6 +1913,10 @@ final class SelectionOverlayView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
+        if window == nil {
+            clearLiveTextAnalysis()
+            return
+        }
         window?.makeFirstResponder(self)
     }
 
@@ -1924,6 +1956,7 @@ final class SelectionOverlayView: NSView {
             handleColorPickerClick(at: point, clickCount: event.clickCount)
             return
         }
+        clearLiveTextAnalysis()
         if isSelectionValid {
             if let handle = SelectionResizeGeometry.handle(at: point, in: selectionRect) {
                 activeResizeHandle = handle
@@ -2590,6 +2623,7 @@ final class SelectionOverlayView: NSView {
             syncSelectionDimensionFields()
             positionToolbar(around: selectionRect)
             toolbar.isHidden = false
+            prepareLiveTextAnalysis()
             invalidateSelectionCursorRects()
             needsDisplay = true
         } else {
@@ -2705,6 +2739,7 @@ final class SelectionOverlayView: NSView {
     }
 
     private func applyKeyboardSelection(_ proposed: CGRect) {
+        clearLiveTextAnalysis()
         let size = SelectionSizeGeometry.constrainedSize(
             width: proposed.width,
             height: proposed.height,
@@ -2802,12 +2837,14 @@ final class SelectionOverlayView: NSView {
 
     private func complete(with disposition: SelectionDisposition) {
         guard isSelectionValid else { return }
+        clearLiveTextAnalysis()
         closeSelectionSizePopover()
         annotationCanvas?.commitPendingText()
         delegate?.selectionView(self, completed: selectionRect, disposition: disposition)
     }
 
     func presentScrollingCaptureOutline() {
+        clearLiveTextAnalysis()
         closeSelectionSizePopover()
         isScrollingCaptureOutline = true
         isAwaitingAction = false
@@ -2872,6 +2909,9 @@ final class SelectionOverlayView: NSView {
             return
         }
         isColorPickerMode = enabled
+        if enabled {
+            clearLiveTextAnalysis()
+        }
         if enabled, isAnnotationMode {
             setAnnotationMode(false)
         }
@@ -2890,6 +2930,9 @@ final class SelectionOverlayView: NSView {
         if isSelectionValid { positionToolbar(around: selectionRect) }
         invalidateSelectionCursorRects()
         needsDisplay = true
+        if !enabled, isAwaitingAction, !isAnnotationMode {
+            prepareLiveTextAnalysis()
+        }
     }
 
     private func updateColorPickerControls() {
@@ -2974,6 +3017,9 @@ final class SelectionOverlayView: NSView {
 
     private func setAnnotationMode(_ enabled: Bool) {
         guard isSelectionValid else { return }
+        if enabled {
+            clearLiveTextAnalysis()
+        }
         if enabled { setColorPickerMode(false) }
         if enabled, annotationCanvas == nil {
             configureAnnotationCanvas()
@@ -3006,6 +3052,9 @@ final class SelectionOverlayView: NSView {
         applyToolbarConfiguration()
         positionToolbar(around: selectionRect)
         needsDisplay = true
+        if !enabled, isAwaitingAction, !isColorPickerMode {
+            prepareLiveTextAnalysis()
+        }
     }
 
     @objc private func annotationToolChanged(_ sender: OverlayToolbarButton) {
@@ -3087,6 +3136,7 @@ final class SelectionOverlayView: NSView {
     @objc private func redoAnnotation() { annotationCanvas?.redo() }
     @objc private func clearAnnotations() { annotationCanvas?.clear() }
     @objc private func cancelSelection() {
+        clearLiveTextAnalysis()
         closeSelectionSizePopover()
         delegate?.selectionView(self, completed: nil, disposition: .copy)
     }
@@ -3184,6 +3234,97 @@ final class SelectionOverlayView: NSView {
         ))
         guard !crop.isNull, crop.width > 0, crop.height > 0 else { return nil }
         return previewSourceImage.cropping(to: crop)
+    }
+
+    func overlayView(
+        _ overlayView: ImageAnalysisOverlayView,
+        shouldBeginAt point: CGPoint,
+        forAnalysisType analysisType: ImageAnalysisOverlayView.InteractionTypes
+    ) -> Bool {
+        LiveTextInteractionPolicy.routesToText(
+            hasInteractiveItem: liveTextCharacterLayout.containsCharacter(
+                at: point,
+                contentBounds: overlayView.bounds
+            ) || overlayView.hasInteractiveItem(at: point)
+                || overlayView.analysisHasText(at: point),
+            hasActiveSelection: overlayView.hasActiveTextSelection,
+            isResizeInteraction: false
+        )
+    }
+
+    private func configureLiveTextOverlay() {
+        let overlay = ImageAnalysisOverlayView(frame: .zero)
+        overlay.delegate = self
+        overlay.preferredInteractionTypes = []
+        overlay.setSupplementaryInterfaceHidden(true, animated: false)
+        overlay.isHidden = true
+        addSubview(overlay, positioned: .below, relativeTo: toolbar)
+        liveTextOverlay = overlay
+        liveTextSelectionRefiner = LiveTextCharacterSelectionRefiner(
+            containerView: self,
+            overlayView: overlay
+        ) { [weak self] point, _ in
+            guard let self else { return false }
+            return isAwaitingAction
+                && !isAnnotationMode
+                && !isColorPickerMode
+                && SelectionResizeGeometry.handle(at: point, in: selectionRect) == nil
+        }
+    }
+
+    private func prepareLiveTextAnalysis() {
+        guard isAwaitingAction,
+              !isAnnotationMode,
+              !isColorPickerMode,
+              isSelectionValid,
+              window != nil,
+              let liveTextOverlay,
+              let cropped = croppedPreviewSource(for: selectionRect) else {
+            clearLiveTextAnalysis()
+            return
+        }
+
+        clearLiveTextAnalysis()
+        let generation = liveTextGeneration
+        let analyzedRect = selectionRect
+        let image = NSImage(cgImage: cropped, size: analyzedRect.size)
+        liveTextOverlay.frame = analyzedRect
+        liveTextTask = Task { @MainActor [weak self] in
+            do {
+                let result = try await LiveTextAnalysisService.shared.analyze(image)
+                guard let self,
+                      !Task.isCancelled,
+                      generation == liveTextGeneration,
+                      analyzedRect == selectionRect,
+                      let result else { return }
+                liveTextOverlay.analysis = result.analysis
+                liveTextOverlay.preferredInteractionTypes = [.textSelection]
+                liveTextOverlay.setSupplementaryInterfaceHidden(true, animated: false)
+                liveTextOverlay.isHidden = false
+                liveTextCharacterLayout = result.characterLayout
+                liveTextSelectionRefiner?.update(characterLayout: result.characterLayout)
+                invalidateSelectionCursorRects()
+            } catch {
+                guard let self,
+                      !Task.isCancelled,
+                      generation == liveTextGeneration else { return }
+                liveTextOverlay.analysis = nil
+                liveTextOverlay.preferredInteractionTypes = []
+                liveTextOverlay.isHidden = true
+            }
+        }
+    }
+
+    private func clearLiveTextAnalysis() {
+        liveTextGeneration &+= 1
+        liveTextTask?.cancel()
+        liveTextTask = nil
+        liveTextOverlay?.resetSelection()
+        liveTextOverlay?.analysis = nil
+        liveTextOverlay?.preferredInteractionTypes = []
+        liveTextOverlay?.isHidden = true
+        liveTextCharacterLayout = .empty
+        liveTextSelectionRefiner?.reset()
     }
 
     private func drawHint() {

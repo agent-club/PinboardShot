@@ -31,6 +31,9 @@
 "tray.update.later" = "稍后";
 "tray.pinboard.title" = "你的贴图板";
 "tray.pinboard.subtitle" = "截图将始终置顶，保持可见。";
+"tray.section.pinboard" = "贴图板";
+"tray.section.app" = "应用";
+"tray.more.subtitle" = "检测水印、帮助与声明";
 "tray.manageAndTools" = "管理与工具";
 "quality.native" = "原生 Retina";
 "menu.capture" = "截图";
@@ -86,10 +89,14 @@
 "common.done" = "完成";
 "scrollCapture.title" = "滚动截图预览";
 "scrollCapture.selectionHint" = "框选窗口内的可滚动区域 · Esc 取消";
-"scrollCapture.status.ready" = "在所选区域内向下滚动，完成后点击“完成”。";
+"scrollCapture.status.ready" = "在所选区域内向上或向下滚动，保留重叠内容；完成后点击“完成”。";
 "scrollCapture.status.capturing" = "正在识别重叠内容并拼接…";
 "scrollCapture.status.revisited" = "正在浏览已捕获区域，继续滚动即可无缝接回。";
-"scrollCapture.status.unmatched" = "暂时无法匹配当前画面，请放慢滚动并保留重叠内容。";
+"scrollCapture.status.unmatched" = "暂时无法匹配。请回滚到已拼接内容，再缓慢滚动以恢复重叠。";
+"scrollCapture.unmatchedFinish.title" = "最近的内容未能拼接";
+"scrollCapture.unmatchedFinish.help" = "回滚到已拼接的画面后继续滚动，或仅保留当前预览中的已拼接部分。";
+"scrollCapture.unmatchedFinish.continue" = "继续采集";
+"scrollCapture.unmatchedFinish.savePartial" = "保留已拼接部分";
 "scrollCapture.status.limitReached" = "已达到长截图临时存储上限，请点击“完成”。";
 "onboarding.title" = "PinboardShot 已在菜单栏运行";
 "onboarding.message" = "PinboardShot 不显示在 Dock 中。请在菜单栏找到取景框图标。\n\n默认不启用全局快捷键。可在“设置 → 快捷键”中按需添加。\n\n截图需要“屏幕与系统音频录制”权限。图片、标注和历史保存在本机；只有软件更新会访问网络。";
@@ -216,6 +223,10 @@
 "preferences.historySearch" = "搜索识别文字或尺寸";
 "preferences.deleteHistoryItem" = "删除这张截图";
 "preferences.deleteHistoryItemFailed" = "无法删除截图：%@";
+"history.keep" = "保留这张截图，跳过自动清理";
+"history.unkeep" = "取消保留，之后按历史规则清理";
+"history.keepHelp" = "星标截图不受自动数量与时间清理限制；手动删除或清空历史仍会移除它们。";
+"history.keepFailed" = "无法更新截图保留状态：%@";
 "preferences.historyPolicyFailed" = "无法应用历史保留策略：%@";
 "preferences.pinToScreen" = "贴到屏幕";
 "preferences.languageSection" = "语言";
@@ -357,7 +368,7 @@
 "error.invalidSelection" = "截图选区超出了屏幕范围。";
 "error.emptyCaptureFrame" = "本次截图被判定为空白帧，剪贴板没有更新，仍保留上一次内容。请重新选择包含可见内容的区域。";
 "error.scrollTargetUnavailable" = "选区中心没有找到可持续捕获的窗口。请重新框选窗口内的滚动区域。";
-"error.scrollCaptureNoMovement" = "没有检测到可拼接的滚动内容。请开始后向下滚动，再点击完成。";
+"error.scrollCaptureNoMovement" = "没有检测到可拼接的滚动内容。请在所选区域内向上或向下滚动，并保留重叠内容。";
 "error.ocrNoText" = "没有在选区内识别到可复制的文字。";
 "preferences.trayIcon" = "菜单栏图标";
 "preferences.trayIconHelp" = "选择后立即生效。单色图标自动适配浅色与深色菜单栏；动态图标会持续变化，开启“减弱动态效果”时保持静止。";
@@ -440,6 +451,7 @@
 "comparison.exportErrorMessage" = "无法导出对比结果：%@";
 "pin.compare.needsTwoPins" = "至少需要两张贴图才能对比";
 "pin.compare.discoveryHint" = "现在有两张贴图了。右键一张设为基准 A，再右键另一张开始视觉对比。";
+"pinWorkspace.discoveryHint" = "多张贴图退出后不会自动恢复。右键任一贴图可保存当前工作区；也可在历史设置中开启会话恢复。";
 "pin.compare.setReference" = "设为对比基准 A";
 "pin.compare.cancelReference" = "取消对比基准";
 "pin.compare.withReference" = "与基准 A 对比";
@@ -569,7 +581,12 @@
 "feature.guide.documentTitle" = "文档标题";
 "feature.guide.stepTitle" = "步骤标题";
 "feature.guide.step" = "步骤 %d";
-"feature.guide.help" = "主动截图并填写操作或问题说明，可调整顺序。最多 100 步；文档不会自动落盘，请保存原稿以便下次继续。关闭窗口会暂停收集，已收集步骤保留到退出应用。";
+"feature.guide.help" = "主动截图并填写操作或问题说明，可调整顺序。最多 100 步；请保存原稿以便下次继续。关闭窗口会暂停收集，已收集步骤保留到退出应用。";
+"feature.guide.recoveryToggle" = "启用本地崩溃恢复";
+"feature.guide.recoveryHelp" = "开启后，未保存原稿临时保存在本机，供意外退出后恢复；正常退出会清除，24 小时后自动过期。截图可能包含敏感信息。";
+"feature.guide.restoreRecovery" = "恢复临时原稿";
+"feature.guide.deleteRecovery" = "删除临时原稿";
+"feature.guide.recoveryFailed" = "临时原稿保存或恢复失败；请手动保存原稿。";
 "feature.guide.collect" = "收集后续截图";
 "feature.guide.capture" = "截图添加一步";
 "feature.guide.addCurrent" = "添加当前图片";
@@ -610,4 +627,6 @@
 "feature.error.noVideoFrames" = "没有收到可用画面，请保持录制区域可见后重试。";
 "feature.record.discardTitle" = "丢弃未保存的录屏并开始新录制？";
 "feature.record.discardHelp" = "取消后可在预览窗口保存当前视频。";
+"feature.record.closeDiscardTitle" = "关闭并丢弃未保存的录屏？";
+"feature.record.closeDiscardHelp" = "取消后可返回预览窗口保存当前视频。";
 "feature.record.exporting" = "视频正在保存，请完成后再退出。";

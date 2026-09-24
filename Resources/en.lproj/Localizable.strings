@@ -31,6 +31,9 @@
 "tray.update.later" = "Later";
 "tray.pinboard.title" = "Your Pinboard";
 "tray.pinboard.subtitle" = "Screenshots stay pinned and visible.";
+"tray.section.pinboard" = "Pinboard";
+"tray.section.app" = "App";
+"tray.more.subtitle" = "Watermark detection, help & notices";
 "tray.manageAndTools" = "Manage & Tools";
 "quality.native" = "Native Retina";
 "menu.capture" = "Capture";
@@ -86,10 +89,14 @@
 "common.done" = "Done";
 "scrollCapture.title" = "Scrolling Capture Preview";
 "scrollCapture.selectionHint" = "Select a scrollable area inside a window · Esc to cancel";
-"scrollCapture.status.ready" = "Scroll down inside the selected area, then click Done.";
+"scrollCapture.status.ready" = "Scroll up or down inside the selected area with some overlap, then click Done.";
 "scrollCapture.status.capturing" = "Matching overlaps and extending the capture…";
 "scrollCapture.status.revisited" = "Reviewing an already captured area. Keep scrolling to resume seamlessly.";
-"scrollCapture.status.unmatched" = "The current frame could not be matched. Scroll more slowly and keep some overlap.";
+"scrollCapture.status.unmatched" = "Could not match this frame. Scroll back to captured content, then scroll slowly to restore overlap.";
+"scrollCapture.unmatchedFinish.title" = "Recent content was not stitched";
+"scrollCapture.unmatchedFinish.help" = "Scroll back to captured content and continue, or keep only the stitched portion shown in the preview.";
+"scrollCapture.unmatchedFinish.continue" = "Continue Capturing";
+"scrollCapture.unmatchedFinish.savePartial" = "Keep Stitched Portion";
 "scrollCapture.status.limitReached" = "The scrolling capture reached its temporary-storage limit. Click Done.";
 "onboarding.title" = "PinboardShot Is Running in the Menu Bar";
 "onboarding.message" = "PinboardShot does not appear in the Dock. Find the viewfinder icon in the menu bar.\n\nGlobal shortcuts are disabled by default. Add only the ones you want in Settings → Shortcuts.\n\nCapturing requires Screen & System Audio Recording access. Images, annotations, and history stay on this Mac; only software updates use the network.";
@@ -216,6 +223,10 @@
 "preferences.historySearch" = "Search recognized text or size";
 "preferences.deleteHistoryItem" = "Delete This Capture";
 "preferences.deleteHistoryItemFailed" = "Could not delete capture: %@";
+"history.keep" = "Keep this capture outside automatic cleanup";
+"history.unkeep" = "Stop keeping this capture outside automatic cleanup";
+"history.keepHelp" = "Starred captures are exempt from automatic count and age limits. Manual deletion and Clear History still remove them.";
+"history.keepFailed" = "Could not update capture retention: %@";
 "preferences.historyPolicyFailed" = "Could not apply the history retention policy: %@";
 "preferences.pinToScreen" = "Pin to Screen";
 "preferences.languageSection" = "Language";
@@ -357,7 +368,7 @@
 "error.invalidSelection" = "The selected region is outside the display bounds.";
 "error.emptyCaptureFrame" = "The capture appears to be an empty frame. The clipboard was not changed. Select a region with visible content and try again.";
 "error.scrollTargetUnavailable" = "No continuously capturable window was found at the center of the selection. Select a scrolling area inside a window.";
-"error.scrollCaptureNoMovement" = "No stitchable scrolling content was detected. Scroll down after capture starts, then click Done.";
+"error.scrollCaptureNoMovement" = "No stitchable scrolling content was detected. Scroll up or down inside the selected area with some overlap.";
 "error.ocrNoText" = "No copyable text was recognized in the selected region.";
 "preferences.trayIcon" = "Menu Bar Icon";
 "preferences.trayIconHelp" = "Changes take effect immediately. Monochrome icons adapt to light and dark menu bars; animated icons stay still when Reduce Motion is enabled.";
@@ -440,6 +451,7 @@
 "comparison.exportErrorMessage" = "The comparison couldn’t be exported: %@";
 "pin.compare.needsTwoPins" = "At least two pins are needed to compare";
 "pin.compare.discoveryHint" = "You now have two pins. Right-click one to set reference A, then right-click the other to compare them.";
+"pinWorkspace.discoveryHint" = "Pins will not return after quitting. Right-click any pin to save this workspace, or enable session recovery in History settings.";
 "pin.compare.setReference" = "Set as comparison reference A";
 "pin.compare.cancelReference" = "Cancel comparison reference";
 "pin.compare.withReference" = "Compare with reference A";
@@ -569,7 +581,12 @@
 "feature.guide.documentTitle" = "Document title";
 "feature.guide.stepTitle" = "Step title";
 "feature.guide.step" = "Step %d";
-"feature.guide.help" = "Capture steps and describe actions or bugs, then reorder them. Up to 100 steps. Save a draft to continue next time; documents are not autosaved. Closing this window pauses collection and keeps steps until the app quits.";
+"feature.guide.help" = "Capture steps and describe actions or bugs, then reorder them. Up to 100 steps. Save a draft to continue next time. Closing this window pauses collection and keeps steps until the app quits.";
+"feature.guide.recoveryToggle" = "Enable local crash recovery";
+"feature.guide.recoveryHelp" = "When enabled, an unsaved draft is stored temporarily on this Mac for recovery after an unexpected quit. It is cleared on normal quit and expires after 24 hours. Screenshots may contain sensitive information.";
+"feature.guide.restoreRecovery" = "Restore temporary draft";
+"feature.guide.deleteRecovery" = "Delete temporary draft";
+"feature.guide.recoveryFailed" = "Could not save or restore the temporary draft. Save your draft manually.";
 "feature.guide.collect" = "Collect subsequent captures";
 "feature.guide.capture" = "Capture next step";
 "feature.guide.addCurrent" = "Add current image";
@@ -610,4 +627,6 @@
 "feature.error.noVideoFrames" = "No usable video frames arrived. Keep the recording region visible and try again.";
 "feature.record.discardTitle" = "Discard the unsaved video and start a new recording?";
 "feature.record.discardHelp" = "Cancel to save the current video from its preview window.";
+"feature.record.closeDiscardTitle" = "Close and discard the unsaved recording?";
+"feature.record.closeDiscardHelp" = "Cancel to return to the preview and save this recording.";
 "feature.record.exporting" = "Video is being saved. Please wait before quitting.";

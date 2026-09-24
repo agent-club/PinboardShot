@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import "./brand.css";
+import "./spatial.css";
+import "./pin-workbench.css";
 import {
   GOOGLE_TAG_ID,
   OPENGRAPH_IMAGE_PATH,
+  PRIVACY_CONSENT_STORAGE_KEY,
   SITE_URL,
   TWITTER_IMAGE_PATH,
   absoluteUrl,
@@ -16,6 +20,30 @@ const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"]
 const socialImage = absoluteUrl(OPENGRAPH_IMAGE_PATH);
 const twitterImage = absoluteUrl(TWITTER_IMAGE_PATH);
 const googleSiteVerification = process.env.NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION?.trim();
+const googleTagBootstrap = `
+(function initializeGoogleTag() {
+window.dataLayer = window.dataLayer || [];
+window.gtag = window.gtag || function gtag(){window.dataLayer.push(arguments);};
+
+try {
+  var savedPrivacyConsent = window.localStorage.getItem(${JSON.stringify(PRIVACY_CONSENT_STORAGE_KEY)});
+  if (savedPrivacyConsent === 'essential') {
+    window['ga-disable-' + ${JSON.stringify(GOOGLE_TAG_ID)}] = true;
+    window.gtag('consent', 'default', { analytics_storage: 'denied' });
+  }
+} catch {
+  // Preserve the documented default-on policy when local storage is unavailable.
+}
+
+window.gtag('js', new Date());
+window.gtag('config', ${JSON.stringify(GOOGLE_TAG_ID)});
+
+var googleTagScript = document.createElement('script');
+googleTagScript.async = true;
+googleTagScript.src = ${JSON.stringify(`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`)};
+document.head.appendChild(googleTagScript);
+})();
+`.trim();
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -69,7 +97,7 @@ export const metadata: Metadata = {
     type: "website",
     locale: "zh_CN",
     alternateLocale: ["en_US"],
-    images: [{ url: socialImage, width: 1792, height: 1024, alt: "PinboardShot for macOS" }],
+    images: [{ url: socialImage, width: 1920, height: 990, alt: "PinboardShot for macOS" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -83,17 +111,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="zh-CN">
       <head>
-        <script async src={`https://www.googletagmanager.com/gtag/js?id=${GOOGLE_TAG_ID}`} />
         <script
           dangerouslySetInnerHTML={{
-            __html: `
-window.dataLayer = window.dataLayer || [];
-function gtag(){dataLayer.push(arguments);}
-
-gtag('js', new Date());
-
-gtag('config', '${GOOGLE_TAG_ID}');
-`.trim(),
+            __html: googleTagBootstrap,
           }}
         />
       </head>

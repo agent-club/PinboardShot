@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import type { ContentPageDefinition } from "@/content/content-pages";
 import currentRelease from "@/content/current-release.json";
 
 export const SITE_URL = "https://pinboardshot.agentclub.dev";
@@ -8,6 +9,7 @@ export const OPENGRAPH_IMAGE_PATH = "/opengraph-image.png";
 export const TWITTER_IMAGE_PATH = "/twitter-image.png";
 export const LLMS_PATH = "/llms.txt";
 export const GOOGLE_TAG_ID = "G-WDBY7TDB0R";
+export const PRIVACY_CONSENT_STORAGE_KEY = "pinboardshot-privacy-consent-v1";
 
 export type SeoLanguage = "zh" | "en";
 
@@ -199,7 +201,7 @@ export function localizedMetadata(language: SeoLanguage): Metadata {
       type: "website",
       locale: entry.locale,
       alternateLocale: language === "zh" ? ["en_US"] : ["zh_CN"],
-      images: [{ url: socialImage, width: 1792, height: 1024, alt: "PinboardShot for macOS" }],
+      images: [{ url: socialImage, width: 1920, height: 990, alt: "PinboardShot for macOS" }],
     },
     twitter: {
       card: "summary_large_image",
@@ -208,6 +210,73 @@ export function localizedMetadata(language: SeoLanguage): Metadata {
       images: [twitterImage],
     },
   };
+}
+
+export function contentPageMetadata(page: ContentPageDefinition): Metadata {
+  const canonical = absoluteUrl(page.path);
+  const socialImage = absoluteUrl(OPENGRAPH_IMAGE_PATH);
+  const twitterImage = absoluteUrl(TWITTER_IMAGE_PATH);
+
+  return {
+    title: page.metaTitle,
+    description: page.description,
+    keywords: seoKeywords,
+    alternates: { canonical },
+    robots: { index: true, follow: true },
+    openGraph: {
+      title: page.metaTitle,
+      description: page.description,
+      url: canonical,
+      siteName: "PinboardShot",
+      type: "article",
+      locale: "zh_CN",
+      images: [{ url: socialImage, width: 1920, height: 990, alt: "PinboardShot for macOS" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: page.metaTitle,
+      description: page.description,
+      images: [twitterImage],
+    },
+  };
+}
+
+export function contentPageStructuredData(page: ContentPageDefinition) {
+  const pageUrl = absoluteUrl(page.path);
+
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "Article",
+      "@id": `${pageUrl}#article`,
+      headline: page.title,
+      description: page.description,
+      inLanguage: "zh-CN",
+      dateModified: page.lastReviewed,
+      mainEntityOfPage: pageUrl,
+      image: absoluteUrl(OPENGRAPH_IMAGE_PATH),
+      author: { "@id": absoluteUrl("/#organization") },
+      publisher: { "@id": absoluteUrl("/#organization") },
+      about: {
+        "@type": "SoftwareApplication",
+        "@id": absoluteUrl("/#software"),
+        name: "PinboardShot",
+        operatingSystem: "macOS 14 or later",
+        softwareVersion: currentRelease.version,
+      },
+      citation: page.sources.map((source) => source.href),
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "@id": `${pageUrl}#breadcrumb`,
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "PinboardShot", item: absoluteUrl("/") },
+        { "@type": "ListItem", position: 2, name: page.categoryLabel },
+        { "@type": "ListItem", position: 3, name: page.title, item: pageUrl },
+      ],
+    },
+  ];
 }
 
 export function structuredData(language: SeoLanguage) {

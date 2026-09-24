@@ -1,5 +1,8 @@
 import currentRelease from "@/content/current-release.json";
+import { CONTENT_PAGES } from "@/content/content-pages";
 import { DOWNLOAD_PATH, GITHUB_URL, SITE_URL, absoluteUrl, localeSeo } from "../seo";
+
+const detailedPages = CONTENT_PAGES.map((page) => `- ${page.title}: ${absoluteUrl(page.path)}`).join("\n");
 
 const content = `# PinboardShot
 
@@ -17,6 +20,12 @@ floating as working references across macOS desktop spaces.
 - Download: ${absoluteUrl(DOWNLOAD_PATH)}
 - Source repository: ${GITHUB_URL}
 - Current release: ${currentRelease.releaseUrl}
+
+## Detailed Guides and Comparisons
+
+These pages are written in Simplified Chinese and include primary-source links:
+
+${detailedPages}
 
 ## Key Facts
 
@@ -41,7 +50,8 @@ floating as working references across macOS desktop spaces.
 - Pin screenshots above other windows across macOS desktop spaces.
 - Control pinned image size, opacity, shadow, and click-through behavior.
 - Export at Native Retina, 720p, 1080p, 2K, 4K, or 8K resolution.
-- Keep the latest 50 captures in local history.
+- Keep 10–250 captures for 1–90 days in configurable local history, with
+  on-device OCR indexing and search.
 - Use Simplified Chinese, Traditional Chinese, or English.
 
 ## System Requirements

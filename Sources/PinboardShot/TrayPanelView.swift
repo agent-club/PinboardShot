@@ -179,6 +179,7 @@ struct TrayPanelView: View {
     @AppStorage("captureCursor") private var captureCursor = false
     @AppStorage(OverlaySafetyPolicy.animationDefaultsKey) private var captureEntranceAnimation = true
     @AppStorage(PinWindowManager.shadowDefaultsKey) private var pinWindowShadow = true
+    @State private var isMoreExpanded = false
 
     private var appVersionLabel: String? {
         guard let version = Bundle.main.object(
@@ -212,10 +213,7 @@ struct TrayPanelView: View {
     }
 
     private var mainPage: some View {
-        ViewThatFits(in: .vertical) {
-            panelPage(scrolls: false)
-            panelPage(scrolls: true)
-        }
+        panelPage(scrolls: true)
     }
 
     private func panelPage(scrolls: Bool) -> some View {
@@ -224,11 +222,21 @@ struct TrayPanelView: View {
             statusNotices
 
             if scrolls {
-                ScrollView {
-                    panelContent
-                        .padding(.bottom, 8)
+                ScrollViewReader { scrollProxy in
+                    ScrollView {
+                        panelContent
+                            .padding(.bottom, 8)
+                    }
+                    .scrollBounceBehavior(.basedOnSize)
+                    .scrollIndicators(.hidden)
+                    .onChange(of: isMoreExpanded) { _, expanded in
+                        if expanded {
+                            withAnimation(.easeInOut(duration: 0.18)) {
+                                scrollProxy.scrollTo("more", anchor: .center)
+                            }
+                        }
+                    }
                 }
-                .scrollIndicators(.hidden)
             } else {
                 panelContent
             }
@@ -242,12 +250,14 @@ struct TrayPanelView: View {
         VStack(spacing: 7) {
             qualityHero
             pinboardPreview
-            quickSettingsOrbit
+            captureSettingsOrbit
+            pinboardSettingsOrbit
             if pinCount > 0 {
                 pinActionsOrbit
             }
             managementToolsOrbit
-            supportToolsOrbit
+            moreOrbit.id("more")
+            appInfoOrbit
             quitOrbit
         }
     }
@@ -336,24 +346,36 @@ struct TrayPanelView: View {
     }
 
     private var qualityHero: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .firstTextBaseline, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Image(systemName: "display")
+                    .font(.system(size: 13, weight: .medium))
+                    .foregroundStyle(OrbitalPalette.secondaryText)
+                    .frame(width: 24, height: 24)
+                    .background(OrbitalPalette.nodeEdge.opacity(0.08), in: RoundedRectangle(cornerRadius: 7))
+
                 Text(L10n.text("preferences.outputQuality"))
                     .font(.system(size: 12, weight: .medium))
                     .foregroundStyle(OrbitalPalette.secondaryText)
 
+                Spacer(minLength: 0)
+
                 Text(selectedCaptureQuality.title)
-                    .font(.system(size: 22, weight: .semibold, design: .rounded))
+                    .font(.system(size: 19, weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(OrbitalPalette.text)
                     .contentTransition(.numericText())
-
-                Spacer(minLength: 0)
             }
 
             QualityRulerControl(selection: captureQualityBinding)
         }
-        .frame(maxWidth: .infinity, minHeight: 54, alignment: .leading)
+        .padding(9)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.white.opacity(0.78), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(OrbitalPalette.nodeEdge.opacity(0.34), lineWidth: 0.6)
+        )
     }
 
     private var captureOrbit: some View {
@@ -493,24 +515,30 @@ struct TrayPanelView: View {
         .clipShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
     }
 
-    private var quickSettingsOrbit: some View {
-        VStack(spacing: 0) {
-            TrayToggleTile(
-                title: L10n.text("tray.setting.includeCursor"),
-                icon: .includeCursor,
-                isOn: $captureCursor,
-                width: 0,
-                height: 0
-            )
-            TrayDivider()
-            TrayToggleTile(
-                title: L10n.text("tray.setting.captureAnimation"),
-                icon: .captureAnimation,
-                isOn: $captureEntranceAnimation,
-                width: 0,
-                height: 0
-            )
-            TrayDivider()
+    private var captureSettingsOrbit: some View {
+        TrayModuleShell(title: L10n.text("menu.capture"), tone: .primary) {
+            VStack(spacing: 0) {
+                TrayToggleTile(
+                    title: L10n.text("tray.setting.includeCursor"),
+                    icon: .includeCursor,
+                    isOn: $captureCursor,
+                    width: 0,
+                    height: 0
+                )
+                TrayDivider()
+                TrayToggleTile(
+                    title: L10n.text("tray.setting.captureAnimation"),
+                    icon: .captureAnimation,
+                    isOn: $captureEntranceAnimation,
+                    width: 0,
+                    height: 0
+                )
+            }
+        }
+    }
+
+    private var pinboardSettingsOrbit: some View {
+        TrayModuleShell(title: L10n.text("tray.section.pinboard"), tone: .pin) {
             TrayToggleTile(
                 title: L10n.text("tray.setting.pinShadow"),
                 icon: .pinShadow,
@@ -519,13 +547,6 @@ struct TrayPanelView: View {
                 height: 0
             )
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 7)
-        .background(Color.white.opacity(0.64), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(OrbitalPalette.nodeEdge.opacity(0.32), lineWidth: 0.6)
-        )
     }
 
     private var pinActionsOrbit: some View {
@@ -560,29 +581,88 @@ struct TrayPanelView: View {
     }
 
     private var managementToolsOrbit: some View {
+        TrayModuleShell(title: L10n.text("tray.section.app"), tone: .neutral) {
+            VStack(spacing: 0) {
+                TrayListRow(title: L10n.text("feature.tools.title"), icon: .toolbarSettings) {
+                    onCommand(.showCaptureTools)
+                }
+                TrayDivider()
+                TrayListRow(title: PreferencesSection.shortcuts.title, icon: .shortcuts) {
+                    onCommand(.showPreferences(.shortcuts))
+                }
+                TrayDivider()
+                TrayListRow(title: PreferencesSection.history.title, icon: .history) {
+                    onCommand(.showPreferences(.history))
+                }
+                TrayDivider()
+                TrayListRow(title: PreferencesSection.watermark.title, icon: .watermarkSettings) {
+                    onCommand(.showPreferences(.watermark))
+                }
+                TrayDivider()
+                TrayListRow(title: L10n.text("tray.customizeToolbar"), icon: .toolbarSettings) {
+                    onCommand(.showPreferences(.toolbar))
+                }
+                TrayDivider()
+                TrayListRow(title: PreferencesSection.general.title, icon: .generalSettings) {
+                    onCommand(.showPreferences(.general))
+                }
+            }
+        }
+    }
+
+    private var moreOrbit: some View {
         VStack(spacing: 0) {
-            TrayListRow(title: L10n.text("feature.tools.title"), icon: .toolbarSettings) {
-                onCommand(.showCaptureTools)
+            Button {
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    isMoreExpanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 10) {
+                    Image(systemName: TrayPanelIcon.detectWatermark.systemName)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(OrbitalPalette.secondaryText)
+                        .frame(width: 23, height: 23)
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(L10n.text("menu.more"))
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(OrbitalPalette.text)
+                        Text(L10n.text("tray.more.subtitle"))
+                            .font(.system(size: 10.5))
+                            .foregroundStyle(OrbitalPalette.secondaryText)
+                    }
+
+                    Spacer(minLength: 4)
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(OrbitalPalette.secondaryText)
+                        .rotationEffect(.degrees(isMoreExpanded ? 90 : 0))
+                }
+                .frame(minHeight: 34)
+                .contentShape(Rectangle())
             }
-            TrayDivider()
-            TrayListRow(title: PreferencesSection.shortcuts.title, icon: .shortcuts) {
-                onCommand(.showPreferences(.shortcuts))
-            }
-            TrayDivider()
-            TrayListRow(title: PreferencesSection.history.title, icon: .history) {
-                onCommand(.showPreferences(.history))
-            }
-            TrayDivider()
-            TrayListRow(title: PreferencesSection.watermark.title, icon: .watermarkSettings) {
-                onCommand(.showPreferences(.watermark))
-            }
-            TrayDivider()
-            TrayListRow(title: L10n.text("tray.customizeToolbar"), icon: .toolbarSettings) {
-                onCommand(.showPreferences(.toolbar))
-            }
-            TrayDivider()
-            TrayListRow(title: PreferencesSection.general.title, icon: .generalSettings) {
-                onCommand(.showPreferences(.general))
+            .buttonStyle(.plain)
+            .accessibilityLabel(L10n.text("menu.more"))
+            .accessibilityValue(isMoreExpanded ? L10n.text("common.enabled") : L10n.text("common.disabled"))
+
+            if isMoreExpanded {
+                TrayDivider()
+                TrayListRow(title: L10n.text("tray.detectWatermark"), icon: .detectWatermark) {
+                    onCommand(.detectWatermark)
+                }
+                TrayDivider()
+                TrayListRow(title: L10n.text("tray.quickStart"), icon: .quickStart) {
+                    onCommand(.showQuickStart)
+                }
+                TrayDivider()
+                TrayListRow(title: L10n.text("tray.letterToUsers"), icon: .letterToUsers) {
+                    onCommand(.showLetterToUsers)
+                }
+                TrayDivider()
+                TrayListRow(title: L10n.text("tray.legalNotices"), icon: .legalNotices) {
+                    onCommand(.showLegalNotices)
+                }
             }
         }
         .padding(.horizontal, 9)
@@ -594,24 +674,8 @@ struct TrayPanelView: View {
         )
     }
 
-    private var supportToolsOrbit: some View {
+    private var appInfoOrbit: some View {
         VStack(spacing: 0) {
-            TrayListRow(title: L10n.text("tray.detectWatermark"), icon: .detectWatermark) {
-                onCommand(.detectWatermark)
-            }
-            TrayDivider()
-            TrayListRow(title: L10n.text("tray.quickStart"), icon: .quickStart) {
-                onCommand(.showQuickStart)
-            }
-            TrayDivider()
-            TrayListRow(title: L10n.text("tray.letterToUsers"), icon: .letterToUsers) {
-                onCommand(.showLetterToUsers)
-            }
-            TrayDivider()
-            TrayListRow(title: L10n.text("tray.legalNotices"), icon: .legalNotices) {
-                onCommand(.showLegalNotices)
-            }
-            TrayDivider()
             TrayListRow(
                 title: L10n.text("tray.checkForUpdates"),
                 icon: .checkForUpdates,
@@ -683,118 +747,33 @@ private enum TrayCommandTileStyle {
 }
 
 private struct QualityRulerControl: View {
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @Binding var selection: CaptureQuality
 
-    private let qualities = CaptureQuality.allCases
-
-    private var selectedIndex: Int {
-        qualities.firstIndex(of: selection) ?? 0
-    }
-
     var body: some View {
-        GeometryReader { proxy in
-            let width = max(1, proxy.size.width)
-            let trackInset: CGFloat = 20
-            let trackY: CGFloat = 26
-            let trackWidth = max(1, width - trackInset * 2)
-            let step = trackWidth / CGFloat(max(qualities.count - 1, 1))
-            let selectedX = trackInset + CGFloat(selectedIndex) * step
-
-            ZStack(alignment: .leading) {
-                Capsule()
-                    .fill(OrbitalPalette.nodeEdge.opacity(0.28))
-                    .frame(width: trackWidth, height: 3)
-                    .position(x: trackInset + trackWidth / 2, y: trackY)
-
-                Capsule()
-                    .fill(OrbitalPalette.blue.opacity(0.82))
-                    .frame(height: 3)
-                    .frame(width: max(0, selectedX - trackInset))
-                    .position(x: trackInset + max(0, selectedX - trackInset) / 2, y: trackY)
-
-                ForEach(Array(qualities.enumerated()), id: \.element.id) { index, quality in
-                    Button {
-                        setQuality(quality)
-                    } label: {
-                        qualityTick(quality, isSelected: quality == selection)
-                    }
-                    .buttonStyle(.plain)
-                    .position(x: trackInset + CGFloat(index) * step, y: 25)
+        HStack(spacing: 1) {
+            ForEach(CaptureQuality.allCases) { quality in
+                Button {
+                    selection = quality
+                } label: {
+                    Text(shortLabel(for: quality))
+                        .font(.system(size: 9.5, weight: quality == selection ? .semibold : .medium, design: .rounded))
+                        .foregroundStyle(quality == selection ? Color.white : OrbitalPalette.secondaryText)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 27)
+                        .background(
+                            quality == selection ? OrbitalPalette.blue : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        )
+                        .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(quality.title)
             }
-            .contentShape(Rectangle())
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        let clampedX = min(max(value.location.x - trackInset, 0), trackWidth)
-                        let index = Int((clampedX / step).rounded())
-                        guard qualities.indices.contains(index) else { return }
-                        setQuality(qualities[index])
-                    }
-            )
         }
-        .frame(height: 48)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 5)
-        .background(Color.white.opacity(0.68), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(OrbitalPalette.nodeEdge.opacity(0.32), lineWidth: 0.6)
-        )
-        .accessibilityElement(children: .ignore)
+        .padding(2)
+        .background(OrbitalPalette.nodeFill, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .accessibilityElement(children: .contain)
         .accessibilityLabel(L10n.text("preferences.outputQuality"))
-        .accessibilityValue(selection.title)
-        .accessibilityAdjustableAction { direction in
-            adjust(direction)
-        }
-        .animation(accessibilityReduceMotion ? nil : .easeOut(duration: 0.16), value: selection)
-    }
-
-    private func qualityTick(_ quality: CaptureQuality, isSelected: Bool) -> some View {
-        VStack(spacing: 5) {
-            ZStack(alignment: .bottom) {
-                Rectangle()
-                    .fill(isSelected ? OrbitalPalette.blue : OrbitalPalette.nodeEdge.opacity(0.60))
-                    .frame(width: isSelected ? 2 : 1, height: isSelected ? 17 : 10)
-
-                if isSelected {
-                    Circle()
-                        .fill(OrbitalPalette.blue)
-                        .frame(width: 10, height: 10)
-                        .offset(y: -15)
-                        .shadow(color: OrbitalPalette.blue.opacity(0.22), radius: 4, y: 1)
-                }
-            }
-            .frame(height: 23, alignment: .bottom)
-
-            Text(shortLabel(for: quality))
-                .font(.system(size: 8.6, weight: isSelected ? .semibold : .medium, design: .rounded))
-                .foregroundStyle(isSelected ? OrbitalPalette.blue : OrbitalPalette.secondaryText)
-                .lineLimit(1)
-                .minimumScaleFactor(0.62)
-                .frame(height: 11)
-        }
-        .frame(width: 46, height: 42, alignment: .top)
-        .contentShape(Rectangle())
-    }
-
-    private func setQuality(_ quality: CaptureQuality) {
-        guard quality != selection else { return }
-        selection = quality
-    }
-
-    private func adjust(_ direction: AccessibilityAdjustmentDirection) {
-        let nextIndex: Int
-        switch direction {
-        case .increment:
-            nextIndex = min(selectedIndex + 1, qualities.count - 1)
-        case .decrement:
-            nextIndex = max(selectedIndex - 1, 0)
-        @unknown default:
-            return
-        }
-        setQuality(qualities[nextIndex])
     }
 
     private func shortLabel(for quality: CaptureQuality) -> String {

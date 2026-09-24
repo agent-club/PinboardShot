@@ -239,6 +239,7 @@ struct HistoryItem: Identifiable, Codable, Hashable, Sendable {
     let pixelWidth: Int
     let pixelHeight: Int
     let sourceApplicationBundleIdentifier: String?
+    var isKept: Bool
     var recognizedText: String?
     var ocrStatus: HistoryOCRStatus
     var ocrIndexedAt: Date?
@@ -250,6 +251,7 @@ struct HistoryItem: Identifiable, Codable, Hashable, Sendable {
         pixelWidth: Int,
         pixelHeight: Int,
         sourceApplicationBundleIdentifier: String? = nil,
+        isKept: Bool = false,
         recognizedText: String? = nil,
         ocrStatus: HistoryOCRStatus = .notIndexed,
         ocrIndexedAt: Date? = nil
@@ -260,6 +262,7 @@ struct HistoryItem: Identifiable, Codable, Hashable, Sendable {
         self.pixelWidth = pixelWidth
         self.pixelHeight = pixelHeight
         self.sourceApplicationBundleIdentifier = sourceApplicationBundleIdentifier
+        self.isKept = isKept
         self.recognizedText = recognizedText
         self.ocrStatus = ocrStatus
         self.ocrIndexedAt = ocrIndexedAt
@@ -272,6 +275,7 @@ struct HistoryItem: Identifiable, Codable, Hashable, Sendable {
         case pixelWidth
         case pixelHeight
         case sourceApplicationBundleIdentifier
+        case isKept
         case recognizedText
         case ocrStatus
         case ocrIndexedAt
@@ -288,6 +292,7 @@ struct HistoryItem: Identifiable, Codable, Hashable, Sendable {
             String.self,
             forKey: .sourceApplicationBundleIdentifier
         )
+        isKept = try container.decodeIfPresent(Bool.self, forKey: .isKept) ?? false
         recognizedText = HistoryOCRTextNormalizer.normalize(
             try container.decodeIfPresent(String.self, forKey: .recognizedText)
         )
@@ -307,6 +312,7 @@ struct HistoryItem: Identifiable, Codable, Hashable, Sendable {
         try container.encode(pixelWidth, forKey: .pixelWidth)
         try container.encode(pixelHeight, forKey: .pixelHeight)
         try container.encodeIfPresent(sourceApplicationBundleIdentifier, forKey: .sourceApplicationBundleIdentifier)
+        try container.encode(isKept, forKey: .isKept)
         try container.encodeIfPresent(recognizedText, forKey: .recognizedText)
         try container.encode(ocrStatus, forKey: .ocrStatus)
         try container.encodeIfPresent(ocrIndexedAt, forKey: .ocrIndexedAt)

@@ -5,11 +5,128 @@ import UniformTypeIdentifiers
 @MainActor
 final class CaptureGuideModel: ObservableObject {
     @Published var guide = CaptureGuide(title: L10n.text("feature.guide.untitled")) {
-        didSet { hasUnsavedChanges = true }
+        didSet {
+            hasUnsavedChanges = true
+            scheduleRecovery()
+        }
     }
     @Published var isCollecting = false
     @Published var hasUnsavedChanges = false
     @Published var selectedID: UUID?
+    @Published var recoveryEnabled = CaptureGuideRecoverySettings.isEnabled()
+    @Published private(set) var hasRecoveryDraft = false
+    @Published private(set) var recoveryError: String?
+    private let recoveryStore = CaptureGuideRecoveryStore()
+    private var recoveryTask: Task<Void, Never>?
+    private var recoveryGeneration = 0
+    // An existing crash draft must be resolved before new edits can replace it.
+    private var isCheckingRecovery = CaptureGuideRecoverySettings.isEnabled()
+    private var isAwaitingRecoveryDecision = false
+
+    init() {
+        if recoveryEnabled {
+            Task { await refreshRecoveryDraft() }
+        }
+    }
+
+    func setRecoveryEnabled(_ enabled: Bool) {
+        recoveryEnabled = enabled
+        UserDefaults.standard.set(enabled, forKey: CaptureGuideRecoverySettings.defaultsKey)
+        recoveryError = nil
+        if enabled {
+            isCheckingRecovery = true
+            Task { await refreshRecoveryDraft() }
+        } else {
+            isCheckingRecovery = false
+            isAwaitingRecoveryDecision = false
+            Task { await clearRecovery() }
+        }
+    }
+
+    func restoreRecovery() async throws {
+        guard let recovered = try await recoveryStore.load() else {
+            hasRecoveryDraft = false
+            isAwaitingRecoveryDecision = false
+            return
+        }
+        isAwaitingRecoveryDecision = false
+        guide = recovered
+        selectedID = recovered.steps.first?.id
+        isCollecting = false
+        hasRecoveryDraft = false
+    }
+
+    func clearRecovery() async {
+        recoveryGeneration += 1
+        let pending = recoveryTask
+        pending?.cancel()
+        recoveryTask = nil
+        await pending?.value
+        do {
+            try await recoveryStore.clear()
+            hasRecoveryDraft = false
+            isAwaitingRecoveryDecision = false
+            recoveryError = nil
+        } catch {
+            recoveryError = L10n.text("feature.guide.recoveryFailed")
+        }
+    }
+
+    func markSaved() {
+        hasUnsavedChanges = false
+        isAwaitingRecoveryDecision = false
+        recoveryGeneration += 1
+        let pending = recoveryTask
+        pending?.cancel()
+        recoveryTask = nil
+        Task {
+            await pending?.value
+            guard !hasUnsavedChanges else { return }
+            do {
+                try await recoveryStore.clear()
+                hasRecoveryDraft = false
+                recoveryError = nil
+            } catch {
+                recoveryError = L10n.text("feature.guide.recoveryFailed")
+            }
+        }
+    }
+
+    private func refreshRecoveryDraft() async {
+        do {
+            hasRecoveryDraft = try await recoveryStore.load() != nil
+            isAwaitingRecoveryDecision = hasRecoveryDraft
+            isCheckingRecovery = false
+            if !hasRecoveryDraft && hasUnsavedChanges { scheduleRecovery() }
+        } catch {
+            hasRecoveryDraft = true
+            isAwaitingRecoveryDecision = true
+            isCheckingRecovery = false
+            recoveryError = L10n.text("feature.guide.recoveryFailed")
+        }
+    }
+
+    private func scheduleRecovery() {
+        guard recoveryEnabled, !isCheckingRecovery, !isAwaitingRecoveryDecision else { return }
+        recoveryGeneration += 1
+        let generation = recoveryGeneration
+        let snapshot = guide
+        recoveryTask?.cancel()
+        recoveryTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(700))
+                try Task.checkCancellation()
+                guard generation == recoveryGeneration, recoveryEnabled else { return }
+                try await recoveryStore.save(snapshot)
+                guard generation == recoveryGeneration else { return }
+                recoveryError = nil
+            } catch is CancellationError {
+                return
+            } catch {
+                recoveryError = L10n.text("feature.guide.recoveryFailed")
+            }
+        }
+    }
 
     func append(_ image: NSImage) throws {
         guard guide.steps.count < 100 else { throw CaptureFeatureError.imageTooLarge }
@@ -308,7 +425,7 @@ private struct CaptureGuideView: View {
     @State private var discardAction: GuideReplacement?
 
     private enum GuideReplacement: String, Identifiable {
-        case new, open
+        case new, open, recover
         var id: String { rawValue }
     }
 
@@ -316,6 +433,22 @@ private struct CaptureGuideView: View {
         VStack(alignment: .leading, spacing: 10) {
             TextField(L10n.text("feature.guide.documentTitle"), text: $model.guide.title).font(.title2)
             Text(L10n.text("feature.guide.help")).foregroundStyle(.secondary)
+            HStack {
+                Toggle(L10n.text("feature.guide.recoveryToggle"), isOn: Binding(
+                    get: { model.recoveryEnabled },
+                    set: { model.setRecoveryEnabled($0) }
+                ))
+                .toggleStyle(.switch)
+                if model.hasRecoveryDraft {
+                    Button(L10n.text("feature.guide.restoreRecovery")) { replace(.recover) }
+                    Button(L10n.text("feature.guide.deleteRecovery")) {
+                        Task { await model.clearRecovery() }
+                    }
+                }
+            }
+            Text(L10n.text("feature.guide.recoveryHelp"))
+                .font(.caption)
+                .foregroundStyle(.secondary)
             HStack {
                 Toggle(L10n.text("feature.guide.collect"), isOn: $model.isCollecting).toggleStyle(.switch)
                 Button(L10n.text("feature.guide.capture")) { model.isCollecting = true; capture() }
@@ -363,6 +496,7 @@ private struct CaptureGuideView: View {
                 Button(L10n.text("feature.export.pdf")) { export(pdf: true) }.disabled(model.guide.steps.isEmpty)
             }
             if let message { Text(message).foregroundStyle(.secondary).textSelection(.enabled) }
+            if let error = model.recoveryError { Text(error).foregroundStyle(.red) }
         }
         .textFieldStyle(.roundedBorder)
         .alert(item: $discardAction) { action in
@@ -383,7 +517,12 @@ private struct CaptureGuideView: View {
             model.guide = CaptureGuide(title: L10n.text("feature.guide.untitled"))
             model.selectedID = nil
             model.isCollecting = false
-            model.hasUnsavedChanges = false
+            model.markSaved()
+        } else if action == .recover {
+            Task {
+                do { try await model.restoreRecovery(); message = nil }
+                catch { message = L10n.text("feature.guide.recoveryFailed") }
+            }
         } else {
             run {
                 let panel = NSOpenPanel()
@@ -396,7 +535,7 @@ private struct CaptureGuideView: View {
                 model.guide = guide
                 model.selectedID = guide.steps.first?.id
                 model.isCollecting = false
-                model.hasUnsavedChanges = false
+                model.markSaved()
             }
         }
     }
@@ -409,7 +548,7 @@ private struct CaptureGuideView: View {
             guard panel.runModal() == .OK, let url = panel.url else { return }
             try model.guide.validate()
             try JSONEncoder().encode(model.guide).write(to: url, options: .atomic)
-            model.hasUnsavedChanges = false
+            model.markSaved()
         }
     }
 

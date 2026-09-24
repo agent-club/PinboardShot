@@ -31,6 +31,9 @@
 "tray.update.later" = "稍後";
 "tray.pinboard.title" = "你的貼圖板";
 "tray.pinboard.subtitle" = "截圖將始終置頂，保持可見。";
+"tray.section.pinboard" = "貼圖板";
+"tray.section.app" = "應用";
+"tray.more.subtitle" = "偵測浮水印、說明與聲明";
 "tray.manageAndTools" = "管理與工具";
 "quality.native" = "原生 Retina";
 "menu.capture" = "截圖";
@@ -86,10 +89,14 @@
 "common.done" = "完成";
 "scrollCapture.title" = "捲動截圖預覽";
 "scrollCapture.selectionHint" = "框選視窗內可捲動的區域 · Esc 取消";
-"scrollCapture.status.ready" = "請在所選區域內向下捲動，完成後按一下「完成」。";
+"scrollCapture.status.ready" = "請在所選區域內向上或向下捲動並保留重疊內容，完成後按一下「完成」。";
 "scrollCapture.status.capturing" = "正在辨識重疊內容並拼接…";
 "scrollCapture.status.revisited" = "正在瀏覽已擷取區域，繼續捲動即可無縫接回。";
-"scrollCapture.status.unmatched" = "暫時無法比對目前畫面，請放慢捲動並保留重疊內容。";
+"scrollCapture.status.unmatched" = "暫時無法比對。請捲回已拼接內容，再緩慢捲動以恢復重疊。";
+"scrollCapture.unmatchedFinish.title" = "最近的內容未能拼接";
+"scrollCapture.unmatchedFinish.help" = "捲回已拼接的畫面後繼續捲動，或只保留目前預覽中的已拼接部分。";
+"scrollCapture.unmatchedFinish.continue" = "繼續擷取";
+"scrollCapture.unmatchedFinish.savePartial" = "保留已拼接部分";
 "scrollCapture.status.limitReached" = "已達到長截圖暫存空間上限，請按一下「完成」。";
 "onboarding.title" = "PinboardShot 已在選單列執行";
 "onboarding.message" = "PinboardShot 不會顯示在 Dock 中。請在選單列找到取景框圖示。\n\n預設不啟用全域快速鍵。可在「設定 → 快速鍵」中按需新增。\n\n截圖需要「螢幕與系統音訊錄製」權限。圖片、標註和記錄保存在本機；只有軟體更新會存取網路。";
@@ -216,6 +223,10 @@
 "preferences.historySearch" = "搜尋辨識文字或尺寸";
 "preferences.deleteHistoryItem" = "刪除這張截圖";
 "preferences.deleteHistoryItemFailed" = "無法刪除截圖：%@";
+"history.keep" = "保留這張截圖，略過自動清理";
+"history.unkeep" = "取消保留，之後依歷史規則清理";
+"history.keepHelp" = "星號截圖不受自動數量與時間清理限制；手動刪除或清空歷史仍會移除它們。";
+"history.keepFailed" = "無法更新截圖保留狀態：%@";
 "preferences.historyPolicyFailed" = "無法套用記錄保留策略：%@";
 "preferences.pinToScreen" = "貼到螢幕";
 "preferences.languageSection" = "語言";
@@ -357,7 +368,7 @@
 "error.invalidSelection" = "截圖選取範圍超出螢幕範圍。";
 "error.emptyCaptureFrame" = "本次截圖被判定為空白畫面，剪貼簿沒有更新，仍保留上一次內容。請重新選擇包含可見內容的區域。";
 "error.scrollTargetUnavailable" = "選取範圍中心沒有找到可持續擷取的視窗。請重新框選視窗內的捲動區域。";
-"error.scrollCaptureNoMovement" = "沒有偵測到可拼接的捲動內容。請開始後向下捲動，再按一下完成。";
+"error.scrollCaptureNoMovement" = "沒有偵測到可拼接的捲動內容。請在所選區域內向上或向下捲動並保留重疊內容。";
 "error.ocrNoText" = "沒有在選取範圍內辨識到可複製的文字。";
 "preferences.trayIcon" = "選單列圖示";
 "preferences.trayIconHelp" = "選擇後立即生效。單色圖示會自動配合淺色與深色選單列；動態圖示會持續變化，開啟「減少動態效果」時保持靜止。";
@@ -440,6 +451,7 @@
 "comparison.exportErrorMessage" = "無法匯出比對結果：%@";
 "pin.compare.needsTwoPins" = "至少需要兩張貼圖才能比對";
 "pin.compare.discoveryHint" = "現在有兩張貼圖了。用右鍵將一張設為基準 A，再用右鍵點另一張開始視覺比對。";
+"pinWorkspace.discoveryHint" = "多張貼圖退出後不會自動恢復。用右鍵點任一貼圖可儲存目前工作區；也可在歷史設定中啟用工作階段復原。";
 "pin.compare.setReference" = "設為比對基準 A";
 "pin.compare.cancelReference" = "取消比對基準";
 "pin.compare.withReference" = "與基準 A 比對";
@@ -569,7 +581,12 @@
 "feature.guide.documentTitle" = "文件標題";
 "feature.guide.stepTitle" = "步驟標題";
 "feature.guide.step" = "步驟 %d";
-"feature.guide.help" = "主動截圖並填寫操作或問題說明，可調整順序。最多 100 步；文件不會自動存檔，請儲存原稿以便下次繼續。關閉視窗會暫停收集，已收集步驟保留到退出應用。";
+"feature.guide.help" = "主動截圖並填寫操作或問題說明，可調整順序。最多 100 步；請儲存原稿以便下次繼續。關閉視窗會暫停收集，已收集步驟保留到退出應用。";
+"feature.guide.recoveryToggle" = "啟用本機當機復原";
+"feature.guide.recoveryHelp" = "開啟後，未儲存原稿會暫存在本機，供意外退出後復原；正常退出時清除，24 小時後自動過期。截圖可能包含敏感資訊。";
+"feature.guide.restoreRecovery" = "復原暫存原稿";
+"feature.guide.deleteRecovery" = "刪除暫存原稿";
+"feature.guide.recoveryFailed" = "暫存原稿儲存或復原失敗；請手動儲存原稿。";
 "feature.guide.collect" = "收集後續截圖";
 "feature.guide.capture" = "截圖新增一步";
 "feature.guide.addCurrent" = "新增目前圖片";
@@ -610,4 +627,6 @@
 "feature.error.noVideoFrames" = "沒有收到可用畫面，請保持錄製區域可見後重試。";
 "feature.record.discardTitle" = "捨棄未儲存的錄影並開始新錄製？";
 "feature.record.discardHelp" = "取消後可在預覽視窗儲存目前影片。";
+"feature.record.closeDiscardTitle" = "關閉並捨棄未儲存的錄影？";
+"feature.record.closeDiscardHelp" = "取消後可返回預覽視窗儲存目前影片。";
 "feature.record.exporting" = "影片正在儲存，請完成後再退出。";

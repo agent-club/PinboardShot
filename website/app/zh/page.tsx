@@ -5,5 +5,5 @@ import { localizedMetadata } from "../seo";
 export const metadata: Metadata = localizedMetadata("zh");
 
 export default function ChinesePage() {
-  return <PinboardShotHome initialLanguage="zh" lockInitialLanguage />;
+  return <PinboardShotHome initialLanguage="zh" />;
 }

@@ -53,6 +53,11 @@ if ! rg -q "releases/download/v${version}/PinboardShot-${version}-${build}\\.zip
   echo "appcast.xml does not point at the expected release ZIP." >&2
   exit 1
 fi
+if ! unzip -Z1 "$archive" | rg -q '^PinboardShot\.app/' || \
+   unzip -Z1 "$archive" | rg -q -v '^PinboardShot\.app/'; then
+  echo "Release ZIP must contain only PinboardShot.app at the top level." >&2
+  exit 1
+fi
 if unzip -l "$archive" | rg -q '(^|/)(Sources|Tests|website|Package\.swift|\.env|AGENTS\.md)(/|$)'; then
   echo "Release ZIP contains source, website, project metadata, or sensitive-looking files." >&2
   exit 1

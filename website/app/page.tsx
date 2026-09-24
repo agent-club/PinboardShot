@@ -1,21 +1,66 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SpatialShowcase } from "./_components/spatial-showcase";
+import { PinWorkbench } from "./_components/pin-workbench";
 import currentRelease from "@/content/current-release.json";
-import { DOWNLOAD_PATH, GOOGLE_TAG_ID, geoContent, structuredData, type SeoLanguage } from "./seo";
+import {
+  DOWNLOAD_PATH,
+  GOOGLE_TAG_ID,
+  PRIVACY_CONSENT_STORAGE_KEY,
+  geoContent,
+  structuredData,
+  type SeoLanguage,
+} from "./seo";
 
 type Language = SeoLanguage;
 
 const releaseUrl = currentRelease.releaseUrl;
 const primaryDownloadUrl = DOWNLOAD_PATH;
 const githubUrl = "https://github.com/agent-club/PinboardShot";
-const privacyConsentStorageKey = "pinboardshot-privacy-consent-v1";
 const showcaseImages = [
   { src: "/showcase/snow-mountain.jpg" },
   { src: "/showcase/blossoms.jpg" },
   { src: "/showcase/sunset.jpg" },
   { src: "/showcase/lakeside-panel.jpg" },
 ];
+
+const featureGuideLinks = [
+  {
+    href: "/features/scrolling-screenshot",
+    zhTitle: "滚动截图",
+    enTitle: "Scrolling screenshot",
+    zhBody: "手动滚动、实时预览和本地重叠拼接。",
+    enBody: "Manual scrolling, live preview, and local overlap stitching.",
+  },
+  {
+    href: "/features/screen-pinning",
+    zhTitle: "屏幕贴图",
+    enTitle: "Screen pinning",
+    zhBody: "透明度、鼠标穿透、工作区和成对比较。",
+    enBody: "Opacity, click-through, workspaces, and paired comparison.",
+  },
+  {
+    href: "/features/local-ocr-history",
+    zhTitle: "本地 OCR 历史",
+    enTitle: "Local OCR history",
+    zhBody: "10–250 条、1–90 天可配置的本地搜索历史。",
+    enBody: "Configurable local search history: 10–250 items for 1–90 days.",
+  },
+  {
+    href: "/use-cases/design-review",
+    zhTitle: "设计评审工作流",
+    enTitle: "Design review workflow",
+    zhBody: "从捕捉、标注和贴图，到比较与导出。",
+    enBody: "From capture and annotation to pinning, comparison, and export.",
+  },
+] as const;
+
+const comparisonGuideLinks = [
+  { href: "/compare/pinboardshot-vs-shottr", name: "Shottr" },
+  { href: "/compare/pinboardshot-vs-snipaste", name: "Snipaste" },
+  { href: "/compare/pinboardshot-vs-cleanshot-x", name: "CleanShot X" },
+] as const;
 
 function GitHubIcon() {
   return (
@@ -80,8 +125,8 @@ function CaptureDemoScene({
 const copy = {
   zh: {
     nav: { features: "功能", workflow: "使用方式", compare: "原则", privacy: "隐私", faq: "问答", changelog: "更新日志", download: "下载" },
-    eyebrow: "为 macOS 精心打造",
-    title: "截图，然后\n留在眼前",
+    eyebrow: "CAPTURE. ANNOTATE. LEVITATE.",
+    title: "打破屏幕\n边界。",
     intro: "原生 macOS 截图、标注与贴图工具，从框选到马赛克、文字和贴屏，全程只在本机完成",
     download: "下载 DMG",
     learn: "看看它能做什么",
@@ -130,7 +175,7 @@ const copy = {
     pinStatus: ["正在框选", "正在标注", "已贴到桌面", "鼠标穿透已开启"],
     comparisonEyebrow: "PRODUCT PRINCIPLES",
     comparisonTitle: "不是更多按钮，\n而是更清楚的取舍",
-    comparisonBody: "PinboardShot 选择更窄的 Mac 工作流：截图、标注、贴住参考，并把外部网络和数据流转保持到最低。页面不借其他产品做对照营销，只说明自己的边界。",
+    comparisonBody: "PinboardShot 选择更窄的 Mac 工作流：截图、标注、贴住参考，并把外部网络和数据流转保持到最低。独立对比页只采用各产品官方公开资料，标明核对日期，也把未知项保留为未知。",
     comparisonCards: [
       {
         name: "Local-first",
@@ -211,7 +256,7 @@ const copy = {
       "Mac、macOS、Retina、Apple、Apple Silicon、Developer ID 和 Apple 公证为 Apple Inc. 在美国及其他国家和地区的商标或服务标记。PinboardShot 与 Apple Inc. 无隶属、赞助或背书关系。GitHub 名称与标识归 GitHub, Inc. 所有，本站仅用于链接项目仓库。",
     privacyConsent: {
       title: "隐私选择",
-      body: "本站默认使用 Google tag 做基础访问衡量，不启用广告个性化。你可以关闭分析；我们会保存语言偏好和这次选择，托管、更新与下载服务可能处理必要访问日志。",
+      body: "本站默认使用 Google tag 做基础访问衡量，不启用广告个性化。你可以关闭分析；我们会保存这次选择，托管、更新与下载服务可能处理必要访问日志。",
       privacy: "查看隐私条款",
       essential: "关闭分析",
       accept: "保持开启",
@@ -219,8 +264,8 @@ const copy = {
   },
   en: {
     nav: { features: "Features", workflow: "How it works", compare: "Principles", privacy: "Privacy", faq: "FAQ", changelog: "Changelog", download: "Download" },
-    eyebrow: "Crafted for macOS",
-    title: "Capture it.\nKeep it in sight.",
+    eyebrow: "CAPTURE. ANNOTATE. LEVITATE.",
+    title: "Beyond the\nscreen.",
     intro: "A native capture, annotation, and pinboard tool for macOS. From selection to markup and pinning, everything stays on your Mac.",
     download: "Download DMG",
     learn: "See what it can do",
@@ -269,7 +314,7 @@ const copy = {
     pinStatus: ["Selecting area", "Annotating", "Pinned to desktop", "Click-through enabled"],
     comparisonEyebrow: "PRODUCT PRINCIPLES",
     comparisonTitle: "Not more buttons.\nClearer tradeoffs.",
-    comparisonBody: "PinboardShot chooses a narrower Mac workflow: capture, annotate, keep references visible, and keep network and data movement minimal. This page avoids positioning the app as another product's replacement and describes its own boundaries instead.",
+    comparisonBody: "PinboardShot chooses a narrower Mac workflow: capture, annotate, keep references visible, and keep network and data movement minimal. Detailed comparisons use official public sources, include a review date, and leave unknowns as unknowns.",
     comparisonCards: [
       {
         name: "Local-first",
@@ -350,7 +395,7 @@ const copy = {
       "Mac, macOS, Retina, Apple, Apple Silicon, Developer ID, and Apple notarization are trademarks or service marks of Apple Inc., registered in the U.S. and other countries and regions. PinboardShot is not affiliated with, sponsored by, or endorsed by Apple Inc. The GitHub name and mark belong to GitHub, Inc. and are used only to link to the project repository.",
     privacyConsent: {
       title: "Privacy choices",
-      body: "This site uses Google tag for basic visit measurement by default and does not enable ad personalization. You can turn analytics off; we store your language preference and this choice, and hosting, update, and download services may process necessary access logs.",
+      body: "This site uses Google tag for basic visit measurement by default and does not enable ad personalization. You can turn analytics off; we store this choice, and hosting, update, and download services may process necessary access logs.",
       privacy: "Read the privacy policy",
       essential: "Turn analytics off",
       accept: "Keep on",
@@ -360,12 +405,10 @@ const copy = {
 
 export function PinboardShotHome({
   initialLanguage = "zh",
-  lockInitialLanguage = false,
 }: {
   initialLanguage?: Language;
-  lockInitialLanguage?: boolean;
 }) {
-  const [language, setLanguage] = useState<Language>(initialLanguage);
+  const language = initialLanguage;
   const [demoStep, setDemoStep] = useState(0);
   const [demoPaused, setDemoPaused] = useState(false);
   const [showPrivacyConsent, setShowPrivacyConsent] = useState(true);
@@ -373,19 +416,10 @@ export function PinboardShotHome({
   const geo = geoContent[language];
   const jsonLd = structuredData(language);
 
-  /** Hydrate the visitor's local language preference after the server-rendered Chinese default. */
+  /** Keep the document language aligned with the URL, including client-side navigation. */
   useEffect(() => {
     document.documentElement.lang = language === "zh" ? "zh-CN" : "en";
-    if (lockInitialLanguage) return;
-
-    const frame = window.requestAnimationFrame(() => {
-      const saved = window.localStorage.getItem("pinboardshot-language") as Language | null;
-      const detected: Language = navigator.language.toLowerCase().startsWith("zh") ? "zh" : "en";
-      setLanguage(saved === "zh" || saved === "en" ? saved : detected);
-    });
-
-    return () => window.cancelAnimationFrame(frame);
-  }, [language, lockInitialLanguage]);
+  }, [language]);
 
   /** Advance the product story unless the visitor is interacting or prefers reduced motion. */
   useEffect(() => {
@@ -396,23 +430,16 @@ export function PinboardShotHome({
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
-      const saved = window.localStorage.getItem(privacyConsentStorageKey);
+      const saved = window.localStorage.getItem(PRIVACY_CONSENT_STORAGE_KEY);
       setShowPrivacyConsent(saved !== "accepted" && saved !== "essential");
     });
 
     return () => window.cancelAnimationFrame(frame);
   }, []);
 
-  /** Keep explicit language choices stable across return visits. */
-  const selectLanguage = (next: Language) => {
-    setLanguage(next);
-    window.localStorage.setItem("pinboardshot-language", next);
-    document.documentElement.lang = next === "zh" ? "zh-CN" : "en";
-  };
-
   const savePrivacyConsent = (choice: "accepted" | "essential") => {
-    window.localStorage.setItem(privacyConsentStorageKey, choice);
-    const analyticsWindow = window as typeof window & { [key: string]: boolean; gtag?: (...args: unknown[]) => void };
+    window.localStorage.setItem(PRIVACY_CONSENT_STORAGE_KEY, choice);
+    const analyticsWindow = window as typeof window & { [key: `ga-disable-${string}`]: boolean; gtag?: (...args: unknown[]) => void };
     analyticsWindow[`ga-disable-${GOOGLE_TAG_ID}`] = choice === "essential";
     const gtag = analyticsWindow.gtag;
     gtag?.("consent", "update", {
@@ -442,9 +469,9 @@ export function PinboardShotHome({
         </nav>
         <div className="header-actions">
           <div className="language-switch" aria-label={language === "zh" ? "语言" : "Language"}>
-            <button className={language === "zh" ? "active" : ""} onClick={() => selectLanguage("zh")} aria-pressed={language === "zh"}>中文</button>
+            <a className={language === "zh" ? "active" : ""} href="/zh" hrefLang="zh-CN" lang="zh-CN" aria-current={language === "zh" ? "page" : undefined}>中文</a>
             <span aria-hidden="true">/</span>
-            <button className={language === "en" ? "active" : ""} onClick={() => selectLanguage("en")} aria-pressed={language === "en"}>EN</button>
+            <a className={language === "en" ? "active" : ""} href="/en" hrefLang="en" lang="en" aria-current={language === "en" ? "page" : undefined}>EN</a>
           </div>
           <a className="icon-link" href={githubUrl} target="_blank" rel="noreferrer" aria-label={content.repo}>
             <GitHubIcon />
@@ -465,46 +492,17 @@ export function PinboardShotHome({
           <p className="requirement">{content.requirement}</p>
         </div>
 
-        <div
-          className={`hero-showcase demo-step-${demoStep}`}
-          onMouseEnter={() => setDemoPaused(true)}
-          onMouseLeave={() => setDemoPaused(false)}
-          onFocus={() => setDemoPaused(true)}
-          onBlur={() => setDemoPaused(false)}
-        >
-          <div className="hero-step-nav" role="tablist" aria-label={language === "zh" ? "主操作步骤" : "Main interaction steps"}>
-            {content.workflow.map(([number, title], index) => (
-              <button
-                key={number}
-                type="button"
-                role="tab"
-                aria-selected={demoStep === index}
-                className={demoStep === index ? "active" : ""}
-                onClick={() => setDemoStep(index)}
-              >
-                <span>{number}</span><strong>{title}</strong>
-              </button>
-            ))}
-          </div>
-          <CaptureDemoScene demoStep={demoStep} content={content} compact />
-        </div>
+        <SpatialShowcase language={language} />
+        <div className="hero-scroll"><span>SCROLL TO EXPLORE</span><span aria-hidden="true">↓</span><span>BUILT FOR FOCUS. DESIGNED TO FLOAT.</span></div>
       </section>
 
-      <section className="distribution section" aria-labelledby="distribution-title">
-        <div className="distribution-copy">
-          <p className="eyebrow"><span />{content.distributionEyebrow}</p>
-          <h2 id="distribution-title">{content.distributionTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
-          <p>{content.distributionBody}</p>
-          <div className="distribution-links">
-            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.checksum}</a>
-            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.source}</a>
-          </div>
+      <section className="workflow section" id="workflow">
+        <div className="workflow-heading">
+          <div><p className="eyebrow"><span />{content.pinEyebrow}</p><h2>{language === "zh" ? <>你的桌面。<span>重新定义。</span></> : <>Your desktop.<span>Redefined.</span></>}</h2></div>
+          <p>{content.pinBody}</p>
         </div>
-        <div className="install-card">
-          <strong>{content.previewBadge}</strong>
-          <ol>{content.distributionSteps.map((step) => <li key={step}>{step}</li>)}</ol>
-          <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
-        </div>
+        <PinWorkbench language={language} />
+        <div className="pin-stats">{content.pinStats.map(([label, value]) => <span key={label}><small>{label}</small><strong>{value}</strong></span>)}</div>
       </section>
 
       <section className="features section" id="features">
@@ -542,23 +540,15 @@ export function PinboardShotHome({
             <article key={title}><span>0{index + 5}</span><h3>{title}</h3><p>{body}</p></article>
           ))}
         </div>
-      </section>
-
-      <section className={`workflow section pin-scene-${demoStep}`} id="workflow">
-        <div className="workflow-copy">
-          <p className="eyebrow light"><span />{content.pinEyebrow}</p>
-          <h2>{content.pinTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
-          <p className="workflow-intro">{content.pinBody}</p>
-          <div className="pin-stats">{content.pinStats.map(([label, value]) => <span key={label}><small>{label}</small><strong>{value}</strong></span>)}</div>
-        </div>
-        <div className="pin-playground" role="img" aria-label={language === "zh" ? "多张贴图、透明度和鼠标穿透动态演示" : "Animated demo of multiple pins, opacity, and click-through"}>
-          <div className="playground-grid" />
-          <div className="floating-pin pin-one"><div className="mini-bar"><i /><i /><i /></div><div className="pin-gradient pin-gradient-a"><ShowcasePhoto src={showcaseImages[2].src} /></div></div>
-          <div className="floating-pin pin-two"><div className="mini-bar"><i /><i /><i /></div><div className="pin-lines"><ShowcasePhoto src={showcaseImages[1].src} /></div></div>
-          <div className="floating-pin pin-three"><div className="mini-bar"><i /><i /><i /></div><div className="pin-gradient pin-gradient-b"><ShowcasePhoto src={showcaseImages[3].src} /></div></div>
-          <div className="opacity-control"><span>{language === "zh" ? "透明度" : "Opacity"}</span><div><i /></div><strong>64%</strong></div>
-          <div className="passthrough-badge"><i>↗</i><span>{language === "zh" ? "鼠标穿透" : "Click-through"}</span><strong>{language === "zh" ? "已开启" : "On"}</strong></div>
-          <div className="playground-cursor">↖</div>
+        <div className="topic-link-grid" aria-label={language === "zh" ? "功能专题" : "Feature guides in Chinese"}>
+          {featureGuideLinks.map((guide) => (
+            <a href={guide.href} key={guide.href}>
+              <small>{language === "zh" ? "功能专题" : "Chinese guide"}</small>
+              <strong>{language === "zh" ? guide.zhTitle : guide.enTitle}</strong>
+              <p>{language === "zh" ? guide.zhBody : guide.enBody}</p>
+              <span>{language === "zh" ? "查看详情 →" : "Read the guide →"}</span>
+            </a>
+          ))}
         </div>
       </section>
 
@@ -588,6 +578,16 @@ export function PinboardShotHome({
         </div>
         <div className="comparison-summary">
           {content.comparisonSummary.map((item) => <span key={item}>{item}</span>)}
+        </div>
+        <div className="topic-link-grid comparison-links" aria-label={language === "zh" ? "产品对比" : "Product comparisons in Chinese"}>
+          {comparisonGuideLinks.map((guide) => (
+            <a href={guide.href} key={guide.href}>
+              <small>{language === "zh" ? "官方资料对比" : "Chinese comparison"}</small>
+              <strong>PinboardShot vs {guide.name}</strong>
+              <p>{language === "zh" ? "按功能、许可、隐私和产品边界逐项核对。" : "A sourced review of features, licensing, privacy, and product boundaries."}</p>
+              <span>{language === "zh" ? "查看对比 →" : "Read the comparison →"}</span>
+            </a>
+          ))}
         </div>
       </section>
 
@@ -676,6 +676,23 @@ export function PinboardShotHome({
               </a>
             </article>
           ))}
+        </div>
+      </section>
+
+      <section className="distribution section" aria-labelledby="distribution-title">
+        <div className="distribution-copy">
+          <p className="eyebrow"><span />{content.distributionEyebrow}</p>
+          <h2 id="distribution-title">{content.distributionTitle.split("\n").map((line) => <span key={line}>{line}</span>)}</h2>
+          <p>{content.distributionBody}</p>
+          <div className="distribution-links">
+            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.checksum}</a>
+            <a href={releaseUrl} target="_blank" rel="noreferrer">{content.source}</a>
+          </div>
+        </div>
+        <div className="install-card">
+          <strong>{content.previewBadge}</strong>
+          <ol>{content.distributionSteps.map((step) => <li key={step}>{step}</li>)}</ol>
+          <a className="button button-primary" href={primaryDownloadUrl}>{content.download}<span aria-hidden="true">↓</span></a>
         </div>
       </section>
 

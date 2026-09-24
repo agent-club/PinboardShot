@@ -1,4 +1,5 @@
 import { absoluteUrl, localeSeo, releaseIsoDate } from "../seo";
+import { CONTENT_PAGES } from "@/content/content-pages";
 
 const languageAlternates = [
   ["zh-CN", absoluteUrl(localeSeo.zh.path)],
@@ -6,12 +7,19 @@ const languageAlternates = [
   ["x-default", absoluteUrl("/")],
 ] as const;
 
-const crawlablePages = [
-  { path: "/", alternates: true },
-  { path: localeSeo.zh.path, alternates: true },
-  { path: localeSeo.en.path, alternates: true },
-  { path: "/privacy", alternates: false },
-] as const;
+type CrawlablePage = { path: string; alternates: boolean; lastModified: string };
+
+const crawlablePages: readonly CrawlablePage[] = [
+  { path: "/", alternates: true, lastModified: releaseIsoDate() },
+  { path: localeSeo.zh.path, alternates: true, lastModified: releaseIsoDate() },
+  { path: localeSeo.en.path, alternates: true, lastModified: releaseIsoDate() },
+  { path: "/privacy", alternates: false, lastModified: "2026-08-23" },
+  ...CONTENT_PAGES.map((page) => ({
+    path: page.path,
+    alternates: false,
+    lastModified: page.lastReviewed,
+  })),
+];
 
 function escapeXml(value: string) {
   return value
@@ -22,7 +30,7 @@ function escapeXml(value: string) {
     .replaceAll("'", "&apos;");
 }
 
-function renderUrlEntry(page: (typeof crawlablePages)[number]) {
+function renderUrlEntry(page: CrawlablePage) {
   const alternateLinks = page.alternates
     ? languageAlternates
         .map(([hreflang, href]) => `<xhtml:link rel="alternate" hreflang="${hreflang}" href="${escapeXml(href)}" />`)
@@ -33,7 +41,7 @@ function renderUrlEntry(page: (typeof crawlablePages)[number]) {
     "<url>",
     `<loc>${escapeXml(absoluteUrl(page.path))}</loc>`,
     alternateLinks,
-    `<lastmod>${releaseIsoDate()}</lastmod>`,
+    `<lastmod>${page.lastModified}</lastmod>`,
     "</url>",
   ]
     .filter(Boolean)
