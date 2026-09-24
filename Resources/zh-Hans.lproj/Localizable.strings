@@ -31,6 +31,9 @@
 "tray.update.later" = "稍后";
 "tray.pinboard.title" = "你的贴图板";
 "tray.pinboard.subtitle" = "截图将始终置顶，保持可见。";
+"tray.section.pinboard" = "贴图板";
+"tray.section.app" = "应用";
+"tray.more.subtitle" = "检测水印、帮助与声明";
 "tray.manageAndTools" = "管理与工具";
 "quality.native" = "原生 Retina";
 "menu.capture" = "截图";

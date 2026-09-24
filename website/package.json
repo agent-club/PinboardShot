@@ -18,13 +18,16 @@
     "check:cloudflare": "vinext check",
     "deploy:dry-run": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext deploy --dry-run",
     "deploy": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext deploy",
-    "db:generate": "drizzle-kit generate"
+    "db:generate": "drizzle-kit generate",
+    "generate:brand": "node scripts/generate-brand.mjs",
+    "generate:spatial-art": "node scripts/generate-spatial-art.mjs"
   },
   "dependencies": {
     "drizzle-orm": "0.45.2",
     "next": "16.3.3",
     "react": "19.2.8",
-    "react-dom": "19.2.8"
+    "react-dom": "19.2.8",
+    "three": "0.180.0"
   },
   "pnpm": {
     "overrides": {
@@ -49,6 +52,7 @@
     "@types/node": "26.4.0",
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
+    "@types/three": "0.180.0",
     "@vitejs/plugin-react": "6.1.0",
     "@vitejs/plugin-rsc": "0.5.34",
     "drizzle-kit": "0.31.10",

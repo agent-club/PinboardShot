@@ -31,6 +31,9 @@
 "tray.update.later" = "Later";
 "tray.pinboard.title" = "Your Pinboard";
 "tray.pinboard.subtitle" = "Screenshots stay pinned and visible.";
+"tray.section.pinboard" = "Pinboard";
+"tray.section.app" = "App";
+"tray.more.subtitle" = "Watermark detection, help & notices";
 "tray.manageAndTools" = "Manage & Tools";
 "quality.native" = "Native Retina";
 "menu.capture" = "Capture";

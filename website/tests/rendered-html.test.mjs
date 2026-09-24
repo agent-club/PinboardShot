@@ -268,7 +268,7 @@ test("server-renders substantial localized Chinese HTML", async () => {
 
   const text = visibleText(html);
   assert.ok(text.length > 3000);
-  assert.match(text, /截图，然后/);
+  assert.match(text, /打破屏幕\s*边界/);
   assert.match(text, /原生 macOS 截图、标注与贴图工具/);
   assert.match(text, /默认本机处理，\s*远程 OCR 由你决定/);
   assert.match(text, /PinboardShot 是什么？/);
@@ -307,7 +307,7 @@ test("server-renders the localized English page", async () => {
 
   const text = visibleText(html);
   assert.ok(text.length > 3000);
-  assert.match(text, /Capture it\. Keep it in sight\./);
+  assert.match(text, /Beyond the\s*screen\./);
   assert.match(text, /native capture, annotation, and pinboard tool for macOS/i);
   assert.match(text, /Local by default\. Remote OCR is your choice\./);
 });
@@ -410,4 +410,18 @@ test("serves stable download and social asset aliases", async () => {
   const appleTouchIcon = await render("/apple-touch-icon.png", "image/png");
   assert.equal(appleTouchIcon.status, 308);
   assert.equal(appleTouchIcon.headers.get("location"), "https://pinboardshot.example/apple-icon.png");
+});
+
+
+test("keeps the spatial homepage usable in server-rendered HTML before WebGL loads", async () => {
+  for (const path of ["/zh", "/en"]) {
+    const response = await render(path);
+    const html = await response.text();
+    assert.match(html, /src="\/showcase\/chromatic\.svg"/);
+    assert.match(html, /src="\/showcase\/fluid\.svg"/);
+    assert.match(html, /id="pin-opacity"[^>]*type="range"|type="range"[^>]*id="pin-opacity"/);
+    assert.match(html, /role="switch"[^>]*aria-checked="false"/);
+    assert.match(html, /href="\/download"/);
+    assert.doesNotMatch(html, /<canvas\b|cdn\.jsdelivr\.net|unpkg\.com/);
+  }
 });

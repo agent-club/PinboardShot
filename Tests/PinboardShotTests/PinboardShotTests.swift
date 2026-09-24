@@ -113,7 +113,7 @@ func trayPanelHeightFollowsContentAndScreen() {
     #expect(TrayPanelMetrics.height(preferredHeight: 809, availableHeight: 700) == 676)
 }
 
-@Test("托盘普通状态按首选高度完整展示，无需滚动")
+@Test("托盘按首选高度展示，并保留展开菜单的滚动能力")
 @MainActor
 func trayPanelShowsAllContentWithoutScrolling() {
     let sizingPanel = TrayPanelView(
@@ -165,7 +165,11 @@ func trayPanelShowsAllContentWithoutScrolling() {
 
     hostingView.layoutSubtreeIfNeeded()
 
-    #expect(!containsScrollView(hostingView))
+    #expect(TrayPanelMetrics.height(
+        preferredHeight: preferredHeight,
+        availableHeight: preferredHeight + TrayPanelMetrics.screenVerticalMargin
+    ) == preferredHeight)
+    #expect(containsScrollView(hostingView))
 }
 
 @Test("托盘仅在屏幕高度不足时启用滚动")
