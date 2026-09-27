@@ -393,7 +393,7 @@
 "preferences.trayIcon.animatedCamera" = "動態相機";
 "preferences.trayIcon.colorfulViewfinder" = "彩色取景框";
 "preferences.trayIcon.colorfulCamera" = "彩色相機";
-"preferences.trayIcon.solCrafted" = "GPT-5.6 Sol 星芒";
+"preferences.trayIcon.solCrafted" = "霓虹圖釘";
 "watermark.preferences.tab" = "浮水印";
 "watermark.preferences.section" = "隱形取證浮水印";
 "watermark.preferences.enabled" = "為新截圖嵌入隱形浮水印";
@@ -579,6 +579,12 @@
 "feature.ocr.help" = "使用本機辨識，可直接修改預覽後複製。表格欄由文字位置推斷，請核對空儲存格和合併儲存格；Markdown 預設首列為表頭。重新辨識會替換預覽中的修改。";
 "feature.ocr.recognize" = "重新辨識";
 "feature.ocr.empty" = "沒有辨識到文字。";
+"feature.qr.title" = "二維碼辨識";
+"feature.qr.recognize" = "重新辨識";
+"feature.qr.help" = "在本機辨識圖片中的二維碼。結果不會自動開啟或上傳；你可以複製內容，或主動開啟網頁連結。";
+"feature.qr.result" = "二維碼 %d";
+"feature.qr.open" = "開啟連結";
+"feature.qr.empty" = "沒有辨識到二維碼。";
 "feature.guide.title" = "步驟文件";
 "feature.guide.untitled" = "操作步驟";
 "feature.guide.documentTitle" = "文件標題";
@@ -643,10 +649,10 @@
 "scrollCapture.auto.start" = "開始自動截圖";
 "scrollCapture.auto.ready" = "可手動捲動截圖，或點擊「開始自動截圖」。";
 "scrollCapture.auto.pointer" = "請將滑鼠移回選區以自動捲動；移出選區會暫停捲動，不會移動你的滑鼠。";
-"scrollCapture.auto.pause" = "暫停";
-"scrollCapture.auto.resume" = "繼續自動捲動";
+"scrollCapture.auto.pause" = "暫停截圖";
+"scrollCapture.auto.resume" = "繼續截圖";
 "scrollCapture.auto.running" = "正在自動捲動，確認畫面接上後繼續。可隨時暫停或完成。";
-"scrollCapture.auto.user" = "已暫停自動捲動，可手動調整；點擊「開始自動截圖」恢復。";
+"scrollCapture.auto.user" = "截圖已暫停，點擊「繼續截圖」恢復。";
 "scrollCapture.auto.unmatched" = "畫面尚未對齊，已暫停自動捲動。請捲回最後確認的畫面後繼續。";
 "scrollCapture.auto.stalled" = "擷取暫未跟上，已暫停自動捲動。畫面穩定後可繼續，或完成目前截圖。";
 "scrollCapture.auto.noMovement" = "未偵測到捲動。請確認選取區域內是可捲動正文，再繼續或重新框選。";
@@ -655,12 +661,12 @@
 
 "browserExtension.title" = "Chrome 網頁長截圖";
 "browserExtension.help" = "網頁由 Chrome 插件按實際捲動座標截取，並在本機回傳編輯。插件需在 Chrome 中由你啟用。";
-"browserExtension.prepare" = "設定 Chrome 插件";
-"browserExtension.setupTitle" = "連接 Chrome 與 PinboardShot";
-"browserExtension.setupHelp" = "將註冊本機接收通道，並把插件匯出到「下載」資料夾。圖片僅在本機傳輸。插件尚未上架 Chrome 商店，需要你在擴充功能頁面開啟開發者模式並載入匯出的資料夾。";
-"browserExtension.connect" = "連接並匯出插件";
+"browserExtension.prepare" = "一鍵下載 Chrome 插件";
+"browserExtension.setupTitle" = "請先安裝 Chrome 長截圖插件";
+"browserExtension.setupHelp" = "Chrome 網頁長截圖需要插件。點擊「一鍵下載插件」，檔案會儲存到「下載」目錄。請在 Chrome 安裝並啟用插件，安裝完成後重新開始長截圖。若你已經安裝並啟用了插件，可確認後開始截圖。";
+"browserExtension.connect" = "一鍵下載插件";
 "browserExtension.readyTitle" = "插件已放入下載資料夾";
-"browserExtension.readyHelp" = "插件已匯出，路徑已複製：\n%@\n\n在 Chrome 開啟 chrome://extensions，開啟開發者模式，點擊「載入未封裝項目」。直接從「下載」選擇 PinboardShot-Chrome 資料夾；也可以按 ⌘⇧G 貼上已複製的路徑。請保留這個資料夾，Chrome 會從中執行插件。";
+"browserExtension.readyHelp" = "插件已下載，路徑已複製：\n%@\n\n在 Chrome 開啟 chrome://extensions，開啟開發者模式，點擊「載入未封裝項目」。從「下載」選擇此 PinboardShot-Chrome 資料夾；也可以按 ⌘⇧G 貼上已複製的路徑。請保留這個資料夾，Chrome 會從中執行插件。\n\n安裝並啟用插件後，請回到目標網頁，再次開始長截圖，並確認「已安裝，開始截圖」。";
 "browserExtension.importFailed" = "無法匯入網頁長截圖。頁面尺寸發生變化、圖片不完整或超出尺寸上限，請重新截圖。";
 
 "browserExtension.start" = "啟動 Chrome 網頁長截圖";
@@ -671,3 +677,11 @@
 
 "browserExtension.autoStart" = "開始自動截屏";
 "browserExtension.detectedHelp" = "已識別 Chrome。點擊開始後由插件自動擷取目前分頁的整頁內容，再回傳編輯；截圖範圍不限於目前選取區域。";
+"scrollCapture.stop" = "停止截圖";
+"scrollCapture.pausing" = "正在暫停截圖…";
+"scrollCapture.paused" = "截圖已暫停";
+"scrollCapture.stopping" = "正在停止並儲存截圖…";
+"browserExtension.controlWaiting" = "正在等待 Chrome 截圖擴充功能…";
+"browserExtension.controlUnavailable" = "無法連接 Chrome 截圖插件。請確認插件已安裝並啟用；更新插件後需重新載入。完成後請重新開始長截圖。";
+
+"browserExtension.installedStart" = "已安裝，開始截圖";

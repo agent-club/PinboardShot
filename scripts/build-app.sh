@@ -25,6 +25,7 @@ mkdir -p .build/app/PinboardShot.app/Contents/Resources/ChromeExtension
 cp browser-extension/manifest.json browser-extension/*.js browser-extension/*.html browser-extension/*.css \
   .build/app/PinboardShot.app/Contents/Resources/ChromeExtension/
 cp -R browser-extension/lib .build/app/PinboardShot.app/Contents/Resources/ChromeExtension/
+cp -R browser-extension/icons .build/app/PinboardShot.app/Contents/Resources/ChromeExtension/
 if [[ -d browser-extension/_locales ]]; then
   cp -R browser-extension/_locales .build/app/PinboardShot.app/Contents/Resources/ChromeExtension/
 fi

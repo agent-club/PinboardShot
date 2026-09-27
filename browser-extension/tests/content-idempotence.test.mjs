@@ -85,3 +85,25 @@ test("re-injecting the content script keeps a single message listener across rep
   assert.equal(windowListeners.get("keydown"), 0);
   assert.equal(listeners.length, 1);
 });
+
+test("scroll replies even when Chrome suspends animation frames", async () => {
+  const { context, window } = makeContext();
+  context.requestAnimationFrame = () => {};
+  vm.runInContext(fs.readFileSync(new URL("../capture.js", import.meta.url), "utf8"), context);
+  const api = context.__pinboardShotCapture;
+  api.prepare();
+  let deadline;
+  try {
+    const result = await Promise.race([
+      api.goTo(400, true),
+      new Promise((_, reject) => {
+        deadline = setTimeout(() => reject(new Error("scroll blocked by suspended animation frames")), 1500);
+      })
+    ]);
+    assert.equal(result.scrollY, 400);
+  } finally {
+    clearTimeout(deadline);
+    api.restore();
+  }
+  assert.equal(window.scrollY, 73);
+});

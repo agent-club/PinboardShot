@@ -1,5 +1,9 @@
 # PinboardShot
 
+<p align="center">
+    <a href="https://linux.do" alt="LINUX DO"><img src="https://shorturl.at/ggSqS" /></a>
+</p>
+
 [中文](#中文) | [English](#english)
 
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/agent-club/PinboardShot/badge)](https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot)
@@ -21,8 +25,8 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 #### 截图
 
 - 区域截图、当前屏幕截图、光标所在窗口截图
-- 滚动截图：框选窗口内的可滚动区域，手动向上或向下滚动时自动识别重叠内容并拼成长图
-- 滚动截图期间在目标窗口右侧实时显示长图预览；预览窗口不会进入成品
+- 滚动截图 MVP：只框选滚动正文，手动向下滚动，确认重叠后追加原始像素；无法定位时暂停追加
+- 滚动截图期间显示持续增长的长图预览和已截尺寸，失配后可照着预览回滚；预览窗口不会进入成品
 - 区域截图后直接贴屏，以及从剪贴板创建贴图
 - 3 秒延迟区域截图
 - 一键重复上次区域；方向键像素级移动选区，`Option` + 方向键调整尺寸，并可输入精确宽高或锁定比例
@@ -56,6 +60,7 @@ PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴
 - 长图处理：拖选或输入像素行删除中段，支持撤销、重做，按指定页高导出连续 PNG 或 PDF。
 - 步骤文档：主动截图收集步骤，添加标题与说明、调整顺序，保存可重新打开的 JSON 原稿，导出 Markdown + 图片或 PDF。最多 100 步；不会自动监听点击。可选择启用本地崩溃恢复，临时保存未完成原稿；仍需手动保存正式文档。
 - 结构化 OCR：本机识别后生成纯文本、保留布局、TSV 和 Markdown 表格，可修改预览后复制。表格列根据文字位置推断，复杂合并单元格需要核对。
+- 二维码识别：从截图结果直接进入，或在截图工具中打开历史图片、剪贴板图片及本地文件；本机识别多个二维码，可复制原始内容，网页链接需主动点击才会打开。
 - 标尺：在独立标注编辑器中测量距离、横向及纵向间距，切换像素或点，绘制水平、垂直参考线。导入图片的点值依赖图片的逻辑尺寸。
 - 区域短录屏：框选后录制最长 60 秒的无声 H.264 MP4，最高 1920 × 1080 / 30 fps，停止后预览、裁剪首尾并保存。PinboardShot 自身窗口不进入视频；关闭预览会丢弃未保存视频。当前不包含 GIF、音频或视频历史。
 
@@ -115,11 +120,12 @@ PinboardShot 默认不启用任何全局快捷键，避免占用其他应用的�
 
 #### 滚动截图
 
-1. 从菜单栏选择“滚动截图”，然后框选某个窗口内部实际会随内容滚动的区域。
-2. 框选结束后在原窗口内使用滚轮或触控板向上或向下滚动；聊天记录可从底部向上截取。建议每次保留一部分可见内容，避免一次跨过整个画面。
-3. 在右侧预览中确认拼接结果，完成后点击“完成”；结果会复制到剪贴板并保留到截图历史。
+1. 从菜单栏选择“滚动截图”，框选窗口内的正文区域；尽量排除固定页脚、侧栏和动画。固定顶部栏可保留一次。
+2. 用滚轮或触控板向下滚动，每次保留至少四分之一屏重叠。此 MVP 不支持向上扩图、键盘翻页或拖动滚动条采集。
+3. 预览显示持续增长的长图，下方显示原始分辨率尺寸。遇到暂停提示，滚回预览底部对应的位置，再缓慢向下滚动。
+4. 点击“完成”生成整张连续截图，结果会复制到剪贴板并保留到截图历史。若仍处于暂停状态，需要明确选择保留已确认部分或取消。
 
-滚动截图适合网页、文档、聊天记录和代码等纵向内容。固定悬浮栏、视频、动画或快速跨页滚动可能妨碍重叠识别；出现匹配提示时请放慢滚动。拼接像素使用自动清理的临时磁盘后备存储，避免长图在内存中保留两份；为避免占满临时磁盘，单张长图最多生成 2.5 亿像素（原始后备数据约 1 GB）。
+只追加高置信度重叠之后的新像素；重复内容无法定位、内容变化或大幅跳跃时不自动补洞。尺寸变化需要重新框选。单张截图限制为 128 MiB 原始像素或 32,768 px 高度，以先到者为准；生成成品时会短暂分配额外图像内存。未接上的画面不归档、不回放、不上传；采集层仅保留上一帧用于去重。
 
 #### 使用贴图
 
@@ -246,6 +252,10 @@ PINBOARDSHOT_NOTARY_PROFILE="PinboardShot-notary" \
 - 高分辨率输出限制在标准 8K 像素量以内，避免无边界的内存分配
 - 捕获任务进行中再次触发贴图动作时会排队处理，避免剪贴板读写竞争
 
+### 致谢
+
+感谢 [linux.do](https://linux.do/) 社区的佬友们分享思路、提出想法和需求。大家的讨论与反馈，为 PinboardShot 的功能设计和持续改进提供了宝贵参考。
+
 ## English
 
 PinboardShot is a fully native, local-first screenshot and pinboard utility for macOS. It is built with AppKit, SwiftUI, and ScreenCaptureKit. By default, it accesses the network only for software updates and contains no analytics services. A selected region is sent to a user-configured service only when a remote OCR plugin is explicitly configured and used.
@@ -259,8 +269,8 @@ Its core workflow is simple: capture content from the screen, annotate it when n
 #### Capture
 
 - Capture a selected area, the current display, or the window under the pointer.
-- Scrolling capture: select a scrollable region inside a window, then scroll up or down manually while PinboardShot detects overlapping content and stitches it into a long image.
-- Show a live long-image preview to the right of the target window during scrolling capture; the preview window is excluded from the result.
+- Scrolling capture MVP: select only scrolling content and scroll downward. Append original pixels only after confirming overlap; pause when placement is uncertain.
+- Show the growing long-image preview and total captured dimensions, so you can return to the last confirmed position after a pause; the preview is excluded from the result.
 - Pin an area capture immediately, or create a pin from an image on the clipboard.
 - Start an area capture after a three-second delay.
 - Repeat the last region in one step. Move or resize the selection by pixels with the arrow keys, enter exact dimensions, or lock its aspect ratio.
@@ -294,6 +304,7 @@ Open **Capture tools** from the menu bar, the capture-result menu, or a history 
 - Long images: drag a band or enter pixel rows to remove a middle section, undo or redo, and export continuous PNG pages or a PDF at a chosen page height.
 - Step guides: capture steps manually, add titles and descriptions, reorder them, save a reopenable JSON draft, and export Markdown with images or PDF. Up to 100 steps; no automatic click monitoring. Optional local crash recovery keeps a temporary unfinished draft; save the document manually for long-term use.
 - Structured OCR: on-device recognition with editable plain text, layout-preserving text, TSV, and Markdown-table previews. Columns are inferred from text positions, so complex merged cells need review.
+- QR codes: open a recent capture directly, or load a history image, clipboard image, or local file in Capture tools. Recognize multiple codes on-device, copy their original contents, and open web links only when you choose to.
 - Ruler: measure distance and horizontal/vertical spacing in pixels or points, and draw horizontal or vertical guides in the standalone annotation editor. Point measurements for imported images depend on their logical size metadata.
 - Region recordings: silent H.264 MP4, up to 60 seconds and 1920 × 1080 at 30 fps, with preview and start/end trimming before saving. PinboardShot windows are excluded. Closing the preview discards unsaved video. GIF, audio, and video history are not included in this version.
 
@@ -353,11 +364,12 @@ Press `Esc` to cancel. Right-clicking does not exit a normal selection; in color
 
 #### Scrolling capture
 
-1. Choose Scrolling Capture from the menu bar, then select a region inside a window whose content actually scrolls.
-2. Scroll down in the original window with a mouse wheel or trackpad. Keep part of the previous content visible between movements instead of jumping by a full page.
-3. Review the stitched result in the preview on the right, then choose Done. The result is copied to the clipboard and retained in capture history.
+1. Choose Scrolling Capture and select the content area, preferably excluding fixed footers, sidebars, and animation. A fixed top bar can be retained once.
+2. Scroll downward with a wheel or trackpad, retaining at least a quarter viewport of overlap. This MVP does not support upward extension, keyboard paging, or scrollbar dragging.
+3. The preview grows with the confirmed capture; the dimensions describe the original-resolution result. If appending pauses, return to the position shown at the bottom of the preview and scroll down slowly.
+4. Choose Done to generate the continuous image, copy it to the clipboard, and retain it in capture history. If capture is still paused, explicitly keep the confirmed portion or cancel.
 
-Scrolling capture works well for webpages, documents, conversations, and code. Fixed floating bars, video, animation, or rapid page-sized scrolling can interfere with overlap detection; slow down when a matching warning appears. Stitched pixels use automatically cleaned temporary disk backing so the long image is not retained twice in memory. A single long image is limited to 250 million pixels (about 1 GB of raw backing data) to avoid exhausting temporary storage.
+Only pixels following a high-confidence overlap are appended. Ambiguous repetition, content changes, or large jumps do not trigger automatic gap filling. Size changes require a new selection. A capture is limited to 128 MiB of raw pixels or 32,768 px in height, whichever comes first; final rendering temporarily allocates additional image memory. Rejected views are not archived, replayed, or uploaded; the capture layer retains only the preceding frame for deduplication.
 
 #### Using pins
 
@@ -474,3 +486,7 @@ PINBOARDSHOT_NOTARY_PROFILE="PinboardShot-notary" \
 - Reject uniformly dark abnormal frames without replacing the previous clipboard content.
 - Limit high-resolution output to the standard 8K pixel budget instead of allowing unbounded memory allocation.
 - Queue another pin action when a capture is already running to avoid clipboard read/write races.
+
+### Acknowledgments
+
+Thanks to the members of the [linux.do](https://linux.do/) community for sharing ideas, suggestions, and feature requests. Your discussions and feedback have been valuable to PinboardShot's design and ongoing improvement.

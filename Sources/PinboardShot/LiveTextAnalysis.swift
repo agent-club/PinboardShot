@@ -6,9 +6,21 @@ import VisionKit
 
 private enum LiveTextAnalysisError: Error {
     case imageUnavailable
+    case imageTooLarge
     case pixelBufferCreation(CVReturn)
     case pixelBufferLock(CVReturn)
     case bitmapContextCreation
+}
+
+enum LiveTextResourceLimit {
+    static let maximumPixelCount = 16_000_000
+    static let maximumDimension = 8_192
+
+    static func allows(width: Int, height: Int) -> Bool {
+        width > 0 && height > 0 &&
+            width <= maximumDimension && height <= maximumDimension &&
+            width <= maximumPixelCount / height
+    }
 }
 
 private struct LiveTextPixelBuffer: @unchecked Sendable {
@@ -124,9 +136,19 @@ final class LiveTextAnalysisService {
     }
 
     private static func makePixelBuffer(from image: NSImage) throws -> LiveTextPixelBuffer {
+        // Image reps expose dimensions without forcing full decode for file and clipboard imports.
+        for representation in image.representations
+        where representation.pixelsWide > 0 && representation.pixelsHigh > 0 {
+            guard LiveTextResourceLimit.allows(
+                width: representation.pixelsWide, height: representation.pixelsHigh
+            ) else { throw LiveTextAnalysisError.imageTooLarge }
+        }
         var proposedRect = CGRect(origin: .zero, size: image.size)
         guard let cgImage = image.cgImage(forProposedRect: &proposedRect, context: nil, hints: nil) else {
             throw LiveTextAnalysisError.imageUnavailable
+        }
+        guard LiveTextResourceLimit.allows(width: cgImage.width, height: cgImage.height) else {
+            throw LiveTextAnalysisError.imageTooLarge
         }
 
         let attributes: CFDictionary = [

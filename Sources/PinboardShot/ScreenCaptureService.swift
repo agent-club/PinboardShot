@@ -181,6 +181,13 @@ enum CaptureDiagnostics {
         defaults.set(String(reflecting: type(of: error)), forKey: errorKey)
     }
 
+    static func recordScrollTarget(_ window: SCWindow, defaults: UserDefaults = .standard) {
+        // Only record application identity for routing diagnostics, never a window title or page content.
+        defaults.set(window.owningApplication?.bundleIdentifier, forKey: "captureDiagnostics.scrollTargetBundleIdentifier")
+        defaults.set(window.owningApplication?.processID, forKey: "captureDiagnostics.scrollTargetProcessID")
+        defaults.set(window.windowLayer, forKey: "captureDiagnostics.scrollTargetWindowLayer")
+    }
+
     static func report(defaults: UserDefaults = .standard) -> String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown"
         let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
@@ -293,6 +300,13 @@ struct ScrollCaptureGeometry: Equatable, Sendable {
     var selectionInWindow: CGRect {
         let rect = quartzSelectionRect.offsetBy(dx: -windowFrame.minX, dy: -windowFrame.minY)
         return rect.intersection(CGRect(origin: .zero, size: windowFrame.size))
+    }
+}
+
+enum ScrollCaptureWindowOrder {
+    static func frontmostID(eligibleIDs: [CGWindowID], frontToBackIDs: [CGWindowID]) -> CGWindowID? {
+        let eligible = Set(eligibleIDs)
+        return frontToBackIDs.first(where: { eligible.contains($0) })
     }
 }
 
@@ -432,14 +446,30 @@ final class ScreenCaptureService {
             windowFrame: .zero
         ).quartzSelectionRect
         let ownProcessID = pid_t(ProcessInfo.processInfo.processIdentifier)
-        guard let window = content.windows.first(where: { candidate in
+        let candidates = content.windows.filter { candidate in
             candidate.isOnScreen &&
+            // System overlays such as Notification Center can cover the entire
+            // display transparently; scrolling targets must be ordinary app windows.
+            candidate.windowLayer == 0 &&
             candidate.owningApplication?.processID != ownProcessID &&
             candidate.frame.contains(CGPoint(x: quartzSelection.midX, y: quartzSelection.midY)) &&
             candidate.frame.width > 80 && candidate.frame.height > 80
-        }) else {
+        }
+        // ScreenCaptureKit enumeration is not the display stacking order. A covered
+        // window must not decide whether this selection launches the Chrome extension.
+        guard let windowInfo = CGWindowListCopyWindowInfo(
+            [.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID
+        ) as? [[String: Any]],
+              let windowID = ScrollCaptureWindowOrder.frontmostID(
+                eligibleIDs: candidates.map(\.windowID),
+                frontToBackIDs: windowInfo.compactMap {
+                    ($0[kCGWindowNumber as String] as? NSNumber)?.uint32Value
+                }
+              ),
+              let window = candidates.first(where: { $0.windowID == windowID }) else {
             throw PinboardShotError.scrollTargetUnavailable
         }
+        CaptureDiagnostics.recordScrollTarget(window)
 
         let geometry = ScrollCaptureGeometry(
             screenFrame: selection.screen.frame,

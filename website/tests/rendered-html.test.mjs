@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
+import { parse } from "parse5";
 import currentRelease from "../content/current-release.json" with { type: "json" };
 
 const googleTagId = "G-WDBY7TDB0R";
@@ -37,16 +38,20 @@ async function render(path = "/", accept = "text/html") {
 }
 
 function visibleText(html) {
-  return html
-    .replace(/<head[\s\S]*?<\/head>/gi, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&amp;/g, "&")
-    .replace(/&#x27;/g, "'")
-    .replace(/<!-- -->/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  const text = [];
+
+  function collect(node) {
+    if (node.nodeName === "#text") {
+      text.push(node.value);
+      return;
+    }
+    if (["head", "script", "style"].includes(node.nodeName)) return;
+    for (const child of node.childNodes ?? []) collect(child);
+  }
+
+  // HTML parsing preserves the browser's single entity decode and script boundaries.
+  collect(parse(html));
+  return text.join(" ").replace(/\s+/g, " ").trim();
 }
 
 function extractStructuredData(html) {
@@ -118,6 +123,11 @@ test("extracts an inline script with whitespace before its closing bracket", () 
     extractAnalyticsBootstrap('<script>window.localStorage.getItem("choice")</script >'),
     'window.localStorage.getItem("choice")',
   );
+});
+
+test("extracts visible text without script contents or repeated entity decoding", () => {
+  const html = '<!doctype html><html><head><title>Hidden</title></head><body><main>Safe &amp;#x27; &lt;script&gt;<script>Hidden script</script ><style>Hidden style</style ><p>Visible &amp; readable</p></main></body></html>';
+  assert.equal(visibleText(html), "Safe &#x27; <script> Visible & readable");
 });
 
 test("server-renders the PinboardShot download page", async () => {

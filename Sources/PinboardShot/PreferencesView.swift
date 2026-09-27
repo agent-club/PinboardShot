@@ -392,252 +392,257 @@ struct PreferencesView: View {
     }
 
     private var historyTab: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Toggle(L10n.text("preferences.historyEnabled"), isOn: $historyEnabled)
-                Spacer()
-            }
-            Toggle(L10n.text("preferences.pinSessionRecovery.title"), isOn: $pinSessionRecoveryEnabled)
-                .onChange(of: pinSessionRecoveryEnabled) { _, enabled in
-                    onPinSessionRecoveryChanged(enabled)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Toggle(L10n.text("preferences.historyEnabled"), isOn: $historyEnabled)
+                    Spacer()
                 }
-                .help(L10n.text("preferences.pinSessionRecovery.help"))
-            Toggle(L10n.text("preferences.historyOCRIndexing"), isOn: $historyOCRIndexingEnabled)
-            Toggle(L10n.text("feature.draft.setting"), isOn: $editableDraftsEnabled)
-                .disabled(!historyEnabled)
-                .help(L10n.text("feature.draft.privacy"))
-
-            if let historyErrorMessage = historyErrorMessage ?? historyStore.retentionErrorMessage {
-                Text(historyErrorMessage)
-                    .font(.callout)
-                    .foregroundStyle(.red)
-            }
-
-            HStack(spacing: 10) {
-                Picker(L10n.text("preferences.historyMaximumItems"), selection: $historyMaximumItems) {
-                    ForEach([10, 25, 50, 100, 250], id: \.self) { count in
-                        Text("\(count)").tag(count)
+                Toggle(L10n.text("preferences.pinSessionRecovery.title"), isOn: $pinSessionRecoveryEnabled)
+                    .onChange(of: pinSessionRecoveryEnabled) { _, enabled in
+                        onPinSessionRecoveryChanged(enabled)
                     }
-                }
-                .frame(width: 120)
-                Spacer()
-                Picker(L10n.text("preferences.historyRetention"), selection: $historyRetentionDays) {
-                    Text(L10n.text("preferences.historyRetention.forever")).tag(0)
-                    Text(L10n.text("preferences.historyRetention.oneDay")).tag(1)
-                    Text(L10n.text("preferences.historyRetention.sevenDays")).tag(7)
-                    Text(L10n.text("preferences.historyRetention.thirtyDays")).tag(30)
-                    Text(L10n.text("preferences.historyRetention.ninetyDays")).tag(90)
-                }
-                .frame(width: 160)
-            }
+                    .help(L10n.text("preferences.pinSessionRecovery.help"))
+                Toggle(L10n.text("preferences.historyOCRIndexing"), isOn: $historyOCRIndexingEnabled)
+                Toggle(L10n.text("feature.draft.setting"), isOn: $editableDraftsEnabled)
+                    .disabled(!historyEnabled)
+                    .help(L10n.text("feature.draft.privacy"))
 
-            Text(L10n.text("history.keepHelp"))
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            TextField(L10n.text("preferences.historySearch"), text: $historySearch)
-                .textFieldStyle(.roundedBorder)
-                .help(L10n.text("history.searchHelp"))
-
-            HStack {
-                Picker(L10n.text("history.clearByTime"), selection: $historyCleanupDays) {
-                    Text(L10n.text("history.cleanupOneDay")).tag(1)
-                    Text(L10n.text("history.cleanupSevenDays")).tag(7)
-                    Text(L10n.text("history.cleanupThirtyDays")).tag(30)
-                    Text(L10n.text("history.cleanupNinetyDays")).tag(90)
-                    Text(L10n.text("history.cleanupAll")).tag(0)
+                if let historyErrorMessage = historyErrorMessage ?? historyStore.retentionErrorMessage {
+                    Text(historyErrorMessage)
+                        .font(.callout)
+                        .foregroundStyle(.red)
                 }
-                .pickerStyle(.segmented)
-                .help(L10n.text("history.cleanupHelp"))
-                Spacer()
-                Button(L10n.text("history.clearByTime")) {
-                    prepareHistoryCleanup()
-                }
-                .disabled(historyStore.items.isEmpty)
-            }
 
-            DisclosureGroup(L10n.text("history.storageAndPrivacy"), isExpanded: $isHistoryStorageExpanded) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Button(L10n.text("history.refreshStorage")) {
-                            loadHistoryStorageMetrics()
+                HStack(spacing: 10) {
+                    Picker(L10n.text("preferences.historyMaximumItems"), selection: $historyMaximumItems) {
+                        ForEach([10, 25, 50, 100, 250], id: \.self) { count in
+                            Text("\(count)").tag(count)
                         }
-                        Spacer()
-                        Button(L10n.text("history.clearOCRIndex"), role: .destructive) {
-                            isConfirmingClearOCRIndex = true
-                        }
-                        .help(L10n.text("history.clearOCRIndexHelp"))
                     }
+                    .frame(width: 120)
+                    Spacer()
+                    Picker(L10n.text("preferences.historyRetention"), selection: $historyRetentionDays) {
+                        Text(L10n.text("preferences.historyRetention.forever")).tag(0)
+                        Text(L10n.text("preferences.historyRetention.oneDay")).tag(1)
+                        Text(L10n.text("preferences.historyRetention.sevenDays")).tag(7)
+                        Text(L10n.text("preferences.historyRetention.thirtyDays")).tag(30)
+                        Text(L10n.text("preferences.historyRetention.ninetyDays")).tag(90)
+                    }
+                    .frame(width: 160)
+                }
 
-                    if let historyStorageMetrics {
-                        Text(L10n.text("history.storageHistory", historyStorageMetrics.itemCount))
-                        Text(L10n.text("history.storageHistoryImages", formatBytes(historyStorageMetrics.imageBytes)))
-                        Text(L10n.text("history.storageHistoryIndex", formatBytes(historyStorageMetrics.indexBytes)))
-                    }
-                    if let pinWorkspaceStorageMetrics {
-                        Text(L10n.text("pinWorkspace.storageSummary", pinWorkspaceStorageMetrics.totalBytes))
-                        Text(L10n.text("pinWorkspace.storageWorkspaceCount", pinWorkspaceStorageMetrics.workspaceCount))
-                        Text(L10n.text("pinWorkspace.storageRecovery", pinWorkspaceStorageMetrics.recoveryBytes))
-                        Text(L10n.text("pinWorkspace.storagePins", pinWorkspaceStorageMetrics.pinCount))
-                    }
-                    if let storageMetricsError {
-                        Text(storageMetricsError).foregroundStyle(.red).font(.caption)
-                    }
+                Text(L10n.text("history.keepHelp"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
 
-                    Divider()
-                    DisclosureGroup(L10n.text("history.applicationExclusions"), isExpanded: $isHistoryExclusionsExpanded) {
-                        VStack(alignment: .leading, spacing: 6) {
-                            if let message = excludedApplicationMessage {
-                                Text(message).foregroundStyle(.red).font(.caption)
+                TextField(L10n.text("preferences.historySearch"), text: $historySearch)
+                    .textFieldStyle(.roundedBorder)
+                    .help(L10n.text("history.searchHelp"))
+
+                HStack {
+                    Picker(L10n.text("history.clearByTime"), selection: $historyCleanupDays) {
+                        Text(L10n.text("history.cleanupOneDay")).tag(1)
+                        Text(L10n.text("history.cleanupSevenDays")).tag(7)
+                        Text(L10n.text("history.cleanupThirtyDays")).tag(30)
+                        Text(L10n.text("history.cleanupNinetyDays")).tag(90)
+                        Text(L10n.text("history.cleanupAll")).tag(0)
+                    }
+                    .pickerStyle(.segmented)
+                    .help(L10n.text("history.cleanupHelp"))
+                    Spacer()
+                    Button(L10n.text("history.clearByTime")) {
+                        prepareHistoryCleanup()
+                    }
+                    .disabled(historyStore.items.isEmpty)
+                }
+
+                DisclosureGroup(L10n.text("history.storageAndPrivacy"), isExpanded: $isHistoryStorageExpanded) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Button(L10n.text("history.refreshStorage")) {
+                                loadHistoryStorageMetrics()
                             }
-                            ScrollView {
-                                LazyVStack(alignment: .leading, spacing: 6) {
-                                    ForEach(excludedApplications) { application in
-                                        HStack {
-                                            VStack(alignment: .leading, spacing: 2) {
-                                                Text(historyApplicationName(for: application.bundleIdentifier))
-                                                    .lineLimit(1)
-                                                Text(application.bundleIdentifier)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                                    .lineLimit(1)
+                            Spacer()
+                            Button(L10n.text("history.clearOCRIndex"), role: .destructive) {
+                                isConfirmingClearOCRIndex = true
+                            }
+                            .help(L10n.text("history.clearOCRIndexHelp"))
+                        }
+
+                        if let historyStorageMetrics {
+                            Text(L10n.text("history.storageHistory", historyStorageMetrics.itemCount))
+                            Text(L10n.text("history.storageHistoryImages", formatBytes(historyStorageMetrics.imageBytes)))
+                            Text(L10n.text("history.storageHistoryIndex", formatBytes(historyStorageMetrics.indexBytes)))
+                        }
+                        if let pinWorkspaceStorageMetrics {
+                            Text(L10n.text("pinWorkspace.storageSummary", pinWorkspaceStorageMetrics.totalBytes))
+                            Text(L10n.text("pinWorkspace.storageWorkspaceCount", pinWorkspaceStorageMetrics.workspaceCount))
+                            Text(L10n.text("pinWorkspace.storageRecovery", pinWorkspaceStorageMetrics.recoveryBytes))
+                            Text(L10n.text("pinWorkspace.storagePins", pinWorkspaceStorageMetrics.pinCount))
+                        }
+                        if let storageMetricsError {
+                            Text(storageMetricsError).foregroundStyle(.red).font(.caption)
+                        }
+
+                        Divider()
+                        DisclosureGroup(L10n.text("history.applicationExclusions"), isExpanded: $isHistoryExclusionsExpanded) {
+                            VStack(alignment: .leading, spacing: 6) {
+                                if let message = excludedApplicationMessage {
+                                    Text(message).foregroundStyle(.red).font(.caption)
+                                }
+                                ScrollView {
+                                    LazyVStack(alignment: .leading, spacing: 6) {
+                                        ForEach(excludedApplications) { application in
+                                            HStack {
+                                                VStack(alignment: .leading, spacing: 2) {
+                                                    Text(historyApplicationName(for: application.bundleIdentifier))
+                                                        .lineLimit(1)
+                                                    Text(application.bundleIdentifier)
+                                                        .font(.caption)
+                                                        .foregroundStyle(.secondary)
+                                                        .lineLimit(1)
+                                                }
+                                                Spacer()
+                                                Button(role: .destructive) {
+                                                    historyPrivacySettings.remove(bundleIdentifier: application.bundleIdentifier)
+                                                    loadHistoryPrivacyApplications()
+                                                } label: {
+                                                    Image(systemName: "xmark.circle")
+                                                }
+                                                .buttonStyle(.borderless)
+                                                .help(L10n.text("history.removeExcludedApplication"))
+                                                .accessibilityLabel(L10n.text("history.removeExcludedApplication"))
                                             }
-                                            Spacer()
-                                            Button(role: .destructive) {
-                                                historyPrivacySettings.remove(bundleIdentifier: application.bundleIdentifier)
-                                                loadHistoryPrivacyApplications()
-                                            } label: {
-                                                Image(systemName: "xmark.circle")
-                                            }
-                                            .buttonStyle(.borderless)
-                                            .help(L10n.text("history.removeExcludedApplication"))
-                                            .accessibilityLabel(L10n.text("history.removeExcludedApplication"))
                                         }
                                     }
                                 }
+                                .frame(maxHeight: 120)
+                                if excludedApplications.isEmpty {
+                                    Text(L10n.text("history.noExcludedApplications"))
+                                        .foregroundStyle(.secondary)
+                                        .font(.caption)
+                                }
+                                Button(L10n.text("history.addExcludedApplication"), action: addHistoryExcludedApplication)
                             }
-                            .frame(maxHeight: 120)
-                            if excludedApplications.isEmpty {
-                                Text(L10n.text("history.noExcludedApplications"))
-                                    .foregroundStyle(.secondary)
-                                    .font(.caption)
-                            }
-                            Button(L10n.text("history.addExcludedApplication"), action: addHistoryExcludedApplication)
                         }
-                    }
-                    Text(L10n.text("history.exclusionFailClosedHelp"))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 4)
-            }
-
-            List(filteredHistoryItems) { item in
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top, spacing: 10) {
-                        HistoryThumbnailView(historyStore: historyStore, item: item)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(item.createdAt, style: .date)
-                                .lineLimit(1)
-                            Text(item.createdAt, style: .time)
-                                .foregroundStyle(.secondary)
-                            Text("\(item.pixelWidth) × \(item.pixelHeight)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button {
-                            setHistoryItemKept(item, kept: !item.isKept)
-                        } label: {
-                            Image(systemName: item.isKept ? "star.fill" : "star")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
-                        .accessibilityLabel(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
-                        Button {
-                            onCopyHistoryItem(item)
-                        } label: {
-                            Image(systemName: "doc.on.doc")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(L10n.text("pin.copy"))
-                        .accessibilityLabel(L10n.text("pin.copy"))
-                        Button(role: .none) {
-                            onPinHistoryItem(item)
-                        } label: {
-                            Image(systemName: "pin")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(L10n.text("preferences.pinToScreen"))
-                        .accessibilityLabel(L10n.text("preferences.pinToScreen"))
-                        Button {
-                            onSaveHistoryItem(item)
-                        } label: {
-                            Image(systemName: "square.and.arrow.down")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(L10n.text("pin.save"))
-                        .accessibilityLabel(L10n.text("pin.save"))
-                        Menu {
-                            Button(L10n.text("feature.draft.edit")) { onEditHistoryItem(item) }
-                            Button(L10n.text("feature.tools.title")) { onHistoryTools(item) }
-                        } label: { Image(systemName: "ellipsis.circle") }
-                        .menuStyle(.borderlessButton)
-                        .fixedSize()
-                        .help(L10n.text("feature.tools.title"))
-                        Button(role: .destructive) {
-                            deleteHistoryItem(item)
-                        } label: {
-                            Image(systemName: "trash")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(L10n.text("preferences.deleteHistoryItem"))
-                        .accessibilityLabel(L10n.text("preferences.deleteHistoryItem"))
-                    }
-                    HStack(spacing: 8) {
-                        Text(historyOCRStatusText(for: item))
+                        Text(L10n.text("history.exclusionFailClosedHelp"))
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        Spacer()
-                        if item.ocrStatus == .indexed {
-                            Button {
-                                copyHistoryOCRText(item)
-                            } label: {
-                                Image(systemName: "doc.on.doc")
-                            }
-                            .buttonStyle(.borderless)
-                            .help(L10n.text("history.copyRecognizedText"))
-                            .accessibilityLabel(L10n.text("history.copyRecognizedText"))
-                        }
-                        Button {
-                            selectedHistoryItemForDetail = item
-                        } label: {
-                            Image(systemName: "info.circle")
-                        }
-                        .buttonStyle(.borderless)
-                        .help(L10n.text("history.viewDetails"))
-                        .accessibilityLabel(L10n.text("history.viewDetails"))
-                        if item.ocrStatus == .notIndexed || item.ocrStatus == .empty || item.ocrStatus == .failed {
-                            Button {
-                                onReindexHistoryItem(item)
-                            } label: {
-                                Image(systemName: "arrow.clockwise.circle")
-                            }
-                            .buttonStyle(.borderless)
-                            .help(L10n.text("history.reindex"))
-                            .accessibilityLabel(L10n.text("history.reindex"))
-                        }
                     }
-                    Text(HistorySearchMatcher.summary(for: item, maximumLength: 140))
-                        .font(.caption)
-                        .lineLimit(2)
-                        .foregroundStyle(.secondary)
+                    .padding(.top, 4)
                 }
-                .padding(.vertical, 3)
+
+                LazyVStack(alignment: .leading, spacing: 0) {
+                    ForEach(filteredHistoryItems) { item in
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack(alignment: .top, spacing: 10) {
+                                HistoryThumbnailView(historyStore: historyStore, item: item)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(item.createdAt, style: .date)
+                                        .lineLimit(1)
+                                    Text(item.createdAt, style: .time)
+                                        .foregroundStyle(.secondary)
+                                    Text("\(item.pixelWidth) × \(item.pixelHeight)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button {
+                                    setHistoryItemKept(item, kept: !item.isKept)
+                                } label: {
+                                    Image(systemName: item.isKept ? "star.fill" : "star")
+                                }
+                                .buttonStyle(.borderless)
+                                .help(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
+                                .accessibilityLabel(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
+                                Button {
+                                    onCopyHistoryItem(item)
+                                } label: {
+                                    Image(systemName: "doc.on.doc")
+                                }
+                                .buttonStyle(.borderless)
+                                .help(L10n.text("pin.copy"))
+                                .accessibilityLabel(L10n.text("pin.copy"))
+                                Button(role: .none) {
+                                    onPinHistoryItem(item)
+                                } label: {
+                                    Image(systemName: "pin")
+                                }
+                                .buttonStyle(.borderless)
+                                .help(L10n.text("preferences.pinToScreen"))
+                                .accessibilityLabel(L10n.text("preferences.pinToScreen"))
+                                Button {
+                                    onSaveHistoryItem(item)
+                                } label: {
+                                    Image(systemName: "square.and.arrow.down")
+                                }
+                                .buttonStyle(.borderless)
+                                .help(L10n.text("pin.save"))
+                                .accessibilityLabel(L10n.text("pin.save"))
+                                Menu {
+                                    Button(L10n.text("feature.draft.edit")) { onEditHistoryItem(item) }
+                                    Button(L10n.text("feature.tools.title")) { onHistoryTools(item) }
+                                } label: { Image(systemName: "ellipsis.circle") }
+                                .menuStyle(.borderlessButton)
+                                .fixedSize()
+                                .help(L10n.text("feature.tools.title"))
+                                Button(role: .destructive) {
+                                    deleteHistoryItem(item)
+                                } label: {
+                                    Image(systemName: "trash")
+                                }
+                                .buttonStyle(.borderless)
+                                .help(L10n.text("preferences.deleteHistoryItem"))
+                                .accessibilityLabel(L10n.text("preferences.deleteHistoryItem"))
+                            }
+                            HStack(spacing: 8) {
+                                Text(historyOCRStatusText(for: item))
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                if item.ocrStatus == .indexed {
+                                    Button {
+                                        copyHistoryOCRText(item)
+                                    } label: {
+                                        Image(systemName: "doc.on.doc")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help(L10n.text("history.copyRecognizedText"))
+                                    .accessibilityLabel(L10n.text("history.copyRecognizedText"))
+                                }
+                                Button {
+                                    selectedHistoryItemForDetail = item
+                                } label: {
+                                    Image(systemName: "info.circle")
+                                }
+                                .buttonStyle(.borderless)
+                                .help(L10n.text("history.viewDetails"))
+                                .accessibilityLabel(L10n.text("history.viewDetails"))
+                                if item.ocrStatus == .notIndexed || item.ocrStatus == .empty || item.ocrStatus == .failed {
+                                    Button {
+                                        onReindexHistoryItem(item)
+                                    } label: {
+                                        Image(systemName: "arrow.clockwise.circle")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help(L10n.text("history.reindex"))
+                                    .accessibilityLabel(L10n.text("history.reindex"))
+                                }
+                            }
+                            Text(HistorySearchMatcher.summary(for: item, maximumLength: 140))
+                                .font(.caption)
+                                .lineLimit(2)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                        Divider()
+                    }
+                }
             }
-            .listStyle(.inset)
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(12)
         .onAppear {
             loadHistoryPrivacyApplications()
             loadHistoryStorageMetrics()

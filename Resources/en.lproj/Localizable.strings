@@ -393,7 +393,7 @@
 "preferences.trayIcon.animatedCamera" = "Animated Camera";
 "preferences.trayIcon.colorfulViewfinder" = "Color Viewfinder";
 "preferences.trayIcon.colorfulCamera" = "Color Camera";
-"preferences.trayIcon.solCrafted" = "GPT-5.6 Sol Spark";
+"preferences.trayIcon.solCrafted" = "Neon Pin";
 "watermark.preferences.tab" = "Watermark";
 "watermark.preferences.section" = "Invisible Forensic Watermark";
 "watermark.preferences.enabled" = "Embed an Invisible Watermark in New Captures";
@@ -579,6 +579,12 @@
 "feature.ocr.help" = "Recognition runs locally. Edit the preview before copying. Table columns are inferred from text positions: check empty and merged cells. Markdown uses the first row as headers. Recognizing again replaces your preview edits.";
 "feature.ocr.recognize" = "Recognize again";
 "feature.ocr.empty" = "No text recognized.";
+"feature.qr.title" = "QR codes";
+"feature.qr.recognize" = "Recognize again";
+"feature.qr.help" = "Recognize QR codes locally. Results are never opened or uploaded automatically. Copy a result or choose to open a web link.";
+"feature.qr.result" = "QR code %d";
+"feature.qr.open" = "Open link";
+"feature.qr.empty" = "No QR codes recognized.";
 "feature.guide.title" = "Step guide";
 "feature.guide.untitled" = "Step-by-step guide";
 "feature.guide.documentTitle" = "Document title";
@@ -643,10 +649,10 @@
 "scrollCapture.auto.start" = "Start Auto Capture";
 "scrollCapture.auto.ready" = "Scroll manually, or click Start Auto Capture.";
 "scrollCapture.auto.pointer" = "Move the pointer into the selection to scroll automatically. Moving it out suspends scrolling without moving your pointer.";
-"scrollCapture.auto.pause" = "Pause";
-"scrollCapture.auto.resume" = "Resume Auto Scroll";
+"scrollCapture.auto.pause" = "Pause Capture";
+"scrollCapture.auto.resume" = "Resume Capture";
 "scrollCapture.auto.running" = "Scrolling automatically after each view is confirmed. Pause or finish at any time.";
-"scrollCapture.auto.user" = "Auto scroll paused. Adjust the view manually, then click Start Auto Capture.";
+"scrollCapture.auto.user" = "Capture paused. Click Resume Capture to continue.";
 "scrollCapture.auto.unmatched" = "The view has not aligned. Auto scroll paused. Return to the last confirmed view before resuming.";
 "scrollCapture.auto.stalled" = "Capture has not caught up. Auto scroll paused. Resume when the view settles, or finish this capture.";
 "scrollCapture.auto.noMovement" = "No scrolling detected. Check that the selected content can scroll, then resume or select another region.";
@@ -655,12 +661,12 @@
 
 "browserExtension.title" = "Chrome webpage capture";
 "browserExtension.help" = "Capture webpages at their actual scroll positions and edit them locally in PinboardShot. Enable the extension in Chrome first.";
-"browserExtension.prepare" = "Set up Chrome extension";
-"browserExtension.setupTitle" = "Connect Chrome to PinboardShot";
-"browserExtension.setupHelp" = "Register a local bridge and export the extension into Downloads. Images stay on this Mac. The extension is not yet in the Chrome Web Store; enable Developer mode and load the exported folder on the extensions page.";
-"browserExtension.connect" = "Connect and export extension";
+"browserExtension.prepare" = "Download Chrome extension";
+"browserExtension.setupTitle" = "Install the Chrome capture extension first";
+"browserExtension.setupHelp" = "Chrome webpage capture requires the extension. Download it with one click into Downloads, then install and enable it in Chrome. Start a new long capture after installation. If it is already installed and enabled, confirm to start capture.";
+"browserExtension.connect" = "Download extension";
 "browserExtension.readyTitle" = "Extension exported to Downloads";
-"browserExtension.readyHelp" = "Extension exported and path copied:\n%@\n\nOpen chrome://extensions, enable Developer mode, and click Load unpacked. Select the PinboardShot-Chrome folder in Downloads, or press ⌘⇧G and paste the copied path. Keep this folder: Chrome runs the extension from it.";
+"browserExtension.readyHelp" = "Extension downloaded and path copied:\n%@\n\nOpen chrome://extensions, enable Developer mode, and click Load unpacked. Select this PinboardShot-Chrome folder in Downloads, or press ⌘⇧G and paste the copied path. Keep this folder: Chrome runs the extension from it.\n\nAfter installing and enabling it, return to the target webpage, start a new long capture, and confirm “Installed — start capture”.";
 "browserExtension.importFailed" = "Could not import the webpage capture. Its dimensions changed, image data is incomplete, or the size limit was exceeded. Capture it again.";
 
 "browserExtension.start" = "Start Chrome webpage capture";
@@ -671,3 +677,11 @@
 
 "browserExtension.autoStart" = "Start automatic capture";
 "browserExtension.detectedHelp" = "Chrome detected. Start to capture the entire current tab with the extension and return to the editor. The capture is not limited to the selection.";
+"scrollCapture.stop" = "Stop Capture";
+"scrollCapture.pausing" = "Pausing capture…";
+"scrollCapture.paused" = "Capture paused";
+"scrollCapture.stopping" = "Stopping and saving capture…";
+"browserExtension.controlWaiting" = "Waiting for the Chrome capture extension…";
+"browserExtension.controlUnavailable" = "Could not connect to the Chrome capture extension. Check that it is installed and enabled; reload it after an update. Then start a new long capture.";
+
+"browserExtension.installedStart" = "Installed — start capture";

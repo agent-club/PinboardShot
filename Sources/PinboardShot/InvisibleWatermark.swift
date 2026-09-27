@@ -154,7 +154,9 @@ final class InvisibleWatermarkStore: ObservableObject {
         try fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directoryURL.path)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys]
-        try encoder.encode(records).write(to: recordsURL, options: [.atomic, .completeFileProtection])
+        // macOS rejects completeFileProtection for this file; the private
+        // directory and file permissions protect records without blocking saves.
+        try encoder.encode(records).write(to: recordsURL, options: .atomic)
         try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: recordsURL.path)
     }
 

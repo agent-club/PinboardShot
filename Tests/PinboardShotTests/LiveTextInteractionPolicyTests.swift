@@ -4,6 +4,15 @@ import Testing
 
 @Suite("Live Text interaction routing")
 struct LiveTextInteractionPolicyTests {
+    @Test("Live Text 像素分配须受面积和边长限制")
+    func analysisResourceLimit() {
+        #expect(LiveTextResourceLimit.allows(width: 4_000, height: 2_000))
+        #expect(LiveTextResourceLimit.allows(width: 5_120, height: 2_880))
+        #expect(!LiveTextResourceLimit.allows(width: 4_001, height: 4_000))
+        #expect(!LiveTextResourceLimit.allows(width: 8_193, height: 1))
+        #expect(!LiveTextResourceLimit.allows(width: Int.max, height: Int.max))
+    }
+
     @Test("短拖动会收敛到单个识别字符")
     func shortDragSelectsSingleCharacter() throws {
         let layout = LiveTextCharacterLayout(lines: [

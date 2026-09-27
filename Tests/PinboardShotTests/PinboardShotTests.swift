@@ -140,7 +140,7 @@ func trayPanelShowsAllContentWithoutScrolling() {
     )
 
     #expect(preferredHeight > 0)
-    // 托盘不再展示截图快捷入口区，但其余内容仍应计入首选高度并完整显示。
+    // 截图入口和其余内容均应计入首选高度，屏幕空间足够时完整显示。
     #expect(preferredHeight > 500)
     #expect(preferredHeight < TrayPanelMetrics.measurementHeightLimit)
 
@@ -389,6 +389,24 @@ func ocrPluginParsesDeclaredResponsePath() throws {
     }
 }
 
+@Test("OCR 响应在流读取时拒绝超限字节")
+func ocrPluginRejectsOversizedStreamBeforeBuffering() async throws {
+    let accepted = AsyncStream<UInt8> { continuation in
+        for byte in [UInt8(1), 2, 3, 4, 5] { continuation.yield(byte) }
+        continuation.finish()
+    }
+    let data = try await OCRPluginRequestBuilder.readResponse(from: accepted, maximumBytes: 5)
+    #expect(data == Data([1, 2, 3, 4, 5]))
+
+    let oversized = AsyncStream<UInt8> { continuation in
+        for byte in [UInt8(1), 2, 3, 4, 5, 6] { continuation.yield(byte) }
+        continuation.finish()
+    }
+    await #expect(throws: OCRPluginError.responseTooLarge) {
+        try await OCRPluginRequestBuilder.readResponse(from: oversized, maximumBytes: 5)
+    }
+}
+
 @Test("OCR 插件目录只载入通过校验且 ID 不冲突的 manifest")
 func ocrPluginCatalogValidatesUserManifests() throws {
     let suiteDirectory = FileManager.default.temporaryDirectory
@@ -626,7 +644,7 @@ func trayIconRenderingModesAreDistinct() {
     #expect(TrayIconChoice.animatedViewfinder.statusBarImage()?.isTemplate == true)
     #expect(TrayIconChoice.colorfulViewfinder.statusBarImage()?.isTemplate == false)
     #expect(TrayIconChoice.solCrafted.statusBarImage()?.isTemplate == false)
-    #expect(TrayIconChoice.solCrafted.statusBarImage()?.size == NSSize(width: 18, height: 18))
+    #expect(TrayIconChoice.solCrafted.statusBarImage()?.size == NSSize(width: 21, height: 21))
     #expect(TrayIconChoice.colorChoices.contains(.solCrafted))
 }
 
@@ -3680,6 +3698,12 @@ func invisibleWatermarkRecordSignature() throws {
         imageSHA256: String(repeating: "a", count: 64)
     )
     #expect(store.isAuthentic(record))
+    let directoryPermissions = try FileManager.default.attributesOfItem(atPath: directory.path)[.posixPermissions] as? NSNumber
+    let filePermissions = try FileManager.default.attributesOfItem(
+        atPath: directory.appendingPathComponent("records.json").path
+    )[.posixPermissions] as? NSNumber
+    #expect(directoryPermissions?.intValue == 0o700)
+    #expect(filePermissions?.intValue == 0o600)
 
     let tampered = InvisibleWatermarkRecord(
         id: record.id,

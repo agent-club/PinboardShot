@@ -15,6 +15,7 @@ public final class BrowserCaptureProtocolProcessor {
     private let inbox: BrowserCaptureInbox
     private var writer: BrowserCaptureWriter?
     private var activeID: UUID?
+    private var controls: BrowserCaptureControlStore { BrowserCaptureControlStore(inbox: inbox) }
 
     public init(inbox: BrowserCaptureInbox = BrowserCaptureInbox()) {
         self.inbox = inbox
@@ -38,13 +39,33 @@ public final class BrowserCaptureProtocolProcessor {
                     throw BrowserCaptureBridgeError.invalidSession
                 }
                 response = ["requestId": id, "ok": true, "protocolVersion": BrowserCaptureConfiguration.protocolVersion,
-                            "maxChunkBytes": BrowserCaptureLimits.maximumChunkBytes]
+                            "maxChunkBytes": BrowserCaptureLimits.maximumChunkBytes, "supportsCaptureControl": true]
             case "begin":
                 guard writer == nil else { throw BrowserCaptureBridgeError.invalidSession }
                 let captureID = UUID()
-                writer = try inbox.makeWriter(id: captureID)
+                let newWriter = try inbox.makeWriter(id: captureID)
+                do { try controls.begin(id: captureID) }
+                catch { try? newWriter.cancel(); throw error }
+                writer = newWriter
                 activeID = captureID
                 response = ["requestId": id, "ok": true, "captureId": captureID.uuidString.lowercased()]
+            case "control":
+                let active = try requireActive(object)
+                guard let rawStatus = object["status"] as? String,
+                      let status = BrowserCaptureControlStatus(rawValue: rawStatus), status != .complete,
+                      let progress = int(object["progress"]), (0...100).contains(progress) else {
+                    throw BrowserCaptureBridgeError.invalidSession
+                }
+                try controls.update(id: active.id, status: status, progress: progress)
+                let request = try controls.request(id: active.id)
+                response = ["requestId": id, "ok": true, "paused": request.paused, "stopped": request.stopped]
+            case "setControl":
+                let active = try requireActive(object)
+                guard let paused = boolean(object["paused"]), let stopped = boolean(object["stopped"]) else {
+                    throw BrowserCaptureBridgeError.invalidSession
+                }
+                try controls.setRequest(id: active.id, paused: paused, stopped: stopped)
+                response = ["requestId": id, "ok": true]
             case "tileBegin":
                 let active = try requireActive(object)
                 guard let tileIndex = int(object["index"]),
@@ -72,6 +93,9 @@ public final class BrowserCaptureProtocolProcessor {
                 let active = try requireActive(object)
                 guard let height = number(object["capturedHeight"]) else { throw BrowserCaptureBridgeError.invalidManifest }
                 _ = try active.finish(capturedHeight: height)
+                // The committed image must remain importable even if optional
+                // control metadata becomes unavailable after finalization.
+                try? controls.update(id: active.id, status: .complete, progress: 100)
                 captureToOpen = active.id
                 writer = nil
                 activeID = nil
@@ -134,6 +158,11 @@ public final class BrowserCaptureProtocolProcessor {
         guard let value = value as? NSNumber, CFGetTypeID(value) != CFBooleanGetTypeID() else { return nil }
         let result = value.doubleValue
         return result.isFinite ? result : nil
+    }
+
+    private func boolean(_ value: Any?) -> Bool? {
+        guard let value = value as? NSNumber, CFGetTypeID(value) == CFBooleanGetTypeID() else { return nil }
+        return value.boolValue
     }
 
     private func int(_ value: Any?) -> Int? {

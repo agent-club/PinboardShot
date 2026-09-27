@@ -37,6 +37,7 @@ struct QuickCaptureOverlayActions {
     let pin: () -> Void
     let dismiss: () -> Void
     var tools: (() -> Void)? = nil
+    var recognizeQR: (() -> Void)? = nil
 }
 
 @MainActor
@@ -133,6 +134,9 @@ private struct QuickCaptureOverlayView: View {
                     overlayButton("doc.on.doc", "pin.copy", action: actions.copy)
                     overlayButton("square.and.arrow.down", "pin.save", action: actions.save)
                     overlayButton("pencil.tip.crop.circle", "quickOverlay.annotate", action: actions.annotate)
+                    if let recognizeQR = actions.recognizeQR {
+                        overlayButton("qrcode.viewfinder", "feature.qr.title", action: recognizeQR)
+                    }
                     overlayButton("pin", "annotation.pin", action: actions.pin)
                 }
             }
