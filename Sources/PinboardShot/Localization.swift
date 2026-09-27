@@ -62,6 +62,8 @@ enum L10n {
         "browserExtension.chromeUnavailable": "请先打开 Chrome，并选中要截图的网页。",
         "browserExtension.accessibilityRequired": "请在系统设置 → 隐私与安全性 → 辅助功能中允许 PinboardShot，再点击启动。",
         "browserExtension.activationFailed": "无法启动 Chrome 网页长截图。请确认插件已启用，且 Chrome 中的插件快捷键为 ⌘⇧Y；也可直接点击插件按钮。",
+        "browserExtension.autoStart": "开始自动截屏",
+        "browserExtension.detectedHelp": "已识别 Chrome。点击开始后由插件自动截取当前标签页的整页内容，再回传编辑；截图范围不限于当前选区。",
         "browserExtension.title": "Chrome 网页长截图",
         "browserExtension.help": "网页由 Chrome 插件按真实滚动坐标截取，并在本机回传编辑。插件需在 Chrome 中由你启用。",
         "browserExtension.prepare": "设置 Chrome 插件",

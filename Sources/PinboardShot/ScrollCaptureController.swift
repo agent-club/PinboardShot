@@ -322,6 +322,7 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
 final class ScrollCaptureController {
     private let previewController = ScrollCapturePreviewController()
     private var continuation: CheckedContinuation<NSImage?, Error>?
+    private var browserContinuation: CheckedContinuation<Bool, Never>?
     private var stream: SCStream?
     private var output: ScrollCaptureStreamOutput?
     private var target: ScrollCaptureTarget?
@@ -334,8 +335,27 @@ final class ScrollCaptureController {
 
     private var hostTime: TimeInterval { CMClockGetTime(CMClockGetHostTimeClock()).seconds }
 
+    func confirmBrowserCapture(target: ScrollCaptureTarget) async throws -> Bool {
+        guard continuation == nil, browserContinuation == nil else { throw PinboardShotError.captureBusy }
+        return await withCheckedContinuation { continuation in
+            browserContinuation = continuation
+            previewController.onFinish = nil
+            previewController.onCancel = { [weak self] in self?.completeBrowserChoice(start: false) }
+            previewController.onToggleAutoScroll = { [weak self] in self?.completeBrowserChoice(start: true) }
+            previewController.show(near: target.selection.rect, on: target.selection.screen)
+            previewController.showBrowserCapture()
+        }
+    }
+
+    private func completeBrowserChoice(start: Bool) {
+        guard let continuation = browserContinuation else { return }
+        browserContinuation = nil
+        previewController.close()
+        continuation.resume(returning: start)
+    }
+
     func capture(target: ScrollCaptureTarget) async throws -> NSImage? {
-        guard continuation == nil else { throw PinboardShotError.captureBusy }
+        guard continuation == nil, browserContinuation == nil else { throw PinboardShotError.captureBusy }
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             self.target = target
@@ -634,6 +654,7 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
         panel.title = L10n.text("scrollCapture.title")
         titleLabel.stringValue = L10n.text("scrollCapture.title")
         finishButton.title = L10n.text("common.done")
+        finishButton.isEnabled = true
         cancelButton.title = L10n.text("common.cancel")
         statusLabel.stringValue = L10n.text("scrollCapture.status.ready")
         sizeLabel.stringValue = "—"
@@ -682,6 +703,15 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
         autoPausedStatusKey = paused || waitingForPointer ? key : nil
         autoScrollButton.title = L10n.text(paused ? "scrollCapture.auto.start" : "scrollCapture.auto.pause")
         statusLabel.stringValue = L10n.text(key)
+    }
+
+    func showBrowserCapture() {
+        autoPausedStatusKey = nil
+        panel.title = L10n.text("browserExtension.title")
+        titleLabel.stringValue = L10n.text("browserExtension.title")
+        statusLabel.stringValue = L10n.text("browserExtension.detectedHelp")
+        autoScrollButton.title = L10n.text("browserExtension.autoStart")
+        finishButton.isEnabled = false
     }
 
     func showLimitReached() {

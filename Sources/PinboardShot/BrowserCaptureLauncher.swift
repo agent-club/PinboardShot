@@ -13,9 +13,20 @@ enum BrowserCaptureLaunchError: LocalizedError {
     }
 }
 
+enum BrowserCaptureRouting {
+    static func usesChromeExtension(sourceApplicationBundleIdentifier: String?) -> Bool {
+        sourceApplicationBundleIdentifier == "com.google.Chrome"
+    }
+
+    static func matches(windowFrame: CGRect, targetFrame: CGRect) -> Bool {
+        abs(windowFrame.minX - targetFrame.minX) <= 2 && abs(windowFrame.minY - targetFrame.minY) <= 2 &&
+        abs(windowFrame.width - targetFrame.width) <= 2 && abs(windowFrame.height - targetFrame.height) <= 2
+    }
+}
+
 @MainActor
 enum BrowserCaptureLauncher {
-    static func start() async throws {
+    static func start(windowFrame: CGRect? = nil) async throws {
         guard let chrome = NSRunningApplication.runningApplications(withBundleIdentifier: "com.google.Chrome")
             .first(where: { !$0.isTerminated }) else {
             throw BrowserCaptureLaunchError.chromeUnavailable
@@ -29,6 +40,13 @@ enum BrowserCaptureLauncher {
         for _ in 0..<20 {
             try await Task.sleep(for: .milliseconds(100))
             if NSWorkspace.shared.frontmostApplication?.processIdentifier == chrome.processIdentifier {
+                if let windowFrame {
+                    try raiseWindow(in: chrome, matching: windowFrame)
+                    try await Task.sleep(for: .milliseconds(150))
+                }
+                guard NSWorkspace.shared.frontmostApplication?.processIdentifier == chrome.processIdentifier else {
+                    throw BrowserCaptureLaunchError.activationFailed
+                }
                 // Chrome grants activeTab on its extension command. Native Messaging
                 // alone cannot grant page access, so invoke only this installed command.
                 guard let down = CGEvent(keyboardEventSource: nil, virtualKey: 16, keyDown: true),
@@ -44,5 +62,35 @@ enum BrowserCaptureLauncher {
             }
         }
         throw BrowserCaptureLaunchError.activationFailed
+    }
+
+    private static func raiseWindow(in chrome: NSRunningApplication, matching targetFrame: CGRect) throws {
+        let application = AXUIElementCreateApplication(chrome.processIdentifier)
+        var value: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(application, kAXWindowsAttribute as CFString, &value) == .success,
+              let windows = value as? [AXUIElement] else { throw BrowserCaptureLaunchError.activationFailed }
+        let matching = windows.filter { window in
+            guard let frame = frame(of: window) else { return false }
+            return BrowserCaptureRouting.matches(windowFrame: frame, targetFrame: targetFrame)
+        }
+        // A selection in another Chrome window must never silently capture the last active window.
+        guard matching.count == 1,
+              AXUIElementPerformAction(matching[0], kAXRaiseAction as CFString) == .success else {
+            throw BrowserCaptureLaunchError.activationFailed
+        }
+    }
+
+    private static func frame(of window: AXUIElement) -> CGRect? {
+        var positionValue: CFTypeRef?
+        var sizeValue: CFTypeRef?
+        guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &positionValue) == .success,
+              AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &sizeValue) == .success,
+              let positionValue, let sizeValue,
+              CFGetTypeID(positionValue) == AXValueGetTypeID(), CFGetTypeID(sizeValue) == AXValueGetTypeID() else { return nil }
+        var origin = CGPoint.zero
+        var size = CGSize.zero
+        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &origin),
+              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else { return nil }
+        return CGRect(origin: origin, size: size)
     }
 }
