@@ -737,6 +737,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func captureScrollingImage(for selection: SelectedRegion) async throws -> ScrollingCaptureResult? {
         defer { overlayController.dismissRetainedOverlay() }
         let target = try await captureService.scrollCaptureTarget(for: selection)
+        if BrowserCaptureRouting.usesChromeExtension(sourceApplicationBundleIdentifier: target.sourceApplicationBundleIdentifier) {
+            overlayController.dismissRetainedOverlay()
+            if try await scrollCaptureController.confirmBrowserCapture(target: target) {
+                // Release the native capture reservation before Chrome can return its image.
+                capturePipeline.cancelCapture()
+                startBrowserCapture(windowFrame: target.window.frame)
+            }
+            return nil
+        }
         guard let image = try await scrollCaptureController.capture(target: target) else { return nil }
         return ScrollingCaptureResult(
             image: image,
@@ -1049,7 +1058,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    private func startBrowserCapture() {
+    private func startBrowserCapture(windowFrame: CGRect? = nil) {
         guard !browserLaunchInProgress, !browserImportInProgress,
               !capturePipeline.isCapturing, !shortRecordingController.isBusy else {
             present(error: PinboardShotError.captureBusy)
@@ -1060,7 +1069,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         Task { @MainActor [weak self] in
             guard let self else { return }
             defer { self.browserLaunchInProgress = false }
-            do { try await BrowserCaptureLauncher.start() }
+            do { try await BrowserCaptureLauncher.start(windowFrame: windowFrame) }
             catch { self.present(error: error) }
         }
     }

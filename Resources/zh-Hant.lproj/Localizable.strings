@@ -668,3 +668,6 @@
 "browserExtension.chromeUnavailable" = "請先開啟 Chrome，並選取要截圖的網頁。";
 "browserExtension.accessibilityRequired" = "請在系統設定 → 隱私權與安全性 → 輔助使用中允許 PinboardShot，再點擊啟動。";
 "browserExtension.activationFailed" = "無法啟動 Chrome 網頁長截圖。請確認插件已啟用，且 Chrome 中的插件快捷鍵為 ⌘⇧Y；也可直接點擊插件按鈕。";
+
+"browserExtension.autoStart" = "開始自動截屏";
+"browserExtension.detectedHelp" = "已識別 Chrome。點擊開始後由插件自動擷取目前分頁的整頁內容，再回傳編輯；截圖範圍不限於目前選取區域。";

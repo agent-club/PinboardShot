@@ -668,3 +668,6 @@
 "browserExtension.chromeUnavailable" = "Open Chrome and select the webpage to capture first.";
 "browserExtension.accessibilityRequired" = "Allow PinboardShot in System Settings → Privacy & Security → Accessibility, then start again.";
 "browserExtension.activationFailed" = "Could not start Chrome webpage capture. Check that the extension is enabled and its Chrome shortcut is ⌘⇧Y, or click the extension button directly.";
+
+"browserExtension.autoStart" = "Start automatic capture";
+"browserExtension.detectedHelp" = "Chrome detected. Start to capture the entire current tab with the extension and return to the editor. The capture is not limited to the selection.";
