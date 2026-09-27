@@ -1,8 +1,42 @@
 import AppKit
-import CoreImage
 import CoreMedia
 import CoreVideo
 @preconcurrency import ScreenCaptureKit
+
+enum ScrollCaptureFrameCropper {
+    static func crop(_ pixelBuffer: CVPixelBuffer, to rect: CGRect) -> CGImage? {
+        guard CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_32BGRA else { return nil }
+        let bounds = CGRect(
+            x: 0, y: 0,
+            width: CVPixelBufferGetWidth(pixelBuffer),
+            height: CVPixelBufferGetHeight(pixelBuffer)
+        )
+        let crop = rect.integral.intersection(bounds)
+        guard !crop.isNull, crop.width > 0, crop.height > 0 else { return nil }
+        let width = Int(crop.width)
+        let height = Int(crop.height)
+        let bytesPerRow = width * 4
+        guard let data = NSMutableData(length: bytesPerRow * height),
+              CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly) == kCVReturnSuccess else { return nil }
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+        guard let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
+        let sourceBytesPerRow = CVPixelBufferGetBytesPerRow(pixelBuffer)
+        let sourceStart = baseAddress.advanced(by: Int(crop.minY) * sourceBytesPerRow + Int(crop.minX) * 4)
+        for row in 0..<height {
+            memcpy(data.mutableBytes.advanced(by: row * bytesPerRow),
+                   sourceStart.advanced(by: row * sourceBytesPerRow), bytesPerRow)
+        }
+        guard let provider = CGDataProvider(data: data) else { return nil }
+        return CGImage(
+            width: width, height: height,
+            bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: bytesPerRow,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue |
+                CGBitmapInfo.byteOrder32Little.rawValue),
+            provider: provider, decode: nil, shouldInterpolate: false, intent: .defaultIntent
+        )
+    }
+}
 
 struct ScrollCaptureProgress: @unchecked Sendable {
     let previewImage: CGImage?
@@ -11,48 +45,130 @@ struct ScrollCaptureProgress: @unchecked Sendable {
     let result: ScrollCaptureAppendResult
 }
 
-final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
-    let sampleQueue = DispatchQueue(label: "com.ryanwang.PinboardShot.scroll-capture", qos: .userInitiated)
+final class ScrollCaptureFramePipeline: @unchecked Sendable {
+    private let maximumPendingBytes: Int
 
-    private let target: ScrollCaptureTarget
-    private let context = CIContext(options: [.cacheIntermediates: false])
+    private let processingQueue: DispatchQueue
+    private let stateLock = NSLock()
     private let accumulator = ScrollCaptureAccumulator()
+    private let frameSpool = ScrollCaptureFrameSpool()
     private let onProgress: @Sendable (ScrollCaptureProgress) -> Void
-    private let onError: @Sendable (Error) -> Void
-    private var appendedFrameCount = 0
+    private let onObservation: @Sendable (ScrollCaptureFrameObservation) -> Void
+    private var lastProcessedResult: ScrollCaptureAppendResult?
+    private var pendingBytes = 0
+    private var didReachLimit = false
+    private var isCancelled = false
+    private var storageFailed = false
     private var consecutiveUnmatchedFrames = 0
     private var lastPreviewDate = Date.distantPast
-    private var didReachLimit = false
+    private var previousAutomaticFrame: CGImage?
 
     init(
-        target: ScrollCaptureTarget,
+        maximumPendingBytes: Int = 256 * 1_024 * 1_024,
+        processingQueue: DispatchQueue = DispatchQueue(
+            label: "com.ryanwang.PinboardShot.scroll-stitch", qos: .userInitiated
+        ),
         onProgress: @escaping @Sendable (ScrollCaptureProgress) -> Void,
-        onError: @escaping @Sendable (Error) -> Void
+        onObservation: @escaping @Sendable (ScrollCaptureFrameObservation) -> Void = { _ in }
     ) {
-        self.target = target
+        self.maximumPendingBytes = max(0, maximumPendingBytes)
+        self.processingQueue = processingQueue
         self.onProgress = onProgress
-        self.onError = onError
+        self.onObservation = onObservation
     }
 
-    func stream(
-        _ stream: SCStream,
-        didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
-        of outputType: SCStreamOutputType
-    ) {
-        guard !didReachLimit else { return }
-        guard outputType == .screen,
-              sampleBuffer.isValid,
-              isUsableFrame(sampleBuffer),
-              let pixelBuffer = sampleBuffer.imageBuffer,
-              let frame = croppedFrame(from: pixelBuffer) else { return }
+    @discardableResult
+    func submit(_ frame: CGImage, timestamp: TimeInterval = CMClockGetTime(CMClockGetHostTimeClock()).seconds,
+                requiresStableFrame: Bool = false) -> Bool {
+        let (pixelCount, pixelOverflow) = frame.width.multipliedReportingOverflow(by: frame.height)
+        let (byteCount, byteOverflow) = pixelCount.multipliedReportingOverflow(by: 4)
+        guard !pixelOverflow, !byteOverflow, byteCount > 0 else { return false }
+        let reservation = stateLock.withLock { () -> Bool? in
+            guard !isCancelled, !didReachLimit, !storageFailed else { return nil }
+            if byteCount <= maximumPendingBytes - pendingBytes {
+                pendingBytes += byteCount
+                return true
+            }
+            return false
+        }
+        guard let holdsMemory = reservation else { return false }
+        let queuedFrame: CGImage
+        if holdsMemory {
+            queuedFrame = frame
+        } else {
+            // Preserve intermediate frames when matching falls behind. Dropping the
+            // newest frame here can leave a permanent gap once the user scrolls on.
+            guard let storedFrame = frameSpool.storeFrame(frame) else {
+                stopForStorageFailure()
+                return false
+            }
+            queuedFrame = storedFrame
+        }
+        // Keep ScreenCaptureKit's callback free to collect intermediate frames while
+        // a previous frame is being matched against the growing document.
+        processingQueue.async { [self] in
+            defer {
+                if holdsMemory { stateLock.withLock { pendingBytes -= byteCount } }
+                else { frameSpool.releaseFrame() }
+            }
+            guard !stateLock.withLock({ isCancelled || didReachLimit }) else { return }
+            if requiresStableFrame {
+                // Keep smooth-scroll intermediate frames out of the final image.
+                // Two consecutive samples must agree on the viewport position.
+                let previous = previousAutomaticFrame
+                previousAutomaticFrame = queuedFrame
+                guard let previous,
+                      ScrollFrameMatcher.match(previous: previous, current: queuedFrame)?.verticalShift == 0 else { return }
+            } else {
+                previousAutomaticFrame = nil
+            }
+            process(queuedFrame, timestamp: timestamp)
+        }
+        return true
+    }
 
+    private func stopForStorageFailure() {
+        let shouldReport = stateLock.withLock { () -> Bool in
+            guard !storageFailed, !isCancelled else { return false }
+            storageFailed = true
+            return true
+        }
+        guard shouldReport else { return }
+        // This marker follows all previously accepted frames, so the valid tail is
+        // processed before reporting a real storage failure.
+        processingQueue.async { [self] in
+            guard !stateLock.withLock({ isCancelled }) else { return }
+            stateLock.withLock { didReachLimit = true }
+            onProgress(ScrollCaptureProgress(
+                previewImage: accumulator.makePreviewImage(),
+                pixelWidth: accumulator.pixelWidth, pixelHeight: accumulator.pixelHeight,
+                result: .limitReached
+            ))
+        }
+    }
+
+    func observeIdle(timestamp: TimeInterval) {
+        processingQueue.async { [self] in
+            guard !stateLock.withLock({ isCancelled || didReachLimit }),
+                  let lastProcessedResult else { return }
+            onObservation(ScrollCaptureFrameObservation(
+                timestamp: timestamp, pixelHeight: accumulator.pixelHeight,
+                result: lastProcessedResult == .unmatched ? .unmatched : .duplicate
+            ))
+        }
+    }
+
+    private func process(_ frame: CGImage, timestamp: TimeInterval) {
         let result = accumulator.append(frame)
+        lastProcessedResult = result
+        onObservation(ScrollCaptureFrameObservation(
+            timestamp: timestamp, pixelHeight: accumulator.pixelHeight, result: result
+        ))
         let wasUnmatched = consecutiveUnmatchedFrames >= 5
         switch result {
         case .initial:
             consecutiveUnmatchedFrames = 0
         case .appended:
-            appendedFrameCount += 1
             consecutiveUnmatchedFrames = 0
         case .duplicate:
             consecutiveUnmatchedFrames = 0
@@ -63,14 +179,17 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
             consecutiveUnmatchedFrames += 1
             guard consecutiveUnmatchedFrames == 5 else { return }
         case .limitReached:
-            didReachLimit = true
+            stateLock.withLock { didReachLimit = true }
         }
 
-        let shouldRenderPreview = result == .initial ||
-            Date().timeIntervalSince(lastPreviewDate) >= 0.12 ||
-            result == .limitReached
-        let preview = shouldRenderPreview ? accumulator.makePreviewImage() : nil
-        if shouldRenderPreview { lastPreviewDate = Date() }
+        let shouldReport = result == .initial || result == .unmatched ||
+            result == .limitReached || wasUnmatched ||
+            Date().timeIntervalSince(lastPreviewDate) >= 0.12
+        guard shouldReport else { return }
+        // A fast scroll can produce many matched frames per second. Limit preview
+        // reads and main-thread updates so they do not delay the stitcher.
+        let preview = accumulator.makePreviewImage()
+        lastPreviewDate = Date()
         onProgress(ScrollCaptureProgress(
             previewImage: preview,
             pixelWidth: accumulator.pixelWidth,
@@ -79,19 +198,99 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
         ))
     }
 
+    func cancel() {
+        stateLock.withLock { isCancelled = true }
+    }
+
+    func finalImage() -> CGImage? {
+        processingQueue.sync { accumulator.makeImage() }
+    }
+
+    func hasAppendedContent() -> Bool {
+        processingQueue.sync { accumulator.hasContent }
+    }
+
+    func hasUnmatchedFrames() -> Bool {
+        processingQueue.sync { consecutiveUnmatchedFrames >= 5 }
+    }
+}
+
+final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegate, @unchecked Sendable {
+    let captureQueue = DispatchQueue(label: "com.ryanwang.PinboardShot.scroll-frames", qos: .userInitiated)
+
+    private let target: ScrollCaptureTarget
+    private let pipeline: ScrollCaptureFramePipeline
+    private let onError: @Sendable (Error) -> Void
+    private var frameOrder = ScrollCaptureFrameOrder()
+    private var automaticSampling = false
+
+    init(
+        target: ScrollCaptureTarget,
+        onProgress: @escaping @Sendable (ScrollCaptureProgress) -> Void,
+        onObservation: @escaping @Sendable (ScrollCaptureFrameObservation) -> Void,
+        onError: @escaping @Sendable (Error) -> Void
+    ) {
+        self.target = target
+        self.pipeline = ScrollCaptureFramePipeline(onProgress: onProgress, onObservation: onObservation)
+        self.onError = onError
+    }
+
+    func stream(
+        _ stream: SCStream,
+        didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
+        of outputType: SCStreamOutputType
+    ) {
+        guard !automaticSampling, outputType == .screen, sampleBuffer.isValid,
+              let status = frameStatus(sampleBuffer) else { return }
+        guard status == .complete || status == .started,
+              let pixelBuffer = sampleBuffer.imageBuffer,
+              let frame = croppedFrame(from: pixelBuffer) else { return }
+        let timestamp = sampleBuffer.presentationTimeStamp.seconds
+        guard frameOrder.accept(timestamp: timestamp) else { return }
+        pipeline.submit(frame, timestamp: timestamp)
+    }
+
+    func submitSnapshot(_ image: CGImage, timestamp: TimeInterval) {
+        captureQueue.async { [self] in
+            // A screenshot request may finish after a newer streamed frame. Never
+            // append that older viewport after the newer one or acknowledge a step with it.
+            guard frameOrder.accept(timestamp: timestamp) else { return }
+            let scaleX = CGFloat(image.width) / target.window.frame.width
+            let scaleY = CGFloat(image.height) / target.window.frame.height
+            let rect = CGRect(x: target.cropRect.minX * scaleX, y: target.cropRect.minY * scaleY,
+                              width: target.cropRect.width * scaleX, height: target.cropRect.height * scaleY)
+            guard let frame = image.cropping(to: rect.integral) else { return }
+            pipeline.submit(frame, timestamp: timestamp, requiresStableFrame: true)
+        }
+    }
+
+    func setAutomaticSampling(_ enabled: Bool) {
+        // Serialize the mode change with frame intake; a stream and a screenshot
+        // must never both commit views of the same automatic scrolling step.
+        captureQueue.async { [self] in automaticSampling = enabled }
+    }
+
     func stream(_ stream: SCStream, didStopWithError error: Error) {
         onError(error)
     }
 
+    func cancel() {
+        pipeline.cancel()
+    }
+
     func finalImage() -> CGImage? {
-        sampleQueue.sync { accumulator.makeImage() }
+        captureQueue.sync { pipeline.finalImage() }
     }
 
     func hasAppendedContent() -> Bool {
-        sampleQueue.sync { accumulator.hasContent }
+        captureQueue.sync { pipeline.hasAppendedContent() }
     }
 
-    private func isUsableFrame(_ sampleBuffer: CMSampleBuffer) -> Bool {
+    func hasUnmatchedFrames() -> Bool {
+        captureQueue.sync { pipeline.hasUnmatchedFrames() }
+    }
+
+    private func frameStatus(_ sampleBuffer: CMSampleBuffer) -> SCFrameStatus? {
         guard let attachmentsArray = CMSampleBufferGetSampleAttachmentsArray(
             sampleBuffer,
             createIfNecessary: false
@@ -99,24 +298,23 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
               let attachments = attachmentsArray.first,
               let statusRawValue = attachments[.status] as? Int,
               let status = SCFrameStatus(rawValue: statusRawValue) else {
-            return false
+            return nil
         }
-        return status == .complete || status == .started
+        return status
     }
 
     private func croppedFrame(from pixelBuffer: CVPixelBuffer) -> CGImage? {
-        let fullImage = CIImage(cvPixelBuffer: pixelBuffer)
-        guard let full = context.createCGImage(fullImage, from: fullImage.extent) else { return nil }
-        let scaleX = CGFloat(full.width) / target.window.frame.width
-        let scaleY = CGFloat(full.height) / target.window.frame.height
+        let scaleX = CGFloat(CVPixelBufferGetWidth(pixelBuffer)) / target.window.frame.width
+        let scaleY = CGFloat(CVPixelBufferGetHeight(pixelBuffer)) / target.window.frame.height
         let cropRect = CGRect(
             x: target.cropRect.minX * scaleX,
             y: target.cropRect.minY * scaleY,
             width: target.cropRect.width * scaleX,
             height: target.cropRect.height * scaleY
-        ).integral.intersection(CGRect(x: 0, y: 0, width: full.width, height: full.height))
-        guard !cropRect.isNull, cropRect.width > 0, cropRect.height > 0 else { return nil }
-        return full.cropping(to: cropRect)
+        )
+        // ScreenCaptureKit already supplies BGRA pixels; copying only the chosen rows
+        // keeps the stream callback short enough to retain frames during a fast scroll.
+        return ScrollCaptureFrameCropper.crop(pixelBuffer, to: cropRect)
     }
 }
 
@@ -129,18 +327,27 @@ final class ScrollCaptureController {
     private var target: ScrollCaptureTarget?
     private var isStopping = false
     private var hasUnmatchedFrames = false
+    private var autoScroll: ScrollCaptureAutoScroll?
+    private var autoScrollTask: Task<Void, Never>?
+    private var targetActivationDeadline: TimeInterval = 0
+    private var waitingForPointer = false
+
+    private var hostTime: TimeInterval { CMClockGetTime(CMClockGetHostTimeClock()).seconds }
 
     func capture(target: ScrollCaptureTarget) async throws -> NSImage? {
         guard continuation == nil else { throw PinboardShotError.captureBusy }
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
             self.target = target
+            autoScroll = ScrollCaptureAutoScroll(viewportHeight: target.cropRect.height, now: hostTime)
+            autoScroll?.pause(.user)
             previewController.onFinish = { [weak self] in
                 Task { @MainActor in await self?.finishCapture() }
             }
             previewController.onCancel = { [weak self] in
                 Task { @MainActor in await self?.cancelCapture() }
             }
+            previewController.onToggleAutoScroll = { [weak self] in self?.toggleAutoScroll() }
             previewController.show(near: target.selection.rect, on: target.selection.screen)
             Task { @MainActor [weak self] in
                 do {
@@ -158,6 +365,9 @@ final class ScrollCaptureController {
             onProgress: { [weak self] progress in
                 Task { @MainActor in self?.handle(progress) }
             },
+            onObservation: { [weak self] observation in
+                Task { @MainActor in self?.autoScroll?.observe(observation) }
+            },
             onError: { [weak self] error in
                 Task { @MainActor in
                     guard let self, !self.isStopping else { return }
@@ -173,7 +383,7 @@ final class ScrollCaptureController {
         )
         configuration.width = dimensions.width
         configuration.height = dimensions.height
-        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 30)
+        configuration.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         configuration.queueDepth = 5
         configuration.showsCursor = false
         configuration.capturesAudio = false
@@ -181,7 +391,7 @@ final class ScrollCaptureController {
         configuration.pixelFormat = kCVPixelFormatType_32BGRA
 
         let stream = SCStream(filter: filter, configuration: configuration, delegate: output)
-        try stream.addStreamOutput(output, type: .screen, sampleHandlerQueue: output.sampleQueue)
+        try stream.addStreamOutput(output, type: .screen, sampleHandlerQueue: output.captureQueue)
         self.output = output
         self.stream = stream
         try await stream.startCapture()
@@ -195,6 +405,114 @@ final class ScrollCaptureController {
            let application = NSRunningApplication(processIdentifier: processID) {
             application.activate()
         }
+        targetActivationDeadline = hostTime + 0.8
+        autoScrollTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self, self.continuation != nil, !self.isStopping else { return }
+                if self.autoScroll?.isPaused == false {
+                    let timestamp = self.hostTime
+                    do {
+                        // An unchanged window need not emit fresh stream buffers.
+                        // Actively sample it so the matching barrier also works at rest.
+                        let image = try await SCScreenshotManager.captureImage(
+                            contentFilter: filter, configuration: configuration)
+                        guard !Task.isCancelled, self.output === output, !self.isStopping else { return }
+                        if self.autoScroll?.isPaused == false {
+                            output.submitSnapshot(image, timestamp: timestamp)
+                        }
+                    } catch {
+                        guard !Task.isCancelled, self.output === output else { return }
+                        self.pauseAutoScroll(.stalled)
+                    }
+                }
+                await self.advanceAutoScroll()
+                do { try await Task.sleep(for: .milliseconds(200)) } catch { return }
+            }
+        }
+    }
+
+    private func advanceAutoScroll() async {
+        guard autoScroll?.isPaused == false, let target else { return }
+        guard let processID = target.window.owningApplication?.processID else {
+            pauseAutoScroll(.targetChanged)
+            return
+        }
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == processID else {
+            if hostTime < targetActivationDeadline { return }
+            pauseAutoScroll(.targetChanged)
+            return
+        }
+        targetActivationDeadline = 0
+        let captureRect = CGRect(x: target.window.frame.minX + target.cropRect.minX,
+                                 y: target.window.frame.minY + target.cropRect.minY,
+                                 width: target.cropRect.width, height: target.cropRect.height)
+        guard let pointer = CGEvent(source: nil)?.location, captureRect.contains(pointer) else {
+            waitingForPointer = true
+            previewController.showAutoScroll(paused: false, waitingForPointer: true)
+            return
+        }
+        if waitingForPointer {
+            // Moving out suspends input without moving the cursor. Start a fresh
+            // frame barrier on re-entry rather than timing out the suspended step.
+            waitingForPointer = false
+            autoScroll?.resume(now: hostTime)
+            previewController.showAutoScroll(paused: false)
+            return
+        }
+        switch autoScroll?.tick(now: hostTime) ?? .wait {
+        case .wait: break
+        case .scroll(let points):
+            let point = pointer
+            let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID)
+                as? [[String: Any]]
+            let hitWindow = windows?.first { info in
+                guard (info[kCGWindowLayer as String] as? Int) == 0,
+                      let bounds = info[kCGWindowBounds as String] as? NSDictionary,
+                      let rect = CGRect(dictionaryRepresentation: bounds) else { return false }
+                return rect.contains(point)
+            }
+            guard (hitWindow?[kCGWindowNumber as String] as? UInt32) == target.window.windowID else {
+                pauseAutoScroll(.targetChanged)
+                return
+            }
+            guard CGPreflightPostEventAccess(),
+                  let event = ScrollCaptureAutoScroll.scrollEvent(points: points) else {
+                pauseAutoScroll(.stalled)
+                return
+            }
+            // A synthetic wheel location also repositions the real cursor. Keep
+            // the event's current pointer location and only scroll inside the selection.
+            guard captureRect.contains(event.location) else { return }
+            event.post(tap: .cghidEventTap)
+        case .finish: await finishCapture()
+        case .pause(let reason): pauseAutoScroll(reason)
+        }
+    }
+
+    private func pauseAutoScroll(_ reason: ScrollCaptureAutoScroll.PauseReason) {
+        autoScroll?.pause(reason)
+        output?.setAutomaticSampling(false)
+        previewController.showAutoScroll(paused: true, statusKey: "scrollCapture.auto.\(reason.rawValue)")
+    }
+
+    private func toggleAutoScroll() {
+        guard continuation != nil, !isStopping else { return }
+        if autoScroll?.isPaused == false {
+            pauseAutoScroll(.user)
+        } else {
+            guard CGPreflightPostEventAccess() || CGRequestPostEventAccess() else {
+                previewController.showAutoScroll(paused: true, statusKey: "scrollCapture.auto.permission")
+                return
+            }
+            guard let processID = target?.window.owningApplication?.processID,
+                  let application = NSRunningApplication(processIdentifier: processID),
+                  application.activate() else { pauseAutoScroll(.targetChanged); return }
+            autoScroll?.resume(now: hostTime)
+            waitingForPointer = true
+            output?.setAutomaticSampling(true)
+            targetActivationDeadline = hostTime + 0.8
+            previewController.showAutoScroll(paused: false, waitingForPointer: true)
+        }
     }
 
     private func handle(_ progress: ScrollCaptureProgress) {
@@ -205,14 +523,18 @@ final class ScrollCaptureController {
         case .limitReached: break
         }
         previewController.update(progress)
+        if autoScroll?.isPaused == false { previewController.showAutoScroll(paused: false, waitingForPointer: waitingForPointer) }
         if progress.result == .limitReached {
+            autoScroll?.pause(.stalled)
+            previewController.showAutoScroll(paused: true)
             previewController.showLimitReached()
         }
     }
 
     private func finishCapture() async {
         guard !isStopping, continuation != nil else { return }
-        if hasUnmatchedFrames {
+        pauseAutoScroll(.user)
+        if output?.hasUnmatchedFrames() ?? hasUnmatchedFrames {
             // Preserve the valid partial image while offering a way to regain overlap before finalizing.
             let alert = NSAlert()
             alert.messageText = L10n.text("scrollCapture.unmatchedFinish.title")
@@ -222,6 +544,7 @@ final class ScrollCaptureController {
             guard alert.runModal() == .alertSecondButtonReturn else { return }
         }
         isStopping = true
+        autoScrollTask?.cancel()
         if let stream { try? await stream.stopCapture() }
         guard let output, output.hasAppendedContent() else {
             complete(throwing: PinboardShotError.scrollCaptureNoMovement)
@@ -242,7 +565,9 @@ final class ScrollCaptureController {
     private func cancelCapture() async {
         guard !isStopping, continuation != nil else { return }
         isStopping = true
+        autoScrollTask?.cancel()
         if let stream { try? await stream.stopCapture() }
+        output?.cancel()
         complete(returning: nil)
     }
 
@@ -261,6 +586,12 @@ final class ScrollCaptureController {
     }
 
     private func reset() {
+        autoScrollTask?.cancel()
+        autoScrollTask = nil
+        autoScroll = nil
+        targetActivationDeadline = 0
+        waitingForPointer = false
+        output?.cancel()
         continuation = nil
         stream = nil
         output = nil
@@ -274,6 +605,7 @@ final class ScrollCaptureController {
 private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
     var onFinish: (() -> Void)?
     var onCancel: (() -> Void)?
+    var onToggleAutoScroll: (() -> Void)?
 
     private let panel: NSPanel
     private let imageView = ScrollCapturePreviewImageView()
@@ -282,6 +614,8 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
     private let sizeLabel = NSTextField(labelWithString: "—")
     private let finishButton = NSButton(title: "", target: nil, action: nil)
     private let cancelButton = NSButton(title: "", target: nil, action: nil)
+    private let autoScrollButton = NSButton(title: "", target: nil, action: nil)
+    private var autoPausedStatusKey: String?
     private var isClosingProgrammatically = false
 
     override init() {
@@ -305,6 +639,7 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
         sizeLabel.stringValue = "—"
         imageView.image = nil
         imageView.resetDocumentSize()
+        showAutoScroll(paused: true, statusKey: "scrollCapture.auto.ready")
 
         let visible = screen.visibleFrame
         let size = panel.frame.size
@@ -339,6 +674,14 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
         case .limitReached:
             showLimitReached()
         }
+        if let autoPausedStatusKey { statusLabel.stringValue = L10n.text(autoPausedStatusKey) }
+    }
+
+    func showAutoScroll(paused: Bool, statusKey: String = "scrollCapture.auto.user", waitingForPointer: Bool = false) {
+        let key = paused ? statusKey : (waitingForPointer ? "scrollCapture.auto.pointer" : "scrollCapture.auto.running")
+        autoPausedStatusKey = paused || waitingForPointer ? key : nil
+        autoScrollButton.title = L10n.text(paused ? "scrollCapture.auto.start" : "scrollCapture.auto.pause")
+        statusLabel.stringValue = L10n.text(key)
     }
 
     func showLimitReached() {
@@ -388,10 +731,12 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
         cancelButton.target = self
         cancelButton.action = #selector(cancelPressed)
         cancelButton.title = L10n.text("common.cancel")
-        let buttonStack = NSStackView(views: [cancelButton, finishButton])
+        autoScrollButton.target = self
+        autoScrollButton.action = #selector(toggleAutoPressed)
+        let buttonStack = NSStackView(views: [autoScrollButton, cancelButton, finishButton])
         buttonStack.orientation = .horizontal
         buttonStack.alignment = .centerY
-        buttonStack.distribution = .fillEqually
+        buttonStack.distribution = .fillProportionally
         buttonStack.spacing = 8
 
         let stack = NSStackView(views: [titleLabel, statusLabel, scrollView, sizeLabel, buttonStack])
@@ -418,6 +763,7 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
 
     @objc private func finishPressed() { onFinish?() }
     @objc private func cancelPressed() { onCancel?() }
+    @objc private func toggleAutoPressed() { onToggleAutoScroll?() }
 }
 
 @MainActor

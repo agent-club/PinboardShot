@@ -4,6 +4,17 @@ import Testing
 
 @Suite("Capture automation isolation")
 struct CaptureAutomationTests {
+    @Test("浏览器回传只接受单个UUID，不接受外部文件路径")
+    func browserImportContract() throws {
+        let id = UUID()
+        #expect(AutomationCommand(url: try #require(URL(string: "pinboardshot://browser-import?id=\(id.uuidString)"))) == .importBrowserCapture(id))
+        for value in ["pinboardshot://browser-import?id=bad", "pinboardshot://browser-import?path=/tmp/image.png",
+                      "pinboardshot://browser-import?id=\(id.uuidString)&id=\(id.uuidString)",
+                      "pinboardshot://browser-import/file?id=\(id.uuidString)",
+                      "pinboardshot://browser-import?id=\(id.uuidString)&path=/tmp/image.png"] {
+            #expect(AutomationCommand(url: try #require(URL(string: value))) == nil)
+        }
+    }
     @Test("所有公开截图模式均携带自己的贴屏选项")
     func captureModesKeepTheirOwnOptions() throws {
         let modes: [(String, CaptureAction)] = [
@@ -15,6 +26,18 @@ struct CaptureAutomationTests {
             let copyURL = try #require(URL(string: "pinboardshot://capture?mode=\(mode)"))
             #expect(AutomationCommand(url: pinnedURL) == .capture(action, pinResult: true))
             #expect(AutomationCommand(url: copyURL) == .capture(action, pinResult: false))
+        }
+    }
+
+    @Test("外部链接中无需框选的截图必须先获本机批准")
+    func immediateCaptureModesRequireApproval() throws {
+        for mode in ["display", "window", "repeat"] {
+            let url = try #require(URL(string: "pinboardshot://capture?mode=\(mode)&after=pin"))
+            #expect(AutomationCommand(url: url)?.requiresCaptureApproval == true)
+        }
+        for mode in ["region", "delayed", "scroll"] {
+            let url = try #require(URL(string: "pinboardshot://capture?mode=\(mode)"))
+            #expect(AutomationCommand(url: url)?.requiresCaptureApproval == false)
         }
     }
 

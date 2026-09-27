@@ -87,17 +87,20 @@
 "common.cancel" = "Cancel";
 "common.add" = "Add";
 "common.done" = "Done";
-"scrollCapture.title" = "Scrolling Capture Preview";
-"scrollCapture.selectionHint" = "Select a scrollable area inside a window · Esc to cancel";
-"scrollCapture.status.ready" = "Scroll up or down inside the selected area with some overlap, then click Done.";
-"scrollCapture.status.capturing" = "Matching overlaps and extending the capture…";
-"scrollCapture.status.revisited" = "Reviewing an already captured area. Keep scrolling to resume seamlessly.";
-"scrollCapture.status.unmatched" = "Could not match this frame. Scroll back to captured content, then scroll slowly to restore overlap.";
-"scrollCapture.unmatchedFinish.title" = "Recent content was not stitched";
-"scrollCapture.unmatchedFinish.help" = "Scroll back to captured content and continue, or keep only the stitched portion shown in the preview.";
-"scrollCapture.unmatchedFinish.continue" = "Continue Capturing";
-"scrollCapture.unmatchedFinish.savePartial" = "Keep Stitched Portion";
-"scrollCapture.status.limitReached" = "The scrolling capture reached its temporary-storage limit. Click Done.";
+"automation.captureApproval.title" = "Allow Automated Capture?";
+"automation.captureApproval.message" = "An external link requests a screenshot. The image will be copied to the clipboard and saved in local history. Continue only if you trust the source.";
+"automation.captureApproval.allow" = "Allow Capture";
+"scrollCapture.title" = "Auto Scrolling Capture";
+"scrollCapture.selectionHint" = "Select scrolling content · Click Start Auto Capture · Move the pointer into the selection";
+"scrollCapture.status.ready" = "Scroll down with a wheel or trackpad, keeping at least a quarter viewport of overlap.";
+"scrollCapture.status.capturing" = "New content connected. The long-image preview is growing; keep scrolling down.";
+"scrollCapture.status.unmatchedDirect" = "The view cannot be aligned yet. Pause, then scroll down slowly. If the preview still does not grow, reselect the scrolling content.";
+"scrollCapture.status.processing" = "Creating the confirmed continuous image…";
+"scrollCapture.status.cancelling" = "Cancelling capture…";
+"scrollCapture.unmatchedFinish.title" = "Only confirmed continuous content is included";
+"scrollCapture.unmatchedFinish.help" = "Capture paused or reached its limit. The latest view was not added. Keep the confirmed portion? The preview shows the last confirmed view.";
+"scrollCapture.unmatchedFinish.savePartial" = "Keep Confirmed Portion";
+"scrollCapture.status.limitReached" = "Unable to store more frames. Click Done to keep the captured content.";
 "onboarding.title" = "PinboardShot Is Running in the Menu Bar";
 "onboarding.message" = "PinboardShot does not appear in the Dock. Find the viewfinder icon in the menu bar.\n\nGlobal shortcuts are disabled by default. Add only the ones you want in Settings → Shortcuts.\n\nCapturing requires Screen & System Audio Recording access. Images, annotations, and history stay on this Mac; only software updates use the network.";
 "onboarding.requestPermission" = "Continue and Request Access";
@@ -368,7 +371,7 @@
 "error.invalidSelection" = "The selected region is outside the display bounds.";
 "error.emptyCaptureFrame" = "The capture appears to be an empty frame. The clipboard was not changed. Select a region with visible content and try again.";
 "error.scrollTargetUnavailable" = "No continuously capturable window was found at the center of the selection. Select a scrolling area inside a window.";
-"error.scrollCaptureNoMovement" = "No stitchable scrolling content was detected. Scroll up or down inside the selected area with some overlap.";
+"error.scrollCaptureNoMovement" = "No usable frame was captured. Select a smaller scrolling region and try again.";
 "error.ocrNoText" = "No copyable text was recognized in the selected region.";
 "preferences.trayIcon" = "Menu Bar Icon";
 "preferences.trayIconHelp" = "Changes take effect immediately. Monochrome icons adapt to light and dark menu bars; animated icons stay still when Reduce Motion is enabled.";
@@ -630,3 +633,38 @@
 "feature.record.closeDiscardTitle" = "Close and discard the unsaved recording?";
 "feature.record.closeDiscardHelp" = "Cancel to return to the preview and save this recording.";
 "feature.record.exporting" = "Video is being saved. Please wait before quitting.";
+
+"scrollCapture.status.moveDown" = "Upward scrolling detected; appending paused. Scroll down to the end of the captured content to continue.";
+
+"scrollCapture.status.geometryChanged" = "The window or region changed size. Finish this capture, then select a new region.";
+
+"scrollCapture.inputUnavailable" = "Could not receive scrolling input. Close this capture and try again.";
+
+"scrollCapture.auto.start" = "Start Auto Capture";
+"scrollCapture.auto.ready" = "Scroll manually, or click Start Auto Capture.";
+"scrollCapture.auto.pointer" = "Move the pointer into the selection to scroll automatically. Moving it out suspends scrolling without moving your pointer.";
+"scrollCapture.auto.pause" = "Pause";
+"scrollCapture.auto.resume" = "Resume Auto Scroll";
+"scrollCapture.auto.running" = "Scrolling automatically after each view is confirmed. Pause or finish at any time.";
+"scrollCapture.auto.user" = "Auto scroll paused. Adjust the view manually, then click Start Auto Capture.";
+"scrollCapture.auto.unmatched" = "The view has not aligned. Auto scroll paused. Return to the last confirmed view before resuming.";
+"scrollCapture.auto.stalled" = "Capture has not caught up. Auto scroll paused. Resume when the view settles, or finish this capture.";
+"scrollCapture.auto.noMovement" = "No scrolling detected. Check that the selected content can scroll, then resume or select another region.";
+"scrollCapture.auto.targetChanged" = "The target app lost focus. Auto scroll paused. Click Start Auto Capture to return to it.";
+"scrollCapture.auto.permission" = "Auto scroll needs Accessibility access. Allow PinboardShot in System Settings → Privacy & Security → Accessibility, then start scrolling capture again.";
+
+"browserExtension.title" = "Chrome webpage capture";
+"browserExtension.help" = "Capture webpages at their actual scroll positions and edit them locally in PinboardShot. Enable the extension in Chrome first.";
+"browserExtension.prepare" = "Set up Chrome extension";
+"browserExtension.setupTitle" = "Connect Chrome to PinboardShot";
+"browserExtension.setupHelp" = "Register a local bridge and export the extension into Downloads. Images stay on this Mac. The extension is not yet in the Chrome Web Store; enable Developer mode and load the exported folder on the extensions page.";
+"browserExtension.connect" = "Connect and export extension";
+"browserExtension.readyTitle" = "Extension exported to Downloads";
+"browserExtension.readyHelp" = "Extension exported and path copied:\n%@\n\nOpen chrome://extensions, enable Developer mode, and click Load unpacked. Select the PinboardShot-Chrome folder in Downloads, or press ⌘⇧G and paste the copied path. Keep this folder: Chrome runs the extension from it.";
+"browserExtension.importFailed" = "Could not import the webpage capture. Its dimensions changed, image data is incomplete, or the size limit was exceeded. Capture it again.";
+
+"browserExtension.start" = "Start Chrome webpage capture";
+"browserExtension.startHelp" = "Select the webpage in Chrome first. Start capture here to scroll automatically and return to the editor. Accessibility access is required; keep the extension shortcut set to ⌘⇧Y.";
+"browserExtension.chromeUnavailable" = "Open Chrome and select the webpage to capture first.";
+"browserExtension.accessibilityRequired" = "Allow PinboardShot in System Settings → Privacy & Security → Accessibility, then start again.";
+"browserExtension.activationFailed" = "Could not start Chrome webpage capture. Check that the extension is enabled and its Chrome shortcut is ⌘⇧Y, or click the extension button directly.";

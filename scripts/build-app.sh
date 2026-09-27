@@ -20,6 +20,14 @@ mkdir -p \
   .build/app/PinboardShot.app/Contents/Resources \
   .build/app/PinboardShot.app/Contents/Frameworks
 cp "$bin_path/PinboardShot" .build/app/PinboardShot.app/Contents/MacOS/PinboardShot
+cp "$bin_path/PinboardShotBrowserHost" .build/app/PinboardShot.app/Contents/MacOS/PinboardShotBrowserHost
+mkdir -p .build/app/PinboardShot.app/Contents/Resources/ChromeExtension
+cp browser-extension/manifest.json browser-extension/*.js browser-extension/*.html browser-extension/*.css \
+  .build/app/PinboardShot.app/Contents/Resources/ChromeExtension/
+cp -R browser-extension/lib .build/app/PinboardShot.app/Contents/Resources/ChromeExtension/
+if [[ -d browser-extension/_locales ]]; then
+  cp -R browser-extension/_locales .build/app/PinboardShot.app/Contents/Resources/ChromeExtension/
+fi
 cp Resources/Info.plist .build/app/PinboardShot.app/Contents/Info.plist
 xcrun actool Resources/Assets.xcassets \
   --compile .build/app/PinboardShot.app/Contents/Resources \
@@ -69,6 +77,7 @@ sign_sparkle() {
 
 if [[ "$requested_signing_identity" == "-" ]]; then
   sign_sparkle - false false
+  codesign --force --sign - .build/app/PinboardShot.app/Contents/MacOS/PinboardShotBrowserHost
   codesign --force --sign - \
     --requirements '=designated => identifier "com.ryanwang.PinboardShot"' \
     .build/app/PinboardShot.app
@@ -90,6 +99,7 @@ else
       app_sign_args+=(--timestamp)
     fi
     if sign_sparkle "$signing_identity" true "$secure_timestamp" && \
+       codesign $app_sign_args .build/app/PinboardShot.app/Contents/MacOS/PinboardShotBrowserHost && \
        codesign $app_sign_args .build/app/PinboardShot.app; then
       signed_with_stable_identity=true
       break
@@ -102,6 +112,7 @@ else
     echo "warning: no stable code-signing identity available; falling back to ad-hoc signing" >&2
     echo "warning: screen recording permission may reset after each rebuild" >&2
     sign_sparkle - false false
+    codesign --force --sign - .build/app/PinboardShot.app/Contents/MacOS/PinboardShotBrowserHost
     codesign --force --sign - \
       --requirements '=designated => identifier "com.ryanwang.PinboardShot"' \
       .build/app/PinboardShot.app
@@ -111,11 +122,17 @@ else
   fi
 fi
 codesign --verify --deep --strict .build/app/PinboardShot.app
+codesign --verify --strict .build/app/PinboardShot.app/Contents/MacOS/PinboardShotBrowserHost
 expected_architectures="${(j: :)architectures}"
 actual_architectures="$(lipo -archs .build/app/PinboardShot.app/Contents/MacOS/PinboardShot)"
+host_architectures="$(lipo -archs .build/app/PinboardShot.app/Contents/MacOS/PinboardShotBrowserHost)"
 for architecture in $architectures; do
   if [[ " $actual_architectures " != *" $architecture "* ]]; then
     echo "Missing architecture $architecture (expected: $expected_architectures; actual: $actual_architectures)" >&2
+    exit 1
+  fi
+  if [[ " $host_architectures " != *" $architecture "* ]]; then
+    echo "Browser host missing architecture $architecture (actual: $host_architectures)" >&2
     exit 1
   fi
 done

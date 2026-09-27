@@ -87,17 +87,20 @@
 "common.cancel" = "取消";
 "common.add" = "添加";
 "common.done" = "完成";
-"scrollCapture.title" = "滚动截图预览";
-"scrollCapture.selectionHint" = "框选窗口内的可滚动区域 · Esc 取消";
-"scrollCapture.status.ready" = "在所选区域内向上或向下滚动，保留重叠内容；完成后点击“完成”。";
-"scrollCapture.status.capturing" = "正在识别重叠内容并拼接…";
-"scrollCapture.status.revisited" = "正在浏览已捕获区域，继续滚动即可无缝接回。";
-"scrollCapture.status.unmatched" = "暂时无法匹配。请回滚到已拼接内容，再缓慢滚动以恢复重叠。";
-"scrollCapture.unmatchedFinish.title" = "最近的内容未能拼接";
-"scrollCapture.unmatchedFinish.help" = "回滚到已拼接的画面后继续滚动，或仅保留当前预览中的已拼接部分。";
-"scrollCapture.unmatchedFinish.continue" = "继续采集";
-"scrollCapture.unmatchedFinish.savePartial" = "保留已拼接部分";
-"scrollCapture.status.limitReached" = "已达到长截图临时存储上限，请点击“完成”。";
+"automation.captureApproval.title" = "允许自动截屏？";
+"automation.captureApproval.message" = "外部链接请求截取屏幕。截屏将写入剪贴板并保存在本机历史记录中。仅在信任发起方时继续。";
+"automation.captureApproval.allow" = "允许截屏";
+"scrollCapture.title" = "自动滚动截图";
+"scrollCapture.selectionHint" = "框选滚动正文 · 点击开始自动截屏 · 鼠标移入选区后自动滚动";
+"scrollCapture.status.ready" = "用滚轮或触控板向下滚动，保留至少四分之一屏重叠。";
+"scrollCapture.status.capturing" = "已接上新内容。长图预览正在增长，请继续向下滚动。";
+"scrollCapture.status.unmatchedDirect" = "暂时无法对齐画面。请稍停后缓慢向下滚动；若预览仍不增长，请重新框选滚动正文。";
+"scrollCapture.status.processing" = "正在生成已确认的连续截图…";
+"scrollCapture.status.cancelling" = "正在取消截图…";
+"scrollCapture.unmatchedFinish.title" = "截图仅包含已确认的连续部分";
+"scrollCapture.unmatchedFinish.help" = "采集已暂停或达到上限，最新画面尚未加入。是否保留已确认的部分？预览显示的是最后确认画面。";
+"scrollCapture.unmatchedFinish.savePartial" = "保留已确认部分";
+"scrollCapture.status.limitReached" = "无法继续保存画面，请点击“完成”保留已采集内容。";
 "onboarding.title" = "PinboardShot 已在菜单栏运行";
 "onboarding.message" = "PinboardShot 不显示在 Dock 中。请在菜单栏找到取景框图标。\n\n默认不启用全局快捷键。可在“设置 → 快捷键”中按需添加。\n\n截图需要“屏幕与系统音频录制”权限。图片、标注和历史保存在本机；只有软件更新会访问网络。";
 "onboarding.requestPermission" = "继续并请求权限";
@@ -368,7 +371,7 @@
 "error.invalidSelection" = "截图选区超出了屏幕范围。";
 "error.emptyCaptureFrame" = "本次截图被判定为空白帧，剪贴板没有更新，仍保留上一次内容。请重新选择包含可见内容的区域。";
 "error.scrollTargetUnavailable" = "选区中心没有找到可持续捕获的窗口。请重新框选窗口内的滚动区域。";
-"error.scrollCaptureNoMovement" = "没有检测到可拼接的滚动内容。请在所选区域内向上或向下滚动，并保留重叠内容。";
+"error.scrollCaptureNoMovement" = "未取得可用画面。请缩小滚动正文选区后重试。";
 "error.ocrNoText" = "没有在选区内识别到可复制的文字。";
 "preferences.trayIcon" = "菜单栏图标";
 "preferences.trayIconHelp" = "选择后立即生效。单色图标自动适配浅色与深色菜单栏；动态图标会持续变化，开启“减弱动态效果”时保持静止。";
@@ -630,3 +633,38 @@
 "feature.record.closeDiscardTitle" = "关闭并丢弃未保存的录屏？";
 "feature.record.closeDiscardHelp" = "取消后可返回预览窗口保存当前视频。";
 "feature.record.exporting" = "视频正在保存，请完成后再退出。";
+
+"scrollCapture.status.moveDown" = "检测到向上滚动，已暂停追加。向下滚动到已截内容底部后可继续。";
+
+"scrollCapture.status.geometryChanged" = "窗口或区域尺寸已变化。请完成当前截图，再重新框选。";
+
+"scrollCapture.inputUnavailable" = "无法接收滚动输入。请关闭本次截图后重试。";
+
+"scrollCapture.auto.start" = "开始自动截屏";
+"scrollCapture.auto.ready" = "可手动滚动截屏，或点击“开始自动截屏”。";
+"scrollCapture.auto.pointer" = "请将鼠标移回选区以自动滚动；移出选区会暂停滚动，不会移动你的鼠标。";
+"scrollCapture.auto.pause" = "暂停";
+"scrollCapture.auto.resume" = "继续自动滚动";
+"scrollCapture.auto.running" = "正在自动滚动，确认画面接上后继续。可随时暂停或完成。";
+"scrollCapture.auto.user" = "已暂停自动滚动，可手动调整；点击“开始自动截屏”恢复。";
+"scrollCapture.auto.unmatched" = "画面尚未对齐，已暂停自动滚动。请滚回最后确认的画面后继续。";
+"scrollCapture.auto.stalled" = "采集暂未跟上，已暂停自动滚动。画面稳定后可继续，或完成当前截图。";
+"scrollCapture.auto.noMovement" = "未检测到滚动。请确认选区内是可滚动正文，再继续或重新框选。";
+"scrollCapture.auto.targetChanged" = "目标应用失去焦点，已暂停自动滚动。点击“开始自动截屏”返回目标应用。";
+"scrollCapture.auto.permission" = "自动滚动需要辅助功能权限。请在系统设置 → 隐私与安全性 → 辅助功能中授权 PinboardShot，然后重新开始长截图。";
+
+"browserExtension.title" = "Chrome 网页长截图";
+"browserExtension.help" = "网页由 Chrome 插件按真实滚动坐标截取，并在本机回传编辑。插件需在 Chrome 中由你启用。";
+"browserExtension.prepare" = "设置 Chrome 插件";
+"browserExtension.setupTitle" = "连接 Chrome 与 PinboardShot";
+"browserExtension.setupHelp" = "将注册本机接收通道，并把插件导出到“下载”文件夹。图片仅在本机传输。插件尚未上架 Chrome 商店，需要你在扩展页面开启开发者模式并加载导出的文件夹。";
+"browserExtension.connect" = "连接并导出插件";
+"browserExtension.readyTitle" = "插件已放入下载文件夹";
+"browserExtension.readyHelp" = "插件已导出，路径已复制：\n%@\n\n在 Chrome 打开 chrome://extensions，开启开发者模式，点击“加载已解压的扩展程序”。直接从“下载”选择 PinboardShot-Chrome 文件夹；也可以按 ⌘⇧G 粘贴已复制的路径。请保留这个文件夹，Chrome 会从中运行插件。";
+"browserExtension.importFailed" = "无法导入网页长截图。页面尺寸发生变化、图片不完整或超出尺寸上限，请重新截图。";
+
+"browserExtension.start" = "启动 Chrome 网页长截图";
+"browserExtension.startHelp" = "先在 Chrome 选好网页，点击启动后自动采集并回传编辑。需辅助功能权限；插件快捷键须保持 ⌘⇧Y。";
+"browserExtension.chromeUnavailable" = "请先打开 Chrome，并选中要截图的网页。";
+"browserExtension.accessibilityRequired" = "请在系统设置 → 隐私与安全性 → 辅助功能中允许 PinboardShot，再点击启动。";
+"browserExtension.activationFailed" = "无法启动 Chrome 网页长截图。请确认插件已启用，且 Chrome 中的插件快捷键为 ⌘⇧Y；也可直接点击插件按钮。";
