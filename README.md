@@ -1,12 +1,10 @@
 # PinboardShot
 
 <p align="center">
-    <a href="https://linux.do" alt="LINUX DO"><img src="https://shorturl.at/ggSqS" /></a>
+    <a href="#中文">中文</a> | <a href="#english">English</a>
 </p>
 
-[中文](#中文) | [English](#english)
-
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/agent-club/PinboardShot/badge)](https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/agent-club/PinboardShot/badge)](https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot) [![LINUX DO](https://shorturl.at/ggSqS)](https://linux.do)
 
 Official website: <https://pinboardshot.agentclub.dev>
 
