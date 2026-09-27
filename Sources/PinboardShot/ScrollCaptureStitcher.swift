@@ -165,48 +165,78 @@ enum ScrollFrameMatcher {
         previous: ScrollFrameSample,
         current: ScrollFrameSample
     ) -> Int? {
-        guard previous.width == current.width,
+        guard previous.width >= 8, previous.width == current.width,
               previous.height == current.height,
               previous.height == previous.sourceHeight,
               current.height == current.sourceHeight else { return nil }
 
-        var uniqueRows: [UInt64: Int] = [:]
-        var repeatedRows: Set<UInt64> = []
-        for row in 0..<previous.height {
-            guard let fingerprint = rowFingerprint(previous, row: row) else { continue }
-            if uniqueRows.updateValue(row, forKey: fingerprint) != nil {
-                repeatedRows.insert(fingerprint)
+        let margin = max(1, previous.width / 12)
+        let columns = margin..<(previous.width - margin)
+        func votedShift(in columns: Range<Int>) -> Int? {
+            var uniqueRows: [UInt64: Int] = [:]
+            var repeatedRows: Set<UInt64> = []
+            for row in 0..<previous.height {
+                guard let fingerprint = rowFingerprint(previous, row: row, columns: columns) else { continue }
+                if uniqueRows.updateValue(row, forKey: fingerprint) != nil {
+                    repeatedRows.insert(fingerprint)
+                }
+            }
+            var votes: [Int: Int] = [:]
+            for row in 0..<current.height {
+                guard let fingerprint = rowFingerprint(current, row: row, columns: columns),
+                      !repeatedRows.contains(fingerprint),
+                      let previousRow = uniqueRows[fingerprint] else { continue }
+                votes[previousRow - row, default: 0] += 1
+            }
+            let ranked = votes.sorted { $0.value > $1.value }
+            guard let best = ranked.first,
+                  best.value >= max(8, min(previous.height / 40,
+                                           (previous.height - abs(best.key)) / 8)),
+                  ranked.dropFirst().first.map({ $0.value * 2 < best.value }) ?? true else { return nil }
+            return best.key
+        }
+        if let shift = votedShift(in: columns) {
+            if shift != 0 { return shift }
+            let difference = meanAbsoluteDifference(
+                previous: previous.pixels, current: current.pixels, width: current.width,
+                previousStartRow: 0, currentStartRow: 0, rowCount: current.height
+            )
+            if difference <= duplicateFrameScore { return 0 }
+        }
+
+        // Fixed sidebars and animated embeds invalidate a whole-row hash. Require
+        // agreement from separate content bands instead of trusting any single patch.
+        var bandVotes: [Int: Int] = [:]
+        for band in 0..<5 {
+            let start = columns.lowerBound + band * columns.count / 5
+            let end = columns.lowerBound + (band + 1) * columns.count / 5
+            if let shift = votedShift(in: start..<end), shift != 0 {
+                bandVotes[shift, default: 0] += 1
             }
         }
-        var votes: [Int: Int] = [:]
-        for row in 0..<current.height {
-            guard let fingerprint = rowFingerprint(current, row: row),
-                  !repeatedRows.contains(fingerprint),
-                  let previousRow = uniqueRows[fingerprint] else { continue }
-            votes[previousRow - row, default: 0] += 1
-        }
-        let ranked = votes.sorted { $0.value > $1.value }
-        guard let best = ranked.first,
-              best.value >= max(8, previous.height / 40),
-              ranked.dropFirst().first.map({ $0.value * 2 < best.value }) ?? true else {
-            return nil
-        }
+        let ranked = bandVotes.sorted { $0.value > $1.value }
+        guard let best = ranked.first, best.value >= 2,
+              ranked.dropFirst().first.map({ $0.value < best.value }) ?? true else { return nil }
         return best.key
     }
 
-    private static func rowFingerprint(_ sample: ScrollFrameSample, row: Int) -> UInt64? {
-        let margin = max(1, sample.width / 12)
-        let span = sample.width - margin * 2
+    private static func rowFingerprint(_ sample: ScrollFrameSample, row: Int, columns: Range<Int>) -> UInt64? {
+        guard row > 0, row < sample.height - 1 else { return nil }
+        let span = columns.count
         var darkest = 255
         var lightest = 0
         var hash: UInt64 = 14_695_981_039_346_656_037
-        let offset = row * sample.width
-        for index in 0..<32 {
-            let x = margin + (index * 2 + 1) * span / 64
-            let value = Int(sample.pixels[offset + x])
-            darkest = min(darkest, value)
-            lightest = max(lightest, value)
-            hash = (hash ^ UInt64(value)) &* 1_099_511_628_211
+        // Include vertical neighbours so the edges of flat image/text rows still
+        // supply unique evidence instead of every row in a solid run being discarded.
+        for neighbour in (row - 1)...(row + 1) {
+            let offset = neighbour * sample.width
+            for index in 0..<32 {
+                let x = columns.lowerBound + (index * 2 + 1) * span / 64
+                let value = Int(sample.pixels[offset + x])
+                darkest = min(darkest, value)
+                lightest = max(lightest, value)
+                hash = (hash ^ UInt64(value)) &* 1_099_511_628_211
+            }
         }
         return lightest - darkest >= 16 ? hash : nil
     }
@@ -215,7 +245,8 @@ enum ScrollFrameMatcher {
         previous: ScrollFrameSample,
         current: ScrollFrameSample,
         approximateShift: Int,
-        searchRadius: Int
+        searchRadius: Int,
+        preferredExactShift: Int? = nil
     ) -> ScrollFrameMatch? {
         guard previous.width == current.width,
               previous.height == current.height,
@@ -235,7 +266,7 @@ enum ScrollFrameMatcher {
         var candidates: [ScrollFrameMatch] = []
         for shift in (approximateShift - searchRadius)...(approximateShift + searchRadius) {
             let overlap = current.height - abs(shift)
-            guard overlap >= max(8, current.height / 6) else { continue }
+            guard overlap >= max(8, current.height / 20) else { continue }
             let score = robustDifference(
                 previous: previous.pixels,
                 current: current.pixels,
@@ -247,46 +278,75 @@ enum ScrollFrameMatcher {
             candidates.append(ScrollFrameMatch(verticalShift: shift, score: score))
         }
         candidates.sort { $0.score < $1.score }
-        guard let best = candidates.first else { return nil }
+        guard let lowestScore = candidates.first else { return nil }
+        // A sparse overlap can give adjacent rows identical block scores. A uniquely
+        // voted exact row displacement is stronger evidence than that local score tie.
+        let best = preferredExactShift.flatMap { preferred in
+            candidates.first { $0.verticalShift == preferred && $0.score <= lowestScore.score + 0.1 }
+        } ?? lowestScore
         if best.verticalShift == 0 {
             return noShiftScore <= duplicateFrameScore ? best : nil
         }
         guard best.score <= maximumAcceptedScore,
               best.score + minimumMatchImprovement / 2 <= noShiftScore else { return nil }
-        if let runnerUp = candidates.dropFirst().first,
-           runnerUp.score < best.score + 0.1 { return nil }
+        if preferredExactShift == nil {
+            if let runnerUp = candidates.dropFirst().first,
+               runnerUp.score < best.score + 0.1 { return nil }
+        } else if candidates.contains(where: {
+            abs($0.verticalShift - best.verticalShift) > 1 && $0.score < best.score + 0.1
+        }) { return nil }
         return best
     }
 
     fileprivate static func stationaryEdges(
         previous: ScrollFrameSample,
         current: ScrollFrameSample,
-        sourceShift: Int
+        sourceShift: Int,
+        excluding sidePatches: [CGRect] = []
     ) -> (top: Int, bottom: Int) {
         guard previous.width == current.width,
               previous.height == current.height,
               current.height == current.sourceHeight else { return (0, 0) }
         let margin = max(1, current.width / 12)
         let columns = margin..<(current.width - margin)
+        func columnsAt(_ row: Int) -> [Int] {
+            columns.filter { column in
+                !sidePatches.contains { $0.contains(CGPoint(x: column, y: row)) }
+            }
+        }
         func edgeHeight(fromTop: Bool) -> Int {
             var texturedRows = 0
             let limit = current.height / 3
             for distance in 0..<limit {
                 let row = fromTop ? distance : current.height - distance - 1
                 let offset = row * current.width
+                let rowColumns = columnsAt(row)
+                guard !rowColumns.isEmpty else { return 0 }
                 var difference = 0
                 var darkest = 255
                 var lightest = 0
-                for x in columns {
+                for x in rowColumns {
                     let value = Int(current.pixels[offset + x])
                     difference += abs(Int(previous.pixels[offset + x]) - value)
                     darkest = min(darkest, value)
                     lightest = max(lightest, value)
                 }
-                if Double(difference) / Double(columns.count) > 0.5 {
+                if Double(difference) / Double(rowColumns.count) > 0.5 {
                     return texturedRows >= 3 ? distance : 0
                 }
-                if lightest - darkest >= 16 { texturedRows += 1 }
+                if lightest - darkest >= 16 {
+                    let values = rowColumns.map { Int(current.pixels[offset + $0]) }
+                    let background = values.sorted()[values.count / 2]
+                    let texturedColumns = rowColumns.filter {
+                        abs(Int(current.pixels[offset + $0]) - background) >= 16
+                    }
+                    // A narrow floating sidebar label cannot establish a full-width
+                    // fixed header/footer, especially during one-pixel movement.
+                    if let first = texturedColumns.first, let last = texturedColumns.last,
+                       last - first >= columns.count / 3 {
+                        texturedRows += 1
+                    }
+                }
             }
             // A large unchanged area without a moving boundary is not enough evidence.
             return 0
@@ -304,7 +364,7 @@ enum ScrollFrameMatcher {
                 let row = fromTop ? distance : current.height - distance - 1
                 let otherRow = row + offset
                 guard otherRow >= 0, otherRow < current.height else { continue }
-                if columns.contains(where: {
+                if columnsAt(row).contains(where: {
                     fixed.pixels[row * fixed.width + $0] != other.pixels[otherRow * other.width + $0]
                 }) {
                     height = min(current.height / 3, distance + 3)
@@ -316,6 +376,82 @@ enum ScrollFrameMatcher {
             includingOcclusion(edgeHeight(fromTop: true), fromTop: true),
             includingOcclusion(edgeHeight(fromTop: false), fromTop: false)
         )
+    }
+
+    fileprivate static func stationarySidePatches(
+        previous: ScrollFrameSample, current: ScrollFrameSample,
+        sourceShift: Int, sourceWidth: Int
+    ) -> [CGRect] {
+        guard sourceShift != 0, previous.width == current.width,
+              previous.height == current.height, current.height == current.sourceHeight else { return [] }
+        let tileWidth = 6
+        let tileHeight = 16
+        var patches: [CGRect] = []
+        for y in stride(from: 0, to: current.height - tileHeight + 1, by: tileHeight) {
+            let alignedY = y - sourceShift
+            guard alignedY >= 0, alignedY + tileHeight <= current.height else { continue }
+            for x in stride(from: 0, to: current.width - tileWidth + 1, by: tileWidth) {
+                guard x + tileWidth <= current.width / 4 || x >= current.width * 3 / 4 else { continue }
+                var stationaryDifference = 0
+                var alignedDifference = 0
+                var darkest = 255
+                var lightest = 0
+                for row in 0..<tileHeight {
+                    for column in 0..<tileWidth {
+                        let oldValue = Int(previous.pixels[(y + row) * current.width + x + column])
+                        let fixedValue = Int(current.pixels[(y + row) * current.width + x + column])
+                        let revealedValue = Int(current.pixels[(alignedY + row) * current.width + x + column])
+                        stationaryDifference += abs(oldValue - fixedValue)
+                        alignedDifference += abs(oldValue - revealedValue)
+                        darkest = min(darkest, oldValue)
+                        lightest = max(lightest, oldValue)
+                    }
+                }
+                let count = tileWidth * tileHeight
+                // Only textured side patches that stay at viewport coordinates while
+                // the document moves qualify. Blank margins alone are not evidence.
+                guard lightest - darkest >= 24, stationaryDifference <= count / 2,
+                      alignedDifference >= count * 3 else { continue }
+                let scale = Double(sourceWidth) / Double(current.width)
+                let left = floor(Double(max(0, x - tileWidth)) * scale)
+                let right = ceil(Double(min(current.width, x + tileWidth * 2)) * scale)
+                let top = max(0, y - tileHeight)
+                let bottom = min(current.height, y + tileHeight * 2)
+                let rect = CGRect(
+                    x: left, y: Double(top), width: right - left, height: Double(bottom - top)
+                )
+                if let index = patches.firstIndex(where: { $0.intersects(rect) }) {
+                    patches[index] = patches[index].union(rect)
+                } else { patches.append(rect) }
+            }
+        }
+        return patches
+    }
+
+    fileprivate static func remainsStationary(
+        _ patch: CGRect, previous: ScrollFrameSample, current: ScrollFrameSample, sourceWidth: Int
+    ) -> Bool {
+        // The expanded repair rectangle includes moving pixels around the label.
+        // Its central texture is the evidence used to retain a confirmed label.
+        let core = patch.insetBy(dx: patch.width / 4, dy: patch.height / 4)
+        let scale = Double(current.width) / Double(sourceWidth)
+        let left = max(0, Int(ceil(core.minX * scale)))
+        let right = min(current.width, Int(floor(core.maxX * scale)))
+        let top = max(0, Int(core.minY))
+        let bottom = min(current.height, Int(core.maxY))
+        guard left < right, top < bottom else { return false }
+        var difference = 0
+        var darkest = 255
+        var lightest = 0
+        for row in top..<bottom {
+            for column in left..<right {
+                let value = Int(current.pixels[row * current.width + column])
+                difference += abs(value - Int(previous.pixels[row * current.width + column]))
+                darkest = min(darkest, value)
+                lightest = max(lightest, value)
+            }
+        }
+        return lightest - darkest >= 24 && difference <= (right - left) * (bottom - top) / 2
     }
 
     private static func meanAbsoluteDifference(
@@ -491,6 +627,33 @@ private struct ScrollCaptureStoredSlice {
     var byteCount: Int { bytesPerRow * height }
 }
 
+final class ScrollCaptureFrameSpool: @unchecked Sendable {
+    private let lock = NSLock()
+    private var store: ScrollCaptureBackingStore?
+    private var pendingFrames = 0
+
+    func storeFrame(_ image: CGImage) -> CGImage? {
+        lock.withLock {
+            if store == nil { store = ScrollCaptureBackingStore() }
+            guard let store, let slice = store.append(image), let frame = store.image(for: slice) else {
+                if pendingFrames == 0 { self.store = nil }
+                return nil
+            }
+            pendingFrames += 1
+            return frame
+        }
+    }
+
+    func releaseFrame() {
+        lock.withLock {
+            pendingFrames -= 1
+            // The file is unlinked at creation. Drop the burst store after the last
+            // queued frame is processed; its image provider owns it until reads finish.
+            if pendingFrames == 0 { store = nil }
+        }
+    }
+}
+
 private final class ScrollCaptureBackingStore {
     // Disk writes determine available capacity; only guard address arithmetic here.
     static let maximumByteCount = Int.max
@@ -632,6 +795,41 @@ private final class ScrollCaptureBackingStore {
         }
         return readByteCount
     }
+
+    func replace(_ image: CGImage, at rect: CGRect, in slices: [ScrollCaptureStoredSlice]) -> Bool {
+        guard image.width == Int(rect.width), image.height == Int(rect.height),
+              let context = CGContext(data: nil, width: image.width, height: image.height,
+                bitsPerComponent: 8, bytesPerRow: image.width * 4,
+                space: CGColorSpaceCreateDeviceRGB(), bitmapInfo:
+                    CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue),
+              let bytes = context.data else { return false }
+        context.draw(image, in: CGRect(x: 0, y: 0, width: image.width, height: image.height))
+        var sliceStart = 0
+        let firstRow = Int(rect.minY)
+        let lastRow = Int(rect.maxY)
+        for slice in slices {
+            defer { sliceStart += slice.height }
+            let start = max(firstRow, sliceStart)
+            let end = min(lastRow, sliceStart + slice.height)
+            guard start < end else { continue }
+            for row in start..<end {
+                let fileOffset = slice.fileOffset + off_t(
+                    (row - sliceStart) * slice.bytesPerRow + Int(rect.minX) * 4
+                )
+                var written = 0
+                let rowBytes = image.width * 4
+                while written < rowBytes {
+                    let result = pwrite(fileDescriptor,
+                        bytes.advanced(by: (row - firstRow) * rowBytes + written),
+                        rowBytes - written, fileOffset + off_t(written))
+                    if result < 0, errno == EINTR { continue }
+                    guard result > 0 else { return false }
+                    written += result
+                }
+            }
+        }
+        return true
+    }
 }
 
 private final class ScrollCaptureFileRegionSource: ScrollCaptureByteSource {
@@ -746,6 +944,8 @@ final class ScrollCaptureAccumulator {
     private var keyframes: [ScrollCaptureKeyframe] = []
     private var fixedHeaderHeight = 0
     private var fixedFooterHeight = 0
+    private var missedLocalMatches = 0
+    private var confirmedSidePatches: [CGRect] = []
 
     var hasContent: Bool { !slices.isEmpty }
 
@@ -785,7 +985,8 @@ final class ScrollCaptureAccumulator {
                     previous: $0,
                     current: verificationSample,
                     approximateShift: shift,
-                    searchRadius: 1
+                    searchRadius: 1,
+                    preferredExactShift: abs(shift) > frame.height * 3 / 4 ? shift : nil
                 )
             }
         }
@@ -813,10 +1014,19 @@ final class ScrollCaptureAccumulator {
         } else {
             localPlacement = nil
         }
-        var placement = localPlacement ?? relocalizedPlacement(
-            for: sample,
-            verificationSample: verificationSample
-        )
+        let fallbackPlacement: ScrollCapturePlacement?
+        if localPlacement == nil {
+            missedLocalMatches += 1
+            // A skipped viewport has no overlap to match. Repeatedly searching all
+            // historical frames would stall the stream exactly while the user scrolls.
+            fallbackPlacement = missedLocalMatches == 1 || missedLocalMatches.isMultiple(of: 12)
+                ? relocalizedPlacement(for: sample, verificationSample: verificationSample, nearbyOnly: true)
+                : nil
+        } else {
+            missedLocalMatches = 0
+            fallbackPlacement = nil
+        }
+        var placement = localPlacement ?? fallbackPlacement
         guard placement != nil else { return .unmatched }
         if let candidate = placement {
             let candidateMinimum = candidate.position
@@ -824,9 +1034,12 @@ final class ScrollCaptureAccumulator {
             let extendsCapturedRange = candidateMinimum < capturedMinimumPosition ||
                 candidateMaximum > capturedMaximumPosition
             let localDisplacement = abs(candidate.position - trackingPosition)
+            // Unique full-height row fingerprints already verify an adjacent jump.
+            // Rechecking every medium scroll against older keyframes can stall the
+            // stream and lose the intermediate frames needed for the next match.
             let trustsStrongLocalMatch = localPlacement != nil &&
                 candidate.score <= 6 &&
-                localDisplacement <= frame.height / 3
+                (localDisplacement <= frame.height / 3 || exactMatch != nil)
             if extendsCapturedRange, keyframes.count > 1, !trustsStrongLocalMatch {
                 let allowedPosition: ClosedRange<Int>
                 if candidateMaximum > capturedMaximumPosition {
@@ -853,17 +1066,45 @@ final class ScrollCaptureAccumulator {
         guard let placement else { return .unmatched }
         if placement.position == trackingPosition {
             // Preserve the reference so sub-threshold movement can accumulate.
+            missedLocalMatches = 0
             return .duplicate
         }
 
+        var sideRepairs: [CGRect] = []
         if let trackingVerificationSample {
+            confirmedSidePatches = confirmedSidePatches.filter {
+                ScrollFrameMatcher.remainsStationary(
+                    $0, previous: trackingVerificationSample, current: verificationSample, sourceWidth: frame.width
+                )
+            }
+            let detectedPatches = ScrollFrameMatcher.stationarySidePatches(
+                previous: trackingVerificationSample, current: verificationSample,
+                sourceShift: placement.position - trackingPosition, sourceWidth: frame.width
+            )
+            for patch in detectedPatches {
+                if let index = confirmedSidePatches.firstIndex(where: { $0.intersects(patch) }) {
+                    confirmedSidePatches[index] = confirmedSidePatches[index].union(patch)
+                } else { confirmedSidePatches.append(patch) }
+            }
+            let sampleScale = CGFloat(verificationSample.width) / CGFloat(frame.width)
             let edges = ScrollFrameMatcher.stationaryEdges(
-                previous: trackingVerificationSample,
-                current: verificationSample,
-                sourceShift: placement.position - trackingPosition
+                previous: trackingVerificationSample, current: verificationSample,
+                sourceShift: placement.position - trackingPosition,
+                excluding: confirmedSidePatches.map {
+                    CGRect(x: $0.minX * sampleScale, y: $0.minY,
+                           width: $0.width * sampleScale, height: $0.height)
+                }
             )
             fixedHeaderHeight = max(fixedHeaderHeight, edges.top)
             fixedFooterHeight = max(fixedFooterHeight, edges.bottom)
+            for patch in confirmedSidePatches
+            where patch.minY >= CGFloat(fixedHeaderHeight) &&
+                patch.maxY <= CGFloat(frame.height - fixedFooterHeight) {
+                sideRepairs.append(patch.offsetBy(dx: 0, dy: CGFloat(trackingPosition)))
+                // Refresh the current label too: its new position may lie entirely
+                // inside the overlap rather than the newly appended strip.
+                sideRepairs.append(patch.offsetBy(dx: 0, dy: CGFloat(placement.position)))
+            }
         }
 
         let frameMinimum = placement.position
@@ -873,8 +1114,27 @@ final class ScrollCaptureAccumulator {
             return .unmatched
         }
 
+        // A later frame reveals the document under an earlier floating label. Use
+        // those actual pixels, including any current label at its final position;
+        // never invent a background or crop away legitimate post timestamps.
+        let visible = CGRect(x: 0, y: frameMinimum, width: frame.width, height: frame.height)
+        let stored = CGRect(x: 0, y: capturedMinimumPosition,
+                            width: pixelWidth, height: pixelHeight)
+        for repair in sideRepairs {
+            let revealed = repair.intersection(visible).intersection(stored)
+            if !revealed.isNull, !revealed.isEmpty {
+                guard let pixels = frame.cropping(to: revealed.offsetBy(dx: 0, dy: -CGFloat(frameMinimum))),
+                      let backingStore,
+                      backingStore.replace(pixels,
+                        at: revealed.offsetBy(dx: 0, dy: -CGFloat(capturedMinimumPosition)), in: slices) else {
+                    return .limitReached
+                }
+            }
+        }
+
         if frameMinimum >= capturedMinimumPosition,
            frameMaximum <= capturedMaximumPosition {
+            missedLocalMatches = 0
             trackingPosition = placement.position
             self.trackingSample = sample
             trackingVerificationSample = verificationSample
@@ -933,6 +1193,7 @@ final class ScrollCaptureAccumulator {
             capturedMaximumPosition = frameMaximum
         }
         pixelHeight += appendHeight
+        missedLocalMatches = 0
         trackingPosition = placement.position
         self.trackingSample = sample
         trackingVerificationSample = verificationSample
@@ -1054,15 +1315,21 @@ final class ScrollCaptureAccumulator {
     private func relocalizedPlacement(
         for sample: ScrollFrameSample,
         verificationSample: ScrollFrameSample,
-        allowedPosition: ClosedRange<Int>? = nil
+        allowedPosition: ClosedRange<Int>? = nil,
+        nearbyOnly: Bool = false
     ) -> ScrollCapturePlacement? {
         var candidates: [ScrollCapturePlacement] = []
         let maximumShift = sample.sourceHeight * 3 / 4
-        let relevantKeyframes = keyframes.filter { keyframe in
+        let eligibleKeyframes = keyframes.filter { keyframe in
             guard let allowedPosition else { return true }
             return keyframe.position >= allowedPosition.lowerBound - maximumShift &&
                 keyframe.position <= allowedPosition.upperBound + maximumShift
         }
+        let relevantKeyframes = nearbyOnly
+            ? Array(eligibleKeyframes.sorted {
+                abs($0.position - trackingPosition) < abs($1.position - trackingPosition)
+            }.prefix(4))
+            : eligibleKeyframes
         let searchStride = max(1, relevantKeyframes.count / 48)
         for (index, keyframe) in relevantKeyframes.enumerated()
         where index.isMultiple(of: searchStride) || index == relevantKeyframes.count - 1 {

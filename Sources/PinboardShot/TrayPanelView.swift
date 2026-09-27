@@ -146,6 +146,7 @@ private enum TrayPanelIcon {
 
 enum TrayPanelCommand {
     case showCaptureTools
+    case startBrowserCapture
     case capture(CaptureAction)
     case closeAllPins
     case restorePinInteraction
@@ -418,6 +419,14 @@ struct TrayPanelView: View {
                 tone: .primary,
                 style: .large,
                 action: { onCommand(.capture(.scrollingRegion)) }
+            )
+
+            TrayCommandTile(
+                title: L10n.text("browserExtension.title"),
+                icon: .captureScrollingRegion,
+                tone: .primary,
+                style: .large,
+                action: { onCommand(.startBrowserCapture) }
             )
 
             TrayCommandTile(

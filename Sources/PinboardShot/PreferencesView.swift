@@ -107,6 +107,8 @@ struct PreferencesView: View {
     let onOpenScreenCaptureSettings: () -> Void
     var onEditHistoryItem: (HistoryItem) -> Void = { _ in }
     var onHistoryTools: (HistoryItem) -> Void = { _ in }
+    var onPrepareBrowserExtension: () -> Void = { }
+    var onStartBrowserCapture: () -> Void = { }
 
     @AppStorage(EditableDraftSettings.enabledKey) private var editableDraftsEnabled = false
 
@@ -1433,6 +1435,16 @@ struct PreferencesView: View {
 
     private var privacyTab: some View {
         Form {
+            Section(L10n.text("browserExtension.title")) {
+                Text(L10n.text("browserExtension.help"))
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                Button(L10n.text("browserExtension.prepare"), action: onPrepareBrowserExtension)
+                Button(L10n.text("browserExtension.start"), action: onStartBrowserCapture)
+                Text(L10n.text("browserExtension.startHelp"))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
             Section(L10n.text("preferences.screenCapturePermission")) {
                 HStack {
                     Label(

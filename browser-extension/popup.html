@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PinboardShot</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <main>
+    <header><strong>PinboardShot</strong><button id="language" type="button" aria-label="Language">EN</button></header>
+    <p id="description"></p>
+    <button id="start" class="primary" type="button"></button>
+    <section id="progressArea" hidden>
+      <div class="progress-track"><div id="progressBar"></div></div>
+      <p id="progressText" role="status" aria-live="polite"></p>
+      <button id="cancel" class="secondary" type="button"></button>
+    </section>
+    <p id="message" role="status" aria-live="polite"></p>
+    <small id="shortcut"></small>
+  </main>
+  <script type="module" src="popup.js"></script>
+</body>
+</html>

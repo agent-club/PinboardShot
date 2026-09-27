@@ -87,17 +87,20 @@
 "common.cancel" = "取消";
 "common.add" = "新增";
 "common.done" = "完成";
-"scrollCapture.title" = "捲動截圖預覽";
-"scrollCapture.selectionHint" = "框選視窗內可捲動的區域 · Esc 取消";
-"scrollCapture.status.ready" = "請在所選區域內向上或向下捲動並保留重疊內容，完成後按一下「完成」。";
-"scrollCapture.status.capturing" = "正在辨識重疊內容並拼接…";
-"scrollCapture.status.revisited" = "正在瀏覽已擷取區域，繼續捲動即可無縫接回。";
-"scrollCapture.status.unmatched" = "暫時無法比對。請捲回已拼接內容，再緩慢捲動以恢復重疊。";
-"scrollCapture.unmatchedFinish.title" = "最近的內容未能拼接";
-"scrollCapture.unmatchedFinish.help" = "捲回已拼接的畫面後繼續捲動，或只保留目前預覽中的已拼接部分。";
-"scrollCapture.unmatchedFinish.continue" = "繼續擷取";
-"scrollCapture.unmatchedFinish.savePartial" = "保留已拼接部分";
-"scrollCapture.status.limitReached" = "已達到長截圖暫存空間上限，請按一下「完成」。";
+"automation.captureApproval.title" = "允許自動截圖？";
+"automation.captureApproval.message" = "外部連結要求截取螢幕。截圖會複製到剪貼簿並儲存在本機歷史記錄中。僅在信任來源時繼續。";
+"automation.captureApproval.allow" = "允許截圖";
+"scrollCapture.title" = "自動捲動截圖";
+"scrollCapture.selectionHint" = "框選捲動正文 · 點擊開始自動截圖 · 滑鼠移入選區後自動捲動";
+"scrollCapture.status.ready" = "用滾輪或觸控板向下捲動，保留至少四分之一屏重疊。";
+"scrollCapture.status.capturing" = "已接上新內容。長圖預覽正在增長，請繼續向下捲動。";
+"scrollCapture.status.unmatchedDirect" = "暫時無法對齊畫面。請稍停後緩慢向下捲動；若預覽仍未增長，請重新框選捲動正文。";
+"scrollCapture.status.processing" = "正在產生已確認的連續截圖…";
+"scrollCapture.status.cancelling" = "正在取消截圖…";
+"scrollCapture.unmatchedFinish.title" = "截圖僅包含已確認的連續部分";
+"scrollCapture.unmatchedFinish.help" = "擷取已暫停或達到上限，最新畫面尚未加入。是否保留已確認的部分？預覽顯示的是最後確認畫面。";
+"scrollCapture.unmatchedFinish.savePartial" = "保留已確認部分";
+"scrollCapture.status.limitReached" = "無法繼續儲存畫面，請按「完成」保留已擷取內容。";
 "onboarding.title" = "PinboardShot 已在選單列執行";
 "onboarding.message" = "PinboardShot 不會顯示在 Dock 中。請在選單列找到取景框圖示。\n\n預設不啟用全域快速鍵。可在「設定 → 快速鍵」中按需新增。\n\n截圖需要「螢幕與系統音訊錄製」權限。圖片、標註和記錄保存在本機；只有軟體更新會存取網路。";
 "onboarding.requestPermission" = "繼續並要求權限";
@@ -368,7 +371,7 @@
 "error.invalidSelection" = "截圖選取範圍超出螢幕範圍。";
 "error.emptyCaptureFrame" = "本次截圖被判定為空白畫面，剪貼簿沒有更新，仍保留上一次內容。請重新選擇包含可見內容的區域。";
 "error.scrollTargetUnavailable" = "選取範圍中心沒有找到可持續擷取的視窗。請重新框選視窗內的捲動區域。";
-"error.scrollCaptureNoMovement" = "沒有偵測到可拼接的捲動內容。請在所選區域內向上或向下捲動並保留重疊內容。";
+"error.scrollCaptureNoMovement" = "未取得可用畫面。請縮小捲動正文選區後重試。";
 "error.ocrNoText" = "沒有在選取範圍內辨識到可複製的文字。";
 "preferences.trayIcon" = "選單列圖示";
 "preferences.trayIconHelp" = "選擇後立即生效。單色圖示會自動配合淺色與深色選單列；動態圖示會持續變化，開啟「減少動態效果」時保持靜止。";
@@ -630,3 +633,41 @@
 "feature.record.closeDiscardTitle" = "關閉並捨棄未儲存的錄影？";
 "feature.record.closeDiscardHelp" = "取消後可返回預覽視窗儲存目前影片。";
 "feature.record.exporting" = "影片正在儲存，請完成後再退出。";
+
+"scrollCapture.status.moveDown" = "偵測到向上捲動，已暫停追加。向下捲動到已擷取內容底部後可繼續。";
+
+"scrollCapture.status.geometryChanged" = "視窗或區域尺寸已變化。請完成目前截圖，再重新框選。";
+
+"scrollCapture.inputUnavailable" = "無法接收捲動輸入。請關閉本次截圖後重試。";
+
+"scrollCapture.auto.start" = "開始自動截圖";
+"scrollCapture.auto.ready" = "可手動捲動截圖，或點擊「開始自動截圖」。";
+"scrollCapture.auto.pointer" = "請將滑鼠移回選區以自動捲動；移出選區會暫停捲動，不會移動你的滑鼠。";
+"scrollCapture.auto.pause" = "暫停";
+"scrollCapture.auto.resume" = "繼續自動捲動";
+"scrollCapture.auto.running" = "正在自動捲動，確認畫面接上後繼續。可隨時暫停或完成。";
+"scrollCapture.auto.user" = "已暫停自動捲動，可手動調整；點擊「開始自動截圖」恢復。";
+"scrollCapture.auto.unmatched" = "畫面尚未對齊，已暫停自動捲動。請捲回最後確認的畫面後繼續。";
+"scrollCapture.auto.stalled" = "擷取暫未跟上，已暫停自動捲動。畫面穩定後可繼續，或完成目前截圖。";
+"scrollCapture.auto.noMovement" = "未偵測到捲動。請確認選取區域內是可捲動正文，再繼續或重新框選。";
+"scrollCapture.auto.targetChanged" = "目標應用程式失去焦點，已暫停自動捲動。點擊「開始自動截圖」返回目標應用程式。";
+"scrollCapture.auto.permission" = "自動捲動需要輔助使用權限。請在系統設定 → 隱私權與安全性 → 輔助使用中授權 PinboardShot，再重新開始長截圖。";
+
+"browserExtension.title" = "Chrome 網頁長截圖";
+"browserExtension.help" = "網頁由 Chrome 插件按實際捲動座標截取，並在本機回傳編輯。插件需在 Chrome 中由你啟用。";
+"browserExtension.prepare" = "設定 Chrome 插件";
+"browserExtension.setupTitle" = "連接 Chrome 與 PinboardShot";
+"browserExtension.setupHelp" = "將註冊本機接收通道，並把插件匯出到「下載」資料夾。圖片僅在本機傳輸。插件尚未上架 Chrome 商店，需要你在擴充功能頁面開啟開發者模式並載入匯出的資料夾。";
+"browserExtension.connect" = "連接並匯出插件";
+"browserExtension.readyTitle" = "插件已放入下載資料夾";
+"browserExtension.readyHelp" = "插件已匯出，路徑已複製：\n%@\n\n在 Chrome 開啟 chrome://extensions，開啟開發者模式，點擊「載入未封裝項目」。直接從「下載」選擇 PinboardShot-Chrome 資料夾；也可以按 ⌘⇧G 貼上已複製的路徑。請保留這個資料夾，Chrome 會從中執行插件。";
+"browserExtension.importFailed" = "無法匯入網頁長截圖。頁面尺寸發生變化、圖片不完整或超出尺寸上限，請重新截圖。";
+
+"browserExtension.start" = "啟動 Chrome 網頁長截圖";
+"browserExtension.startHelp" = "先在 Chrome 選好網頁，點擊啟動後自動擷取並回傳編輯。需輔助使用權限；插件快捷鍵須保持 ⌘⇧Y。";
+"browserExtension.chromeUnavailable" = "請先開啟 Chrome，並選取要截圖的網頁。";
+"browserExtension.accessibilityRequired" = "請在系統設定 → 隱私權與安全性 → 輔助使用中允許 PinboardShot，再點擊啟動。";
+"browserExtension.activationFailed" = "無法啟動 Chrome 網頁長截圖。請確認插件已啟用，且 Chrome 中的插件快捷鍵為 ⌘⇧Y；也可直接點擊插件按鈕。";
+
+"browserExtension.autoStart" = "開始自動截屏";
+"browserExtension.detectedHelp" = "已識別 Chrome。點擊開始後由插件自動擷取目前分頁的整頁內容，再回傳編輯；截圖範圍不限於目前選取區域。";

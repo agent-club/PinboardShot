@@ -54,6 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var lastExternalApplicationBundleIdentifier: String?
     private var pinSessionRecoverySaveTimer: Timer?
     private var historyRetentionTimer: Timer?
+    private var browserImportInProgress = false
+    private var browserLaunchInProgress = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -405,6 +407,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusPopover.performClose(nil)
         switch command {
         case .showCaptureTools: captureToolsController.show()
+        case .startBrowserCapture: startBrowserCapture()
         case .capture(let action): perform(action)
         case .closeAllPins: closeAllPins()
         case .restorePinInteraction: restoreAllPinInteraction()
@@ -734,6 +737,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func captureScrollingImage(for selection: SelectedRegion) async throws -> ScrollingCaptureResult? {
         defer { overlayController.dismissRetainedOverlay() }
         let target = try await captureService.scrollCaptureTarget(for: selection)
+        if BrowserCaptureRouting.usesChromeExtension(sourceApplicationBundleIdentifier: target.sourceApplicationBundleIdentifier) {
+            overlayController.dismissRetainedOverlay()
+            if try await scrollCaptureController.confirmBrowserCapture(target: target) {
+                // Release the native capture reservation before Chrome can return its image.
+                capturePipeline.cancelCapture()
+                startBrowserCapture(windowFrame: target.window.frame)
+            }
+            return nil
+        }
         guard let image = try await scrollCaptureController.capture(target: target) else { return nil }
         return ScrollingCaptureResult(
             image: image,
@@ -1004,12 +1016,82 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     private func handleAutomationURL(_ url: URL) {
         guard let command = AutomationCommand(url: url) else { return }
+        // These modes capture immediately, so an external URL must receive local approval before any screen pixels are read.
+        if command.requiresCaptureApproval {
+            NSApp.activate(ignoringOtherApps: true)
+            let alert = NSAlert()
+            alert.messageText = L10n.text("automation.captureApproval.title")
+            alert.informativeText = L10n.text("automation.captureApproval.message")
+            alert.addButton(withTitle: L10n.text("common.cancel"))
+            alert.addButton(withTitle: L10n.text("automation.captureApproval.allow"))
+            guard alert.runModal() == .alertSecondButtonReturn else { return }
+        }
         switch command {
         case .capture(let action, let pinResult): perform(action, pinResult: pinResult)
         case .pinClipboard: perform(.clipboardPin)
         case .togglePins: perform(.togglePins)
         case .pinFile(let url): pinImageFile(at: url)
+        case .importBrowserCapture(let id): importBrowserCapture(id)
         }
+    }
+
+    private func importBrowserCapture(_ id: UUID) {
+        guard !browserImportInProgress, !capturePipeline.isCapturing, !shortRecordingController.isBusy else {
+            present(error: PinboardShotError.captureBusy)
+            return
+        }
+        browserImportInProgress = true
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.browserImportInProgress = false }
+            do {
+                let capture = try await Task.detached(priority: .userInitiated) {
+                    try BrowserCaptureImporter.load(id: id)
+                }.value
+                let image = NSImage(cgImage: capture.image, size: capture.logicalSize)
+                guard let result = await self.annotationEditorController.edit(image: image) else { return }
+                self.completeCapture(result.image, pin: result.disposition == .pin,
+                    applyWatermark: result.draft != nil,
+                    privacyContext: CapturePrivacyContext(sourceApplicationBundleIdentifier: "com.google.Chrome"),
+                    draft: result.draft, keepDraft: result.draft != nil, collectStep: false)
+            } catch { self.present(error: error) }
+        }
+    }
+
+    private func startBrowserCapture(windowFrame: CGRect? = nil) {
+        guard !browserLaunchInProgress, !browserImportInProgress,
+              !capturePipeline.isCapturing, !shortRecordingController.isBusy else {
+            present(error: PinboardShotError.captureBusy)
+            return
+        }
+        browserLaunchInProgress = true
+        statusPopover.performClose(nil)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer { self.browserLaunchInProgress = false }
+            do { try await BrowserCaptureLauncher.start(windowFrame: windowFrame) }
+            catch { self.present(error: error) }
+        }
+    }
+
+    private func prepareBrowserExtension() {
+        NSApp.activate(ignoringOtherApps: true)
+        let alert = NSAlert()
+        alert.messageText = L10n.text("browserExtension.setupTitle")
+        alert.informativeText = L10n.text("browserExtension.setupHelp")
+        alert.addButton(withTitle: L10n.text("browserExtension.connect"))
+        alert.addButton(withTitle: L10n.text("common.cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            let directory = try BrowserExtensionSetup.prepare()
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(directory.path, forType: .string)
+            let done = NSAlert()
+            done.messageText = L10n.text("browserExtension.readyTitle")
+            done.informativeText = L10n.text("browserExtension.readyHelp", directory.path)
+            done.addButton(withTitle: L10n.text("common.done"))
+            done.runModal()
+        } catch { present(error: error) }
     }
 
     @objc private func showPreferences() {
@@ -1106,7 +1188,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 onHistoryTools: { [weak self] item in
                     guard let self, let image = self.historyStore.image(for: item) else { return }
                     self.captureToolsController.show(image: image)
-                }
+                },
+                onPrepareBrowserExtension: { [weak self] in self?.prepareBrowserExtension() },
+                onStartBrowserCapture: { [weak self] in self?.startBrowserCapture() }
             )
             let controller = NSWindowController(window: NSWindow(contentViewController: NSHostingController(rootView: view)))
             controller.window?.title = L10n.text("preferences.windowTitle")
