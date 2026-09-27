@@ -223,6 +223,7 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
     private let onError: @Sendable (Error) -> Void
     private var frameOrder = ScrollCaptureFrameOrder()
     private var automaticSampling = false
+    private var capturePaused = false
 
     init(
         target: ScrollCaptureTarget,
@@ -240,7 +241,7 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
         didOutputSampleBuffer sampleBuffer: CMSampleBuffer,
         of outputType: SCStreamOutputType
     ) {
-        guard !automaticSampling, outputType == .screen, sampleBuffer.isValid,
+        guard !capturePaused, !automaticSampling, outputType == .screen, sampleBuffer.isValid,
               let status = frameStatus(sampleBuffer) else { return }
         guard status == .complete || status == .started,
               let pixelBuffer = sampleBuffer.imageBuffer,
@@ -252,6 +253,7 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
 
     func submitSnapshot(_ image: CGImage, timestamp: TimeInterval) {
         captureQueue.async { [self] in
+            guard !capturePaused else { return }
             // A screenshot request may finish after a newer streamed frame. Never
             // append that older viewport after the newer one or acknowledge a step with it.
             guard frameOrder.accept(timestamp: timestamp) else { return }
@@ -268,6 +270,12 @@ final class ScrollCaptureStreamOutput: NSObject, SCStreamOutput, SCStreamDelegat
         // Serialize the mode change with frame intake; a stream and a screenshot
         // must never both commit views of the same automatic scrolling step.
         captureQueue.async { [self] in automaticSampling = enabled }
+    }
+
+    func setCapturePaused(_ paused: Bool) {
+        // Freeze new input on the same queue as stream/snapshot intake. Already
+        // accepted frames may finish so the saved image keeps its complete tail.
+        captureQueue.async { [self] in capturePaused = paused }
     }
 
     func stream(_ stream: SCStream, didStopWithError error: Error) {
@@ -511,6 +519,7 @@ final class ScrollCaptureController {
 
     private func pauseAutoScroll(_ reason: ScrollCaptureAutoScroll.PauseReason) {
         autoScroll?.pause(reason)
+        output?.setCapturePaused(reason == .user)
         output?.setAutomaticSampling(false)
         previewController.showAutoScroll(paused: true, statusKey: "scrollCapture.auto.\(reason.rawValue)")
     }
@@ -529,6 +538,7 @@ final class ScrollCaptureController {
                   application.activate() else { pauseAutoScroll(.targetChanged); return }
             autoScroll?.resume(now: hostTime)
             waitingForPointer = true
+            output?.setCapturePaused(false)
             output?.setAutomaticSampling(true)
             targetActivationDeadline = hostTime + 0.8
             previewController.showAutoScroll(paused: false, waitingForPointer: true)
@@ -636,6 +646,7 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
     private let cancelButton = NSButton(title: "", target: nil, action: nil)
     private let autoScrollButton = NSButton(title: "", target: nil, action: nil)
     private var autoPausedStatusKey: String?
+    private var hasStartedAutoCapture = false
     private var isClosingProgrammatically = false
 
     override init() {
@@ -653,13 +664,14 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
         isClosingProgrammatically = false
         panel.title = L10n.text("scrollCapture.title")
         titleLabel.stringValue = L10n.text("scrollCapture.title")
-        finishButton.title = L10n.text("common.done")
+        finishButton.title = L10n.text("scrollCapture.stop")
         finishButton.isEnabled = true
         cancelButton.title = L10n.text("common.cancel")
         statusLabel.stringValue = L10n.text("scrollCapture.status.ready")
         sizeLabel.stringValue = "—"
         imageView.image = nil
         imageView.resetDocumentSize()
+        hasStartedAutoCapture = false
         showAutoScroll(paused: true, statusKey: "scrollCapture.auto.ready")
 
         let visible = screen.visibleFrame
@@ -701,7 +713,10 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
     func showAutoScroll(paused: Bool, statusKey: String = "scrollCapture.auto.user", waitingForPointer: Bool = false) {
         let key = paused ? statusKey : (waitingForPointer ? "scrollCapture.auto.pointer" : "scrollCapture.auto.running")
         autoPausedStatusKey = paused || waitingForPointer ? key : nil
-        autoScrollButton.title = L10n.text(paused ? "scrollCapture.auto.start" : "scrollCapture.auto.pause")
+        if !paused { hasStartedAutoCapture = true }
+        autoScrollButton.title = L10n.text(paused
+            ? (hasStartedAutoCapture ? "scrollCapture.auto.resume" : "scrollCapture.auto.start")
+            : "scrollCapture.auto.pause")
         statusLabel.stringValue = L10n.text(key)
     }
 

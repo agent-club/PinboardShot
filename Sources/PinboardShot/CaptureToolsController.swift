@@ -153,14 +153,15 @@ final class CaptureToolsController: NSObject, NSWindowDelegate {
     var onRecord: (() -> Void)?
     var onUseImage: ((NSImage) -> Void)?
 
-    func show(image: NSImage? = nil, guideSelected: Bool = false) {
-        if let window, image == nil, !guideSelected {
+    func show(image: NSImage? = nil, guideSelected: Bool = false, qrSelected: Bool = false) {
+        if let window, image == nil, !guideSelected, !qrSelected {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
         window?.close()
-        let content = CaptureToolsView(image: image, guideModel: guide, initialTab: guideSelected ? 2 : 0,
+        let content = CaptureToolsView(image: image, guideModel: guide,
+            initialTab: guideSelected ? 2 : (qrSelected ? 3 : 0),
             edit: { [weak self] in self?.onEdit?($0, $1) },
             capture: { [weak self] in self?.onCaptureStep?() },
             record: { [weak self] in self?.onRecord?() },
@@ -230,6 +231,7 @@ private struct CaptureToolsView: View {
                 Text(L10n.text("feature.long.title")).tag(0)
                 Text(L10n.text("feature.ocr.title")).tag(1)
                 Text(L10n.text("feature.guide.title")).tag(2)
+                Text(L10n.text("feature.qr.title")).tag(3)
             }.pickerStyle(.segmented)
             ZStack {
                 CaptureGuideView(model: guideModel, currentImage: image, capture: capture)
@@ -239,6 +241,8 @@ private struct CaptureToolsView: View {
                         .opacity(tab == 0 ? 1 : 0).allowsHitTesting(tab == 0).disabled(tab != 0).accessibilityHidden(tab != 0)
                     StructuredOCRView(image: source, active: tab == 1).id(ObjectIdentifier(image))
                         .opacity(tab == 1 ? 1 : 0).allowsHitTesting(tab == 1).disabled(tab != 1).accessibilityHidden(tab != 1)
+                    QRCodeRecognitionView(image: source, active: tab == 3).id(ObjectIdentifier(image))
+                        .opacity(tab == 3 ? 1 : 0).allowsHitTesting(tab == 3).disabled(tab != 3).accessibilityHidden(tab != 3)
                 } else if tab != 2 {
                     ContentUnavailableView(L10n.text("feature.tools.choose"), systemImage: "photo.on.rectangle",
                         description: Text(L10n.text("feature.tools.chooseHelp")))
@@ -263,6 +267,78 @@ private struct CaptureToolsView: View {
                 image = NSImage(cgImage: source, size: CGSize(width: source.width, height: source.height))
             } catch { message = error.localizedDescription }
         }
+    }
+}
+
+private struct QRCodeRecognitionView: View {
+    let image: CGImage
+    let active: Bool
+    @State private var payloads: [String] = []
+    @State private var busy = false
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Button(L10n.text("feature.qr.recognize")) { recognize() }.disabled(busy)
+                if busy { ProgressView().controlSize(.small) }
+                Spacer()
+            }
+            Text(L10n.text("feature.qr.help")).foregroundStyle(.secondary)
+            HSplitView {
+                ScrollView([.horizontal, .vertical]) {
+                    Image(decorative: image, scale: 1).resizable().scaledToFit().frame(width: 320)
+                }.frame(minWidth: 200, idealWidth: 320, maxWidth: 420)
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 12) {
+                        ForEach(Array(payloads.enumerated()), id: \.offset) { entry in
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text(L10n.text("feature.qr.result", entry.offset + 1)).font(.headline)
+                                Text(entry.element).textSelection(.enabled)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                HStack {
+                                    Button(L10n.text("annotation.copy")) {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(entry.element, forType: .string)
+                                    }
+                                    if let url = webURL(for: entry.element) {
+                                        Button(L10n.text("feature.qr.open")) {
+                                            NSWorkspace.shared.open(url)
+                                        }
+                                    }
+                                }
+                            }
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
+                        }
+                    }.padding(4)
+                }
+            }
+            if let message { Text(message).foregroundStyle(.secondary) }
+        }.task(id: active) { if active && payloads.isEmpty && !busy { recognize() } }
+    }
+
+    private func recognize() {
+        busy = true
+        message = nil
+        Task {
+            do {
+                let source = image
+                payloads = try await Task.detached(priority: .userInitiated) {
+                    try TextRecognitionService.recognizeQRCodes(in: source)
+                }.value
+                if payloads.isEmpty { message = L10n.text("feature.qr.empty") }
+            } catch { message = error.localizedDescription }
+            busy = false
+        }
+    }
+
+    private func webURL(for payload: String) -> URL? {
+        guard let url = URL(string: payload),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+              url.host != nil, url.user == nil, url.password == nil else { return nil }
+        return url
     }
 }
 

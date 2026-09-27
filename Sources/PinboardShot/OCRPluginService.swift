@@ -96,6 +96,19 @@ enum OCRPluginRequestBuilder {
         guard let text = root.string(at: path) else { throw OCRPluginError.invalidResponse }
         return text
     }
+
+    static func readResponse<Bytes: AsyncSequence>(
+        from bytes: Bytes,
+        maximumBytes: Int = OCRPluginConstants.maximumResponseBytes
+    ) async throws -> Data where Bytes.Element == UInt8 {
+        // Enforce the response limit while receiving bytes; a post-download check cannot bound memory use.
+        var data = Data()
+        for try await byte in bytes {
+            guard data.count < maximumBytes else { throw OCRPluginError.responseTooLarge }
+            data.append(byte)
+        }
+        return data
+    }
 }
 
 private struct OCRRequestOrigin: Equatable, Sendable {
@@ -170,7 +183,7 @@ enum RemoteOCRPluginClient {
         let session = URLSession(configuration: configuration, delegate: redirectDelegate, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
 
-        let (data, response) = try await session.data(for: request)
+        let (bytes, response) = try await session.bytes(for: request)
         if redirectDelegate.didRejectCrossOriginRedirect {
             throw OCRPluginError.crossOriginRedirect
         }
@@ -180,6 +193,7 @@ enum RemoteOCRPluginClient {
         guard 200..<300 ~= httpResponse.statusCode else {
             throw OCRPluginError.httpStatus(httpResponse.statusCode)
         }
+        let data = try await OCRPluginRequestBuilder.readResponse(from: bytes)
         return try OCRPluginRequestBuilder.parseResponse(data, manifest: manifest)
     }
 }

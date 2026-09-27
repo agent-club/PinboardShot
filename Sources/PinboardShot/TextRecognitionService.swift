@@ -33,6 +33,16 @@ enum TextRecognitionService {
             .joined(separator: "\n")
     }
 
+    static func recognizeQRCodes(in image: CGImage) throws -> [String] {
+        let request = VNDetectBarcodesRequest()
+        request.symbologies = [.qr]
+        try VNImageRequestHandler(cgImage: image, options: [:]).perform([request])
+        return (request.results ?? []).compactMap { observation in
+            guard let payload = observation.payloadStringValue, !payload.isEmpty else { return nil }
+            return payload
+        }
+    }
+
     static func sensitiveRegions(in image: CGImage) throws -> [CGRect] {
         let textRequest = VNRecognizeTextRequest()
         textRequest.recognitionLevel = .accurate

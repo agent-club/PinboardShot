@@ -31,7 +31,8 @@ export class NativeCaptureClient {
       this.port = null;
     });
     const hello = await this.request("hello", { protocolVersion: PROTOCOL_VERSION });
-    if (hello.protocolVersion !== PROTOCOL_VERSION || !Number.isInteger(hello.maxChunkBytes) || hello.maxChunkBytes < 4) {
+    if (hello.protocolVersion !== PROTOCOL_VERSION || hello.supportsCaptureControl !== true ||
+        !Number.isInteger(hello.maxChunkBytes) || hello.maxChunkBytes < 4) {
       throw new Error("native_protocol_unsupported");
     }
     this.maxChunkChars = hello.maxChunkBytes;

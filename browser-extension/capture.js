@@ -111,7 +111,9 @@
   }
 
   async function settleScroll() {
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Chrome can suspend animation frames for an occluded page. Keep scroll
+    // replies bounded so the worker can acknowledge Pause and finish Stop.
+    await bounded(new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))), 250);
     let previous = window.scrollY;
     let stable = 0;
     const deadline = Date.now() + 2200;
@@ -137,7 +139,8 @@
       if (typeof image.decode === "function") pending.push(image.decode());
     }
     await bounded(Promise.all(pending), 1200);
-    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    // Resource readiness must not reintroduce an unbounded frame wait.
+    await bounded(new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))), 250);
   }
 
   function onKeyDown(event) {

@@ -265,7 +265,7 @@ public struct BrowserCaptureInbox: Sendable {
     }
 
     private func removeCaptureDirectory(_ directory: URL) throws {
-        let allowed = Set(["manifest.json", ".manifest.tmp", "tile-*.png"])
+        let allowed = Set(["manifest.json", ".manifest.tmp", "tile-*.png", "control-request.json", "control-status.json", "control.lock"])
         let children = try FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil, options: [])
         for child in children {
             let name = child.lastPathComponent

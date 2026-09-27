@@ -393,7 +393,7 @@
 "preferences.trayIcon.animatedCamera" = "动态相机";
 "preferences.trayIcon.colorfulViewfinder" = "彩色取景框";
 "preferences.trayIcon.colorfulCamera" = "彩色相机";
-"preferences.trayIcon.solCrafted" = "GPT-5.6 Sol 星芒";
+"preferences.trayIcon.solCrafted" = "霓虹图钉";
 "watermark.preferences.tab" = "水印";
 "watermark.preferences.section" = "隐形取证水印";
 "watermark.preferences.enabled" = "为新截图嵌入隐形水印";
@@ -579,6 +579,12 @@
 "feature.ocr.help" = "使用本机识别，可直接修改预览后复制。表格列由文字位置推断，请核对空单元格和合并单元格；Markdown 默认首行为表头。重新识别会替换预览中的修改。";
 "feature.ocr.recognize" = "重新识别";
 "feature.ocr.empty" = "没有识别到文字。";
+"feature.qr.title" = "二维码识别";
+"feature.qr.recognize" = "重新识别";
+"feature.qr.help" = "在本机识别图片中的二维码。结果不会自动打开或上传；你可以复制内容，或主动打开网页链接。";
+"feature.qr.result" = "二维码 %d";
+"feature.qr.open" = "打开链接";
+"feature.qr.empty" = "没有识别到二维码。";
 "feature.guide.title" = "步骤文档";
 "feature.guide.untitled" = "操作步骤";
 "feature.guide.documentTitle" = "文档标题";
@@ -643,10 +649,10 @@
 "scrollCapture.auto.start" = "开始自动截屏";
 "scrollCapture.auto.ready" = "可手动滚动截屏，或点击“开始自动截屏”。";
 "scrollCapture.auto.pointer" = "请将鼠标移回选区以自动滚动；移出选区会暂停滚动，不会移动你的鼠标。";
-"scrollCapture.auto.pause" = "暂停";
-"scrollCapture.auto.resume" = "继续自动滚动";
+"scrollCapture.auto.pause" = "暂停截图";
+"scrollCapture.auto.resume" = "继续截图";
 "scrollCapture.auto.running" = "正在自动滚动，确认画面接上后继续。可随时暂停或完成。";
-"scrollCapture.auto.user" = "已暂停自动滚动，可手动调整；点击“开始自动截屏”恢复。";
+"scrollCapture.auto.user" = "截图已暂停，点击“继续截图”恢复。";
 "scrollCapture.auto.unmatched" = "画面尚未对齐，已暂停自动滚动。请滚回最后确认的画面后继续。";
 "scrollCapture.auto.stalled" = "采集暂未跟上，已暂停自动滚动。画面稳定后可继续，或完成当前截图。";
 "scrollCapture.auto.noMovement" = "未检测到滚动。请确认选区内是可滚动正文，再继续或重新框选。";
@@ -655,12 +661,12 @@
 
 "browserExtension.title" = "Chrome 网页长截图";
 "browserExtension.help" = "网页由 Chrome 插件按真实滚动坐标截取，并在本机回传编辑。插件需在 Chrome 中由你启用。";
-"browserExtension.prepare" = "设置 Chrome 插件";
-"browserExtension.setupTitle" = "连接 Chrome 与 PinboardShot";
-"browserExtension.setupHelp" = "将注册本机接收通道，并把插件导出到“下载”文件夹。图片仅在本机传输。插件尚未上架 Chrome 商店，需要你在扩展页面开启开发者模式并加载导出的文件夹。";
-"browserExtension.connect" = "连接并导出插件";
+"browserExtension.prepare" = "一键下载 Chrome 插件";
+"browserExtension.setupTitle" = "请先安装 Chrome 长截图插件";
+"browserExtension.setupHelp" = "Chrome 网页长截图需要插件。点击“一键下载插件”，文件会保存到“下载”目录。请在 Chrome 安装并启用插件，安装完成后重新开始长截图。若你已经安装并启用了插件，可确认后开始截图。";
+"browserExtension.connect" = "一键下载插件";
 "browserExtension.readyTitle" = "插件已放入下载文件夹";
-"browserExtension.readyHelp" = "插件已导出，路径已复制：\n%@\n\n在 Chrome 打开 chrome://extensions，开启开发者模式，点击“加载已解压的扩展程序”。直接从“下载”选择 PinboardShot-Chrome 文件夹；也可以按 ⌘⇧G 粘贴已复制的路径。请保留这个文件夹，Chrome 会从中运行插件。";
+"browserExtension.readyHelp" = "插件已下载，路径已复制：\n%@\n\n在 Chrome 打开 chrome://extensions，开启开发者模式，点击“加载已解压的扩展程序”。从“下载”选择此 PinboardShot-Chrome 文件夹；也可以按 ⌘⇧G 粘贴已复制的路径。请保留这个文件夹，Chrome 会从中运行插件。\n\n安装并启用插件后，请回到目标网页，再次开始长截图，并确认“已安装，开始截图”。";
 "browserExtension.importFailed" = "无法导入网页长截图。页面尺寸发生变化、图片不完整或超出尺寸上限，请重新截图。";
 
 "browserExtension.start" = "启动 Chrome 网页长截图";
@@ -671,3 +677,11 @@
 
 "browserExtension.autoStart" = "开始自动截屏";
 "browserExtension.detectedHelp" = "已识别 Chrome。点击开始后由插件自动截取当前标签页的整页内容，再回传编辑；截图范围不限于当前选区。";
+"scrollCapture.stop" = "停止截图";
+"scrollCapture.pausing" = "正在暂停截图…";
+"scrollCapture.paused" = "截图已暂停";
+"scrollCapture.stopping" = "正在停止并保存截图…";
+"browserExtension.controlWaiting" = "正在等待 Chrome 截图插件…";
+"browserExtension.controlUnavailable" = "无法连接 Chrome 截图插件。请确认插件已安装并启用；更新插件后需重新加载。完成后请重新开始长截图。";
+
+"browserExtension.installedStart" = "已安装，开始截图";

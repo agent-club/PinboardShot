@@ -22,6 +22,7 @@ enum TrayIconChoice: String, CaseIterable, Identifiable, Sendable {
     case animatedCamera
     case colorfulViewfinder
     case colorfulCamera
+    // Preserve the stored choice identifier so existing selections keep working.
     case solCrafted
 
     var id: String { rawValue }
@@ -82,10 +83,10 @@ enum TrayIconChoice: String, CaseIterable, Identifiable, Sendable {
             [.systemOrange, .systemPink, .systemPurple, .systemBlue]
         case .solCrafted:
             [
-                NSColor(srgbRed: 0.84, green: 0.66, blue: 0.29, alpha: 1),
-                NSColor(srgbRed: 1.00, green: 0.91, blue: 0.64, alpha: 1),
-                NSColor(srgbRed: 0.84, green: 0.66, blue: 0.29, alpha: 1),
-                NSColor(srgbRed: 0.67, green: 0.47, blue: 0.16, alpha: 1)
+                NSColor(srgbRed: 1.00, green: 0.73, blue: 0.31, alpha: 1),
+                NSColor(srgbRed: 1.00, green: 0.56, blue: 0.42, alpha: 1),
+                NSColor(srgbRed: 1.00, green: 0.37, blue: 0.47, alpha: 1),
+                NSColor(srgbRed: 1.00, green: 0.56, blue: 0.42, alpha: 1)
             ]
         default:
             []
@@ -144,73 +145,69 @@ enum TrayIconChoice: String, CaseIterable, Identifiable, Sendable {
     }
 
     private func solCraftedStatusBarImage(frameIndex: Int) -> NSImage {
-        let size = NSSize(width: 18, height: 18)
-        let normalizedFrame = normalizedIndex(frameIndex, count: animationColors.count)
-        let frameGold = animationColors[normalizedFrame]
-        let image = NSImage(size: size, flipped: false) { rect in
+        let size = NSSize(width: 21, height: 21)
+        let pinColor = animationColors[normalizedIndex(frameIndex, count: animationColors.count)]
+        let image = NSImage(size: size, flipped: false) { _ in
+            NSGraphicsContext.saveGraphicsState()
+            defer { NSGraphicsContext.restoreGraphicsState() }
+            let scale = NSAffineTransform()
+            scale.scale(by: size.width / 18)
+            scale.concat()
+            let rect = NSRect(x: 0, y: 0, width: 18, height: 18)
             let background = NSBezierPath(
                 roundedRect: rect.insetBy(dx: 0.75, dy: 0.75),
                 xRadius: 4.2,
                 yRadius: 4.2
             )
-            NSColor(srgbRed: 0.035, green: 0.035, blue: 0.04, alpha: 1).setFill()
+            NSColor(srgbRed: 0.10, green: 0.09, blue: 0.27, alpha: 1).setFill()
             background.fill()
 
-            frameGold.setStroke()
-            background.lineWidth = 1.15
-            background.stroke()
+            let backSheet = NSBezierPath()
+            backSheet.move(to: NSPoint(x: 3.7, y: 4.0))
+            backSheet.line(to: NSPoint(x: 12.7, y: 3.3))
+            backSheet.line(to: NSPoint(x: 14.3, y: 12.5))
+            backSheet.line(to: NSPoint(x: 5.2, y: 13.8))
+            backSheet.close()
+            NSColor(srgbRed: 0.54, green: 0.36, blue: 0.96, alpha: 1).setFill()
+            backSheet.fill()
 
-            let cornerPath = NSBezierPath()
-            cornerPath.lineWidth = 1.45
-            cornerPath.lineCapStyle = .round
-            let inset: CGFloat = 4.6
-            let arm: CGFloat = 2.55
-            let minX = rect.minX + inset
-            let maxX = rect.maxX - inset
-            let minY = rect.minY + inset
-            let maxY = rect.maxY - inset
+            let frontSheet = NSBezierPath()
+            frontSheet.move(to: NSPoint(x: 4.3, y: 4.0))
+            frontSheet.line(to: NSPoint(x: 13.1, y: 5.1))
+            frontSheet.line(to: NSPoint(x: 12.9, y: 13.8))
+            frontSheet.line(to: NSPoint(x: 3.6, y: 12.8))
+            frontSheet.close()
+            NSColor(srgbRed: 0.91, green: 0.94, blue: 1.00, alpha: 1).setFill()
+            frontSheet.fill()
 
-            cornerPath.move(to: NSPoint(x: minX, y: minY + arm))
-            cornerPath.line(to: NSPoint(x: minX, y: minY))
-            cornerPath.line(to: NSPoint(x: minX + arm, y: minY))
-            cornerPath.move(to: NSPoint(x: maxX - arm, y: minY))
-            cornerPath.line(to: NSPoint(x: maxX, y: minY))
-            cornerPath.line(to: NSPoint(x: maxX, y: minY + arm))
-            cornerPath.move(to: NSPoint(x: maxX, y: maxY - arm))
-            cornerPath.line(to: NSPoint(x: maxX, y: maxY))
-            cornerPath.line(to: NSPoint(x: maxX - arm, y: maxY))
-            cornerPath.move(to: NSPoint(x: minX + arm, y: maxY))
-            cornerPath.line(to: NSPoint(x: minX, y: maxY))
-            cornerPath.line(to: NSPoint(x: minX, y: maxY - arm))
-            cornerPath.stroke()
+            let photoScene = NSBezierPath()
+            photoScene.move(to: NSPoint(x: 4.8, y: 5.8))
+            photoScene.line(to: NSPoint(x: 7.0, y: 9.1))
+            photoScene.line(to: NSPoint(x: 8.5, y: 7.7))
+            photoScene.line(to: NSPoint(x: 10.0, y: 9.2))
+            photoScene.line(to: NSPoint(x: 12.1, y: 6.7))
+            photoScene.close()
+            NSColor(srgbRed: 0.29, green: 0.28, blue: 0.65, alpha: 1).setFill()
+            photoScene.fill()
 
-            let center = NSPoint(x: rect.midX, y: rect.midY)
-            let radius: CGFloat = normalizedFrame == 1 ? 3.0 : 2.45
-            let star = NSBezierPath()
-            star.move(to: NSPoint(x: center.x, y: center.y + radius))
-            star.curve(
-                to: NSPoint(x: center.x + radius, y: center.y),
-                controlPoint1: NSPoint(x: center.x + 0.45, y: center.y + 0.45),
-                controlPoint2: NSPoint(x: center.x + 0.45, y: center.y + 0.45)
-            )
-            star.curve(
-                to: NSPoint(x: center.x, y: center.y - radius),
-                controlPoint1: NSPoint(x: center.x + 0.45, y: center.y - 0.45),
-                controlPoint2: NSPoint(x: center.x + 0.45, y: center.y - 0.45)
-            )
-            star.curve(
-                to: NSPoint(x: center.x - radius, y: center.y),
-                controlPoint1: NSPoint(x: center.x - 0.45, y: center.y - 0.45),
-                controlPoint2: NSPoint(x: center.x - 0.45, y: center.y - 0.45)
-            )
-            star.curve(
-                to: NSPoint(x: center.x, y: center.y + radius),
-                controlPoint1: NSPoint(x: center.x - 0.45, y: center.y + 0.45),
-                controlPoint2: NSPoint(x: center.x - 0.45, y: center.y + 0.45)
-            )
-            star.close()
-            NSColor(srgbRed: 1.00, green: 0.91, blue: 0.64, alpha: 1).setFill()
-            star.fill()
+            let pinHead = NSBezierPath(ovalIn: NSRect(x: 9.6, y: 10.4, width: 5.2, height: 5.2))
+            pinColor.setFill()
+            pinHead.fill()
+            NSColor(srgbRed: 1.00, green: 0.82, blue: 0.50, alpha: 1).setStroke()
+            pinHead.lineWidth = 0.55
+            pinHead.stroke()
+
+            let pinCenter = NSBezierPath(ovalIn: NSRect(x: 11.55, y: 12.35, width: 1.3, height: 1.3))
+            NSColor(srgbRed: 0.29, green: 0.11, blue: 0.40, alpha: 1).setFill()
+            pinCenter.fill()
+
+            let pinStem = NSBezierPath()
+            pinStem.move(to: NSPoint(x: 12.3, y: 10.7))
+            pinStem.line(to: NSPoint(x: 12.6, y: 8.9))
+            pinStem.lineWidth = 0.9
+            pinStem.lineCapStyle = .round
+            NSColor(srgbRed: 0.29, green: 0.11, blue: 0.40, alpha: 1).setStroke()
+            pinStem.stroke()
             return true
         }
         image.isTemplate = false

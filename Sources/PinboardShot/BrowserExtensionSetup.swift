@@ -48,9 +48,10 @@ enum BrowserExtensionSetup {
 
     static func exportExtension(from source: URL, downloads: URL) throws -> URL {
         let files = ["manifest.json", "background.js", "capture.js", "popup.html", "popup.js", "popup.css",
-                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs"]
+                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs",
+                     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png"]
         let manager = FileManager.default
-        for directory in [source, source.appendingPathComponent("lib")] {
+        for directory in [source, source.appendingPathComponent("lib"), source.appendingPathComponent("icons")] {
             let info = try directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
             guard info.isDirectory == true, info.isSymbolicLink != true else { throw BrowserCaptureImportError.invalidGeometry }
         }
@@ -77,8 +78,10 @@ enum BrowserExtensionSetup {
             guard try destination.resourceValues(forKeys: [.isSymbolicLinkKey]).isSymbolicLink != true else {
                 throw BrowserCaptureImportError.invalidGeometry
             }
-            let libInfo = try destination.appendingPathComponent("lib").resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
-            guard libInfo.isDirectory == true, libInfo.isSymbolicLink != true else { throw BrowserCaptureImportError.invalidGeometry }
+            for name in ["lib", "icons"] {
+                let info = try destination.appendingPathComponent(name).resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+                guard info.isDirectory == true, info.isSymbolicLink != true else { throw BrowserCaptureImportError.invalidGeometry }
+            }
             for (name, data) in contents {
                 let file = destination.appendingPathComponent(name)
                 let info = try file.resourceValues(forKeys: [.isRegularFileKey, .isSymbolicLinkKey])
@@ -90,6 +93,7 @@ enum BrowserExtensionSetup {
         try manager.createDirectory(at: destination, withIntermediateDirectories: false)
         do {
             try manager.createDirectory(at: destination.appendingPathComponent("lib"), withIntermediateDirectories: false)
+            try manager.createDirectory(at: destination.appendingPathComponent("icons"), withIntermediateDirectories: false)
             for (name, data) in contents { try data.write(to: destination.appendingPathComponent(name), options: .withoutOverwriting) }
         } catch {
             try? manager.removeItem(at: destination)

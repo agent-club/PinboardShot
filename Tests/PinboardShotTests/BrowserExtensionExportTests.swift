@@ -8,9 +8,11 @@ struct BrowserExtensionExportTests {
         let source = root.appendingPathComponent("source", isDirectory: true)
         let downloads = root.appendingPathComponent("Downloads", isDirectory: true)
         try FileManager.default.createDirectory(at: source.appendingPathComponent("lib"), withIntermediateDirectories: true)
+        try FileManager.default.createDirectory(at: source.appendingPathComponent("icons"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         for file in ["manifest.json", "background.js", "capture.js", "popup.html", "popup.js", "popup.css",
-                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs"] {
+                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs",
+                     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png"] {
             try Data(file.utf8).write(to: source.appendingPathComponent(file))
         }
         return (root, source, downloads)
@@ -22,6 +24,7 @@ struct BrowserExtensionExportTests {
         defer { try? FileManager.default.removeItem(at: root) }
         let first = try BrowserExtensionSetup.exportExtension(from: source, downloads: downloads)
         #expect(try BrowserExtensionSetup.exportExtension(from: source, downloads: downloads) == first)
+        #expect(try Data(contentsOf: first.appendingPathComponent("icons/icon128.png")) == Data("icons/icon128.png".utf8))
         let original = try Data(contentsOf: first.appendingPathComponent("capture.js"))
         try Data("updated runtime".utf8).write(to: source.appendingPathComponent("capture.js"))
         let second = try BrowserExtensionSetup.exportExtension(from: source, downloads: downloads)

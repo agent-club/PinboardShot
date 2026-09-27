@@ -17,6 +17,7 @@ private struct ScrollingCaptureResult {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private static let firstLaunchDefaultsKey = "hasCompletedFirstLaunchOnboarding"
     private static let permissionDeferredDefaultsKey = "screenCapturePermissionDeferred"
+    private static let browserExtensionInstalledDefaultsKey = "browserExtension.installationConfirmed"
 
     private let shortcutStore = ShortcutStore()
     private let hotKeyManager = HotKeyManager()
@@ -56,6 +57,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var historyRetentionTimer: Timer?
     private var browserImportInProgress = false
     private var browserLaunchInProgress = false
+    private let browserCaptureControlController = BrowserCaptureControlController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
@@ -944,6 +946,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 tools: { [weak self] in
                     self?.captureResultOverlay.dismiss()
                     self?.captureToolsController.show(image: image)
+                },
+                recognizeQR: { [weak self] in
+                    self?.captureResultOverlay.dismiss()
+                    self?.captureToolsController.show(image: image, qrSelected: true)
                 }
             )
         )
@@ -1036,6 +1042,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func importBrowserCapture(_ id: UUID) {
+        browserCaptureControlController.close()
         guard !browserImportInProgress, !capturePipeline.isCapturing, !shortRecordingController.isBusy else {
             present(error: PinboardShotError.captureBusy)
             return
@@ -1059,29 +1066,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func startBrowserCapture(windowFrame: CGRect? = nil) {
-        guard !browserLaunchInProgress, !browserImportInProgress,
+        guard !browserLaunchInProgress, !browserImportInProgress, !browserCaptureControlController.isActive,
               !capturePipeline.isCapturing, !shortRecordingController.isBusy else {
             present(error: PinboardShotError.captureBusy)
             return
         }
         browserLaunchInProgress = true
         statusPopover.performClose(nil)
+        guard confirmBrowserExtensionInstallation() else {
+            browserLaunchInProgress = false
+            return
+        }
         Task { @MainActor [weak self] in
             guard let self else { return }
             defer { self.browserLaunchInProgress = false }
-            do { try await BrowserCaptureLauncher.start(windowFrame: windowFrame) }
-            catch { self.present(error: error) }
+            do {
+                self.browserCaptureControlController.onUnavailable = { [weak self] in
+                    // A previous confirmation cannot prove the extension is still enabled.
+                    UserDefaults.standard.set(false, forKey: Self.browserExtensionInstalledDefaultsKey)
+                    self?.present(error: NSError(domain: "PinboardShot.BrowserCapture", code: 1,
+                        userInfo: [NSLocalizedDescriptionKey: L10n.text("browserExtension.controlUnavailable")]))
+                }
+                self.browserCaptureControlController.show()
+                try await BrowserCaptureLauncher.start(windowFrame: windowFrame)
+            } catch {
+                self.browserCaptureControlController.close()
+                self.present(error: error)
+            }
         }
     }
 
-    private func prepareBrowserExtension() {
+    private func confirmBrowserExtensionInstallation() -> Bool {
+        // Chrome's profile is private. Record the user's explicit confirmation
+        // instead of treating an exported folder as an installed extension.
+        if UserDefaults.standard.bool(forKey: Self.browserExtensionInstalledDefaultsKey) { return true }
         NSApp.activate(ignoringOtherApps: true)
         let alert = NSAlert()
         alert.messageText = L10n.text("browserExtension.setupTitle")
         alert.informativeText = L10n.text("browserExtension.setupHelp")
         alert.addButton(withTitle: L10n.text("browserExtension.connect"))
+        alert.addButton(withTitle: L10n.text("browserExtension.installedStart"))
         alert.addButton(withTitle: L10n.text("common.cancel"))
-        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            prepareBrowserExtension()
+            return false
+        case .alertSecondButtonReturn:
+            UserDefaults.standard.set(true, forKey: Self.browserExtensionInstalledDefaultsKey)
+            return true
+        default:
+            return false
+        }
+    }
+
+    private func prepareBrowserExtension() {
+        statusPopover.performClose(nil)
+        NSApp.activate(ignoringOtherApps: true)
         do {
             let directory = try BrowserExtensionSetup.prepare()
             NSPasteboard.general.clearContents()

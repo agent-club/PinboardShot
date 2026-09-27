@@ -7,17 +7,75 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <main>
-    <header><strong>PinboardShot</strong><button id="language" type="button" aria-label="Language">EN</button></header>
-    <p id="description"></p>
-    <button id="start" class="primary" type="button"></button>
-    <section id="progressArea" hidden>
-      <div class="progress-track"><div id="progressBar"></div></div>
-      <p id="progressText" role="status" aria-live="polite"></p>
-      <button id="cancel" class="secondary" type="button"></button>
+  <main class="panel">
+    <header class="brand-header">
+      <div class="brand-lockup">
+        <img class="brand-icon" src="icons/icon128.png" alt="" aria-hidden="true">
+        <strong>PinboardShot</strong>
+      </div>
+      <button id="language" class="language-button" type="button">EN</button>
+    </header>
+
+    <section class="hero" aria-labelledby="title">
+      <div class="hero-copy">
+        <span id="statusBadge" class="status-badge" hidden></span>
+        <h1 id="title"></h1>
+        <p id="description" class="description"></p>
+      </div>
+      <div class="page-art" aria-hidden="true">
+        <svg viewBox="0 0 240 164" role="presentation" focusable="false">
+          <defs>
+            <linearGradient id="pageGlow" x1="0" y1="0" x2="1" y2="1">
+              <stop offset="0" stop-color="#e9f3ff" />
+              <stop offset="1" stop-color="#d7e8ff" />
+            </linearGradient>
+          </defs>
+          <rect x="31" y="11" width="148" height="142" rx="13" fill="url(#pageGlow)" />
+          <rect x="52" y="4" width="148" height="142" rx="13" class="art-sheet" />
+          <rect x="52" y="4" width="148" height="25" rx="13" class="art-toolbar" />
+          <path d="M52 17a13 13 0 0 1 13-13h122a13 13 0 0 1 13 13v12H52z" class="art-toolbar" />
+          <circle cx="66" cy="16" r="3" class="art-dot" />
+          <circle cx="77" cy="16" r="3" class="art-dot" />
+          <circle cx="88" cy="16" r="3" class="art-dot" />
+          <rect x="65" y="42" width="120" height="5" rx="2.5" class="art-line strong" />
+          <rect x="65" y="54" width="105" height="4" rx="2" class="art-line" />
+          <rect x="65" y="63" width="114" height="4" rx="2" class="art-line" />
+          <rect x="65" y="77" width="120" height="26" rx="6" class="art-image" />
+          <path d="m72 96 18-12 12 9 10-7 15 13H72z" class="art-landscape" />
+          <circle cx="164" cy="86" r="4" class="art-sun" />
+          <rect x="65" y="113" width="120" height="4" rx="2" class="art-line" />
+          <rect x="65" y="122" width="108" height="4" rx="2" class="art-line" />
+          <rect x="65" y="131" width="82" height="4" rx="2" class="art-line" />
+          <path d="M209 61v47m0 0-7-8m7 8 7-8" class="art-scroll" />
+        </svg>
+      </div>
     </section>
-    <p id="message" role="status" aria-live="polite"></p>
-    <small id="shortcut"></small>
+
+    <section class="capture-card">
+      <button id="start" class="primary" type="button"></button>
+
+      <div id="progressArea" class="progress-area" hidden>
+        <div class="progress-heading">
+          <p id="progressText" role="status" aria-live="polite"></p>
+          <span id="progressPercent" class="progress-percent" hidden></span>
+        </div>
+        <div class="progress-track" role="presentation">
+          <div id="progressBar"></div>
+        </div>
+        <div class="capture-actions">
+          <button id="pause" class="secondary" type="button"></button>
+          <button id="stop" class="stop-button" type="button"></button>
+        </div>
+        <button id="cancel" class="cancel-button" type="button"></button>
+        <p id="finishHint" class="finish-hint" hidden></p>
+      </div>
+      <p id="message" class="message" role="status" aria-live="polite"></p>
+    </section>
+
+    <footer class="panel-footer">
+      <span class="footer-mark" aria-hidden="true"></span>
+      <small id="shortcut"></small>
+    </footer>
   </main>
   <script type="module" src="popup.js"></script>
 </body>
