@@ -6,6 +6,7 @@ const CHANNEL = "pinboardshot.capture";
 const captureState = { status: "idle", progress: 0, error: null, tabId: null };
 let activeCapture = null;
 const CONTROL_POLL_INTERVAL_MS = 250;
+const CHROME_CAPTURE_TIMEOUT_MS = 30000;
 
 function publish() {
   chrome.runtime.sendMessage({ channel: CHANNEL, type: "state", state: { ...captureState } }).catch(() => {});
@@ -25,13 +26,38 @@ function errorCode(error) {
 }
 
 async function sendToContent(tabId, message) {
-  const reply = await chrome.tabs.sendMessage(tabId, { channel: CHANNEL, ...message });
+  const reply = await boundedChromeCall(
+    () => chrome.tabs.sendMessage(tabId, { channel: CHANNEL, ...message }),
+    "page_response_timeout", message.type !== "restore");
   if (!reply?.ok) throw new Error(reply?.error || "page_capture_failed");
   return reply;
 }
 
+async function boundedChromeCall(start, timeoutCode, cancelable = true) {
+  const run = activeCapture;
+  if (cancelable && run?.cancelled) throw new Error("cancelled");
+  let timer;
+  let cancelWaiter;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(timeoutCode)), CHROME_CAPTURE_TIMEOUT_MS);
+  });
+  const pending = [timeout];
+  if (cancelable && run) {
+    pending.push(new Promise((_, reject) => {
+      cancelWaiter = () => reject(new Error("cancelled"));
+      run.cancelWaiters.add(cancelWaiter);
+    }));
+  }
+  try {
+    return await Promise.race([start(), ...pending]);
+  } finally {
+    clearTimeout(timer);
+    if (cancelWaiter) run.cancelWaiters.delete(cancelWaiter);
+  }
+}
+
 async function activeTabMatches(tabId, windowId) {
-  const focused = await chrome.windows.getLastFocused({ populate: true });
+  const focused = await boundedChromeCall(() => chrome.windows.getLastFocused({ populate: true }), "tab_query_timeout");
   const activeTab = focused.tabs?.find(tab => tab.active);
   // captureVisibleTab targets this Chrome window, even while a popup or another app has OS focus.
   return focused.id === windowId && activeTab?.id === tabId && activeTab.windowId === windowId;
@@ -44,7 +70,9 @@ async function waitForTab(tabId, windowId) {
 
 async function captureVisible(tabId, windowId) {
   await waitForTab(tabId, windowId);
-  const dataUrl = await chrome.tabs.captureVisibleTab(windowId, { format: "png" });
+  // A pending Chrome API must not trap Cancel or hold the page and native session indefinitely.
+  const dataUrl = await boundedChromeCall(
+    () => chrome.tabs.captureVisibleTab(windowId, { format: "png" }), "screenshot_timeout");
   await waitForTab(tabId, windowId);
   const comma = dataUrl.indexOf(",");
   if (comma < 0 || !dataUrl.startsWith("data:image/png;base64,")) throw new Error("invalid_screenshot");
@@ -204,6 +232,7 @@ function cancelCapture() {
   const run = activeCapture;
   if (!run || run.cancelled || run.stopRequested) return false;
   run.cancelled = true;
+  for (const wake of run.cancelWaiters) wake();
   run.resume?.();
   setState("cancelling", captureState.progress);
   return true;
@@ -247,7 +276,7 @@ async function runCapture(tab) {
     controlRevision: 0, controlWaiters: [], controlPollingStopped: false,
     remotePaused: null, desiredPaused: null, remoteStopped: null,
     controlTask: null, controlError: null, client: null, captureId: null,
-    lastTileDocumentHeight: 0
+    lastTileDocumentHeight: 0, cancelWaiters: new Set()
   };
   activeCapture = run;
   Object.assign(captureState, { status: "preparing", progress: 0, error: null, tabId: tab.id });
@@ -447,6 +476,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return false;
     }
     chrome.tabs.query({ active: true, lastFocusedWindow: true }).then(([tab]) => {
+      // The window-wide side panel persists across tabs, but activeTab access does not.
+      if (!tab?.url) {
+        sendResponse({ ok: false, error: "invoke_on_current_tab" });
+        return;
+      }
       void runCapture(tab).catch(error => setState("error", captureState.progress, errorCode(error)));
       sendResponse({ ok: true });
     }).catch(error => sendResponse({ ok: false, error: errorCode(error) }));
