@@ -1,48 +1,42 @@
 {
-  "version": "0.14.0",
-  "build": "49",
-  "date": "2026.09.28",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.14.0",
+  "version": "0.14.1",
+  "build": "50",
+  "date": "2026.09.29",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.14.1",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.14.0-49.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.0/PinboardShot-0.14.0-49.dmg",
-      "sha256": "50289097cc8c88dfbc85dd5efa83ecbb52c0d8a592091674fcf9254d6b9a08b8"
+      "name": "PinboardShot-0.14.1-50.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.1/PinboardShot-0.14.1-50.dmg",
+      "sha256": "9325a6b99c5d71f8aa37241db0ac4ea5997be4f5db56208ca71b5abb4639d258"
     },
     "zip": {
-      "name": "PinboardShot-0.14.0-49.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.0/PinboardShot-0.14.0-49.zip",
-      "sha256": "e32f92f49605a5103661aba9043bbc6998ce8d202ea4da5f823a5a247aceda3c"
+      "name": "PinboardShot-0.14.1-50.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.1/PinboardShot-0.14.1-50.zip",
+      "sha256": "6653c6cce7d1d83060977ccf807bee874ce05ee269a11a3ce09752490624d195"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.0/appcast.xml",
-      "sha256": "79d9e745257c6c17b7dbfacf1eea209f3622dfbf9a8bdbe9d69ddf4c0b715caf"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.1/appcast.xml",
+      "sha256": "64d1ab07921cb59257215f0d746110c63ccc2d020f9908c67556583fad5f9792"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "二维码识别与长截图控制",
+    "title": "Chrome 长截图稳定性修复",
     "changes": [
-      "新增本机二维码识别，支持多个结果、复制内容和主动打开网页链接",
-      "Chrome 插件新增常驻侧栏与暂停、继续、停止控制，App 可通过独立面板控制同一次采集",
-      "修复滚动截图目标窗口识别和暂停期间继续采集的问题",
-      "更新应用、菜单栏和插件图标，调整设置界面",
-      "限制实况文本分析图像大小和远程 OCR 响应体大小，修复隐形水印记录保存",
-      "Chrome 插件需重新导出并加载；仅支持文档滚动，虚拟列表完整性不保证",
+      "侧栏切换到未授权的新标签页时，提示在当前网页重新点击插件图标",
+      "Chrome 截图或网页响应超时后结束采集；取消操作可及时恢复网页状态",
+      "Chrome 插件更新至 0.2.1，更新 App 后需重新导出并加载；仍仅支持文档滚动",
       "应用与 DMG 已通过 Apple 公证，Sparkle 更新包带有签名"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "QR recognition and long capture controls",
+    "title": "Chrome long capture reliability",
     "changes": [
-      "New local QR code recognition supports multiple results, copying content, and explicitly opening web links.",
-      "The Chrome extension adds a persistent side panel with pause, resume, and stop controls; an App panel can control the same capture.",
-      "Fixed scrolling capture window selection and continued sampling while paused.",
-      "Updated App, menu bar, and extension icons and adjusted settings.",
-      "Bounded Live Text image sizes and remote OCR response sizes, and fixed invisible watermark record saving.",
-      "Export and reload the Chrome extension after updating; only document scrolling is supported and virtualized-list completeness is not guaranteed.",
+      "When the side panel moves to a new tab without access, it asks you to click the extension icon on that tab.",
+      "Capture ends when Chrome screenshots or page responses time out; Cancel can promptly restore the page.",
+      "The Chrome extension is updated to 0.2.1; export and reload it after updating the App. Only document scrolling is supported.",
       "The App and DMG are Apple-notarized, and the Sparkle update package is signed."
     ]
   }

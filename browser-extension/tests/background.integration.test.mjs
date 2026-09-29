@@ -5,7 +5,8 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 
 function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false, finishOpenFailed = false,
   windowFocused = true, supportsCaptureControl = true, pauseAfterFirstTile = false,
-  pauseBeforeSecondTile = false, documentHeight = 1500, viewportHeight = 500 } = {}) {
+  pauseBeforeSecondTile = false, documentHeight = 1500, viewportHeight = 500,
+  hideTabURL = false, hangVisibleCapture = false, hangMetrics = false } = {}) {
   const runtimeMessages = [];
   const nativeRequests = [];
   const contentRequests = [];
@@ -62,10 +63,12 @@ function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false
     commands: { onCommand: { addListener: fn => listeners.commands.push(fn) } },
     windows: { getLastFocused: async () => ({ id: windowId, focused: active && windowFocused, tabs: [{ id: tabId, windowId, active }] }) },
     tabs: {
-      query: async () => [{ id: tabId, windowId, active: true, url: "https://example.test/article" }],
+      query: async () => [{ id: tabId, windowId, active: true,
+        ...(!hideTabURL ? { url: "https://example.test/article" } : {}) }],
       captureVisibleTab: async requestedWindow => {
         assert.equal(requestedWindow, windowId);
         imageCount++;
+        if (hangVisibleCapture) return new Promise(() => {});
         const image = `data:image/png;base64,${"A".repeat(100)}`;
         if (switchAfterFirstImage && imageCount === 1) active = false;
         if (moveAfterFirstImage && imageCount === 1) scrollY += 17;
@@ -83,7 +86,10 @@ function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false
           scrollY = Math.min(message.targetY, page.documentHeight - page.viewportHeight);
           return { ok: true, metrics: { ...page, scrollX: 0, scrollY } };
         }
-        if (message.type === "metrics") return { ok: true, metrics: { ...page, scrollX: 0, scrollY } };
+        if (message.type === "metrics") {
+          if (hangMetrics) return new Promise(() => {});
+          return { ok: true, metrics: { ...page, scrollX: 0, scrollY } };
+        }
         if (message.type === "restore") { scrollY = 73; restored = true; return { ok: true, restored: true }; }
         throw new Error(`Unexpected content message: ${message.type}`);
       }
@@ -120,6 +126,38 @@ test("only a manual toolbar click opens the persistent control panel", async () 
   await settle();
   assert.deepEqual(mock.openedPanels, [{ windowId: 7 }]);
   assert.equal(mock.nativeRequests.length, 0);
+});
+
+test("a side panel carried to a tab without activeTab access asks for a toolbar click", async () => {
+  const mock = makeChrome({ hideTabURL: true });
+  await loadBackground(mock);
+  const reply = await startCapture(mock);
+  assert.deepEqual(reply, { ok: false, error: "invoke_on_current_tab" });
+  assert.equal(mock.nativeRequests.length, 0);
+});
+
+test("cancel releases a capture when Chrome never returns its first screenshot", async () => {
+  const mock = makeChrome({ hangVisibleCapture: true });
+  await loadBackground(mock);
+  assert.equal((await startCapture(mock)).ok, true);
+  assert.ok(await waitUntil(() => mock.inspect().imageCount === 1));
+  await new Promise(resolve => mock.listeners.runtime[0](
+    { channel: "pinboardshot.capture", type: "cancel" }, popupSender, resolve));
+  assert.ok(await waitUntil(() => mock.runtimeMessages.some(message => message.state?.status === "cancelled")));
+  assert.equal(mock.inspect().restored, true);
+  assert.ok(mock.nativeRequests.some(request => request.command === "cancel"));
+});
+
+test("cancel releases a capture when the page stops replying to metrics", async () => {
+  const mock = makeChrome({ hangMetrics: true });
+  await loadBackground(mock);
+  assert.equal((await startCapture(mock)).ok, true);
+  assert.ok(await waitUntil(() => mock.inspect().contentRequests.some(message => message.type === "metrics")));
+  await new Promise(resolve => mock.listeners.runtime[0](
+    { channel: "pinboardshot.capture", type: "cancel" }, popupSender, resolve));
+  assert.ok(await waitUntil(() => mock.runtimeMessages.some(message => message.state?.status === "cancelled")));
+  assert.equal(mock.inspect().restored, true);
+  assert.ok(mock.nativeRequests.some(request => request.command === "cancel"));
 });
 
 test("the App shortcut captures without opening an extension panel", async () => {
