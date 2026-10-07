@@ -1,490 +1,143 @@
 # PinboardShot
 
-<p align="center">
-    <a href="#中文">中文</a> | <a href="#english">English</a>
-</p>
+Capture, annotate, and pin images on macOS · macOS 截图、标注与贴图工具
 
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/agent-club/PinboardShot/badge)](https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot) [![LINUX DO](https://shorturl.at/ggSqS)](https://linux.do)
+[English](#english) · [中文](#中文) · [Website / 官网](https://pinboardshot.agentclub.dev) · [Download / 下载](https://github.com/agent-club/PinboardShot/releases/latest)
 
-Official website: <https://pinboardshot.agentclub.dev>
+[![LINUX DO](https://shorturl.at/ggSqS)](https://linux.do)
 
-![PinboardShot 产品介绍图：截图、标注与贴屏](website/public/og.png)
-
-## 中文
-
-PinboardShot 是一个纯原生、以本机处理为核心的 macOS 截图与贴图工具。它基于 AppKit、SwiftUI 和 ScreenCaptureKit；默认仅为软件更新访问网络，不包含分析服务。只有主动配置并使用远程 OCR 插件时，才会将框选区域发送到用户指定的服务。
-
-官网：<https://pinboardshot.agentclub.dev/zh>
-
-它的核心工作流很简单：截取屏幕内容，按需完成标注，然后把结果复制到剪贴板或贴在桌面最前方，继续当前工作。
-
-### 当前能力
-
-#### 截图
-
-- 区域截图、当前屏幕截图、光标所在窗口截图
-- 滚动截图 MVP：只框选滚动正文，手动向下滚动，确认重叠后追加原始像素；无法定位时暂停追加
-- 滚动截图期间显示持续增长的长图预览和已截尺寸，失配后可照着预览回滚；预览窗口不会进入成品
-- 区域截图后直接贴屏，以及从剪贴板创建贴图
-- 3 秒延迟区域截图
-- 一键重复上次区域；方向键像素级移动选区，`Option` + 方向键调整尺寸，并可输入精确宽高或锁定比例
-- 截图完成后显示可关闭的快速结果浮层，可复制、保存、标注、贴屏或直接拖入其他 App
-- 支持从本地图片文件创建贴图，并提供 `pinboardshot://` URL Scheme 与 macOS 快捷指令动作
-- 区域截图时显示冻结的屏幕快照，避免 PinboardShot 自身遮罩和窗口进入成品
-- 框选后可通过八个控制点继续调整选区；双击选区可直接复制
-- 可选择是否在区域截图和全屏截图中包含鼠标指针
-- 可关闭截图开始时的轻量进入动画
-- 输出清晰度支持原生 Retina、720p、1080p、2K、4K 和 8K，默认使用 1080p
-- 标准清晰度会保持宽高比，只在目标档位高于原图时放大，不会压缩已有原生像素
-
-#### 截图标注
-
-区域框选完成后可直接进入标注模式，无需先保存文件。当前支持：
-
-- 马赛克、画笔、矩形、椭圆、直线、编号、高亮、箭头和文字
-- 默认使用本机 OCR，也可为主动框选的 OCR 区域配置声明式远程插件；取色、历史索引和基于文字、条码、人脸的智能脱敏仍在本机完成
-- 裁剪与顺时针旋转
-- 自定义颜色和笔触粗细
-- 撤销、重做与清除全部标注
-- 已有文字可重新编辑、调整样式并拖动位置
-- 标注结果可直接复制或贴到屏幕
-- 标注先合成到原生裁图，再应用所选输出清晰度
-
-#### 截图工具与文档
-
-从菜单栏的「截图工具」、截图结果的更多菜单或历史记录的更多菜单进入。
-
-- 可编辑原稿：在历史设置中开启，或在标注编辑器中勾选保存。原稿保留底图、标注和逻辑尺寸，可从历史「继续编辑」。关闭历史或排除来源 App 时不保存；含马赛克或脱敏区域时固化整张图，不保留遮盖前的内容。裁剪、旋转会固化已有标注。
-- 长图处理：拖选或输入像素行删除中段，支持撤销、重做，按指定页高导出连续 PNG 或 PDF。
-- 步骤文档：主动截图收集步骤，添加标题与说明、调整顺序，保存可重新打开的 JSON 原稿，导出 Markdown + 图片或 PDF。最多 100 步；不会自动监听点击。可选择启用本地崩溃恢复，临时保存未完成原稿；仍需手动保存正式文档。
-- 结构化 OCR：本机识别后生成纯文本、保留布局、TSV 和 Markdown 表格，可修改预览后复制。表格列根据文字位置推断，复杂合并单元格需要核对。
-- 二维码识别：从截图结果直接进入，或在截图工具中打开历史图片、剪贴板图片及本地文件；本机识别多个二维码，可复制原始内容，网页链接需主动点击才会打开。
-- 标尺：在独立标注编辑器中测量距离、横向及纵向间距，切换像素或点，绘制水平、垂直参考线。导入图片的点值依赖图片的逻辑尺寸。
-- 区域短录屏：框选后录制最长 60 秒的无声 H.264 MP4，最高 1920 × 1080 / 30 fps，停止后预览、裁剪首尾并保存。PinboardShot 自身窗口不进入视频；关闭预览会丢弃未保存视频。当前不包含 GIF、音频或视频历史。
-
-#### 贴图
-
-- 可同时创建任意多张贴图，并在所有桌面空间和全屏应用上方显示
-- 拖动贴图移动位置，拖动窗口边缘或使用触控板双指捏合，可按原始宽高比自由缩放
-- 可显示或隐藏全部贴图、关闭全部贴图，以及统一恢复鼠标交互
-- 支持按贴图切换鼠标穿透
-- 单张贴图可调透明度、锁定位置、限制到当前桌面空间或当前 App，并可在鼠标移入时自动暂隐
-- 支持 `⌘C`、`⌘S`、`⌘+`、`⌘-`、`⌘0` 与方向键操作贴图
-- 支持全局开启或关闭贴图阴影
-- 右键贴图可放大、缩小、一键恢复首次贴屏时的位置/尺寸/交互状态，以及复制、保存、切换鼠标穿透或关闭
-- 右键贴图可与另一张贴图进行并排、差异或混合对比
-- 每张贴图可添加备注与标签，并随贴图工作区和会话恢复快照保存
-- 贴图工作区支持搜索、排序、重命名、复制、最近工作区恢复，以及图片、PDF、Markdown 导出
-
-#### 快捷键与历史
-
-- 快捷键中心支持新增、修改、删除和清除全部绑定
-- 同一动作可以绑定多组快捷键
-- 自动拒绝冲突或不安全的全局快捷键；普通字母组合必须包含 `⌘`、`⌥` 或 `⌃`，也可直接使用功能键
-- 菜单会显示未能注册的快捷键，便于定位系统级冲突
-- 可配置保留 10–250 张截图，保留期可选 1、7、30、90 天或不限（默认不限）；可查看、复制、保存、删除或重新贴屏
-- 启动时及运行期间每小时执行历史保留策略，同步清理过期图片和 OCR 索引；清理失败可在历史设置中查看
-- 可在本机为历史截图建立 OCR 索引并搜索识别文字，同时查看状态、复制文字、打开详情或重试失败识别
-- 可从多张历史截图创建横向、纵向或网格拼板，自定义背景、间距、圆角、阴影和标题
-- 可手动清空历史、按时间清理或选择在退出应用时自动清理，并可预览存储占用和排除指定来源 App
-- 可选择开启崩溃/重启后的贴图会话恢复；默认关闭，恢复快照最长保留 24 小时
-
-#### 系统集成与语言
-
-- 菜单栏常驻，不占用 Dock
-- 菜单栏图标支持静态或动态样式，并在设置中区分单色和彩色选项；系统启用“减弱动态效果”时动态图标保持静止
-- 首次启动先说明菜单栏入口、快捷键默认关闭和权限用途，再由用户决定是否请求屏幕录制权限
-- 支持登录时自动启动；需要系统确认时可直接打开“登录项”设置
-- 界面语言支持跟随系统、简体中文、繁体中文和英文
-- 所有截图、历史和偏好设置都保存在本机
-- 通过菜单手动检查更新；设置中可开启自动检查，并选择每小时、每 6 小时、每 12 小时、每天、每 3 天或每周检查
-
-### 快捷键
-
-PinboardShot 默认不启用任何全局快捷键，避免占用其他应用的按键组合。可在“设置 → 快捷键”中为需要的动作主动添加快捷键，也可以为同一动作增加多组绑定。
-
-支持直接使用功能键；普通字母组合必须包含 `⌘`、`⌥` 或 `⌃`。功能键是否需要同时按下 `fn`，取决于 macOS 的键盘设置。
-
-### 基本使用
-
-#### 区域截图与标注
-
-1. 从菜单栏选择“区域截图”，然后拖动选择截图区域；如果已主动配置快捷键，也可用快捷键启动。
-2. 如需微调，拖动选区边缘或角落的控制点。
-3. 双击选区可立即复制；也可以使用工具栏进行标注、复制或贴屏。
-4. 标注模式下选择工具、颜色和粗细，完成后复制或贴到屏幕。
-
-按 `Esc` 取消截图。普通框选时右键不会退出；取色模式下右键会复制颜色并退出。框选阶段连续 12 秒无操作会自动退出，鼠标与键盘操作会续期；选区完成并进入工具操作后，空闲超时延长到 5 分钟，避免遮罩无限覆盖桌面。
-
-#### 滚动截图
-
-1. 从菜单栏选择“滚动截图”，框选窗口内的正文区域；尽量排除固定页脚、侧栏和动画。固定顶部栏可保留一次。
-2. 用滚轮或触控板向下滚动，每次保留至少四分之一屏重叠。此 MVP 不支持向上扩图、键盘翻页或拖动滚动条采集。
-3. 预览显示持续增长的长图，下方显示原始分辨率尺寸。遇到暂停提示，滚回预览底部对应的位置，再缓慢向下滚动。
-4. 点击“完成”生成整张连续截图，结果会复制到剪贴板并保留到截图历史。若仍处于暂停状态，需要明确选择保留已确认部分或取消。
-
-只追加高置信度重叠之后的新像素；重复内容无法定位、内容变化或大幅跳跃时不自动补洞。尺寸变化需要重新框选。单张截图限制为 128 MiB 原始像素或 32,768 px 高度，以先到者为准；生成成品时会短暂分配额外图像内存。未接上的画面不归档、不回放、不上传；采集层仅保留上一帧用于去重。
-
-#### 使用贴图
-
-- 从菜单栏选择“粘贴剪贴板图片”可把剪贴板中的图片贴到桌面；如果已主动配置快捷键，也可用快捷键执行。
-- 拖动贴图可移动；拖动边缘或使用触控板双指捏合可等比缩放。
-- 右键贴图可放大、缩小或恢复初始状态，也可复制、保存、切换鼠标穿透或关闭。
-- 如果贴图开启了鼠标穿透，可从菜单栏的“贴图管理”中恢复全部贴图交互。
-
-### 设置项
-
-设置窗口分为快捷键、历史、水印和偏好四个部分，可配置：
-
-- 全局快捷键与多组动作绑定
-- 截图输出清晰度、鼠标指针和进入动画
-- 界面语言
-- 登录时自动启动
-- 自动检查更新开关与检查周期
-- 退出时清空历史
-- 历史数量、保留期限、OCR 索引与快速结果浮层
-- 贴图阴影
-- 屏幕录制权限状态与修复入口
-
-选择 8K 输出时会显著增加内存占用、剪贴板体积和 PNG 编码时间；只有确实需要高分辨率成品时才建议启用。
-
-### 系统要求与构建
-
-- macOS 14 或更高版本
-- Swift 6.2 工具链
-- Xcode Command Line Tools
-- 推荐安装 Apple Development 代码签名证书，以便屏幕录制权限在本地重建后保持稳定
-
-```bash
-swift test --no-parallel
-./scripts/build-app.sh
-open .build/app/PinboardShot.app
-```
-
-`build-app.sh` 默认同时构建 `arm64` 与 `x86_64`。只构建当前 Apple Silicon 架构时可执行：
-
-```bash
-PINBOARDSHOT_ARCHS=arm64 ./scripts/build-app.sh
-```
-
-脚本默认依次尝试 Developer ID Application 与 Apple Development 身份；均不可用时会回退到 ad-hoc
-签名并输出警告。也可以通过 `PINBOARDSHOT_CODE_SIGN_IDENTITY` 显式指定稳定签名身份。
-macOS 26 会把每次 ad-hoc 重建视为新的应用身份，因此屏幕录制权限可能需要重新授权。
-
-### 应用签名与分发
-
-`build-app.sh` 的本地开发构建仍会在没有 Apple 证书时回退到 ad-hoc 签名。公开分发必须使用
-Developer ID Application 证书，并通过 Apple 公证；`prepare-update.sh` 不再允许把 ad-hoc 或
-Apple Development 签名的应用误发布为正式更新。
-
-首次配置时，先在 Xcode 的“Settings → Accounts → Manage Certificates”中为当前团队创建并安装
-`Developer ID Application` 证书。然后在终端执行以下命令，把公证凭据交互式保存到钥匙串；
-Apple ID、Team ID 和 app 专用密码都不要写入项目或 shell 脚本：
-
-```bash
-xcrun notarytool store-credentials "PinboardShot-notary"
-```
-
-如果需要使用其他钥匙串 profile 名称，可在发布时设置 `PINBOARDSHOT_NOTARY_PROFILE`。正式更新流程为：
-
-1. 使用 Developer ID Application 逐层签名 Sparkle 组件和主应用，并启用 Hardened Runtime 与安全时间戳。
-2. 将应用提交到 Apple 公证服务并等待结果。
-3. 把公证票据 stapling 到 `.app`，验证 Gatekeeper，再生成最终 ZIP。
-4. 使用 Sparkle EdDSA 签名最终 ZIP 并生成 `appcast.xml`。
-
-尚未取得 Developer ID 或只需要内部预览时，可继续使用两条预览渠道：
-
-1. 源码渠道：用户从仓库获取源码并在自己的 Mac 上运行 `./scripts/build-app.sh`。
-2. 预览包渠道：执行 `./scripts/package-preview.sh`，生成 ad-hoc 签名的 Universal ZIP 和 SHA-256 文件，并同步到 `website/public/`。
-
-预览包未经 Apple 公证。macOS 会显示未知开发者警告；用户应先核对 SHA-256，并只在确认来源可信后，按照 Apple 官方流程前往“系统设置 → 隐私与安全性 → 仍要打开”。不建议通过命令关闭或绕过系统安全检查。
-
-### 权限、隐私与本地数据
-
-首次启动时，应用会先说明为什么需要“屏幕与系统音频录制”权限，并由用户选择立即请求或稍后设置。也可以从菜单中的权限提示再次发起授权。授权后如果截图仍失败，请退出并重新打开 PinboardShot；开发阶段还应确认应用使用稳定代码签名，而不是重建后身份会变化的 ad-hoc 签名。
-
-截图历史保存在：
-
-```text
-~/Library/Application Support/PinboardShot/History
-```
-
-PinboardShot 默认仅为检查和下载软件更新访问网络，也不包含遥测或分析服务。只有当用户明确选择并配置远程 OCR 插件、随后主动使用 OCR 标注工具时，所框选的图片区域才会发送到用户指定的 OCR 服务；API Key 保存在 macOS 钥匙串中。历史 OCR 索引与智能脱敏始终在本机执行。历史可以在设置中手动清空，或配置为退出应用时自动清理。OCR 插件格式见 [`docs/ocr-plugins.md`](docs/ocr-plugins.md)。
-
-### 隐私与安全背书
-
-- 隐私政策：<https://pinboardshot.agentclub.dev/privacy>
-- 安全策略：[`SECURITY.md`](SECURITY.md)
-- OpenSSF Scorecard：<https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot>
-- OpenSSF Best Practices Badge：待完成官方自认证后添加徽章；认证前不展示未取得的标识。
-- 官网检查建议：发布前用 Mozilla HTTP Observatory、SSL Labs 和 Blacklight 检查安全响应头、TLS 配置和第三方追踪情况；这些扫描结果是公开佐证，不等同于正式隐私认证。
-- 社区评审候选：PrivacySpy 和 Privacy Guides 可作为后续提交目标；是否收录取决于各社区审核。
-- 维护清单：[`docs/privacy-security-signals.md`](docs/privacy-security-signals.md)
-
-### 可选的软件更新渠道
-
-Sparkle 更新包使用独立的 EdDSA 密钥验签，不依赖 Apple Developer 账号，但发布前必须确认私钥、appcast 与下载地址均可用。未完成这条验证链时，官网只发布源码和手动下载的预览包，不承诺应用内自动更新。
-
-确认 Developer ID、公证钥匙串 profile 和 Sparkle 更新签名链均可用后，先更新
-`Resources/Info.plist` 中的版本号与 build，再执行：
-
-```bash
-./scripts/prepare-update.sh <version> <build>
-```
-
-脚本会构建、签名并公证应用，再生成 Sparkle 签名 ZIP 和 `appcast.xml`，产物位于
-`.build/update-feed/`。将两者上传到同一个版本 Release。更新私钥只保存在本机钥匙串的
-`agent-club` 账户中，不应写入仓库或日志。需要显式选择证书或公证 profile 时可执行：
-
-```bash
-PINBOARDSHOT_CODE_SIGN_IDENTITY="Developer ID Application" \
-PINBOARDSHOT_NOTARY_PROFILE="PinboardShot-notary" \
-  ./scripts/prepare-update.sh <version> <build>
-```
-
-### 稳定性保护
-
-- 截图前先冻结排除本应用窗口的屏幕内容，遮罩不会进入最终截图
-- 所有取消路径会统一撤销遮罩、事件监听和光标状态
-- 均匀深色异常帧会被拒绝，不会覆盖剪贴板中的上一份内容
-- 高分辨率输出限制在标准 8K 像素量以内，避免无边界的内存分配
-- 捕获任务进行中再次触发贴图动作时会排队处理，避免剪贴板读写竞争
-
-### 致谢
-
-感谢 [linux.do](https://linux.do/) 社区的佬友们分享思路、提出想法和需求。大家的讨论与反馈，为 PinboardShot 的功能设计和持续改进提供了宝贵参考。
+![PinboardShot: capture, annotate, and pin images](website/public/og.png)
 
 ## English
 
-PinboardShot is a fully native, local-first screenshot and pinboard utility for macOS. It is built with AppKit, SwiftUI, and ScreenCaptureKit. By default, it accesses the network only for software updates and contains no analytics services. A selected region is sent to a user-configured service only when a remote OCR plugin is explicitly configured and used.
-
-Official website: <https://pinboardshot.agentclub.dev/en>
-
-Its core workflow is simple: capture content from the screen, annotate it when needed, then copy the result to the clipboard or pin it above the desktop and continue working.
-
-### Current capabilities
-
-#### Capture
-
-- Capture a selected area, the current display, or the window under the pointer.
-- Scrolling capture MVP: select only scrolling content and scroll downward. Append original pixels only after confirming overlap; pause when placement is uncertain.
-- Show the growing long-image preview and total captured dimensions, so you can return to the last confirmed position after a pause; the preview is excluded from the result.
-- Pin an area capture immediately, or create a pin from an image on the clipboard.
-- Start an area capture after a three-second delay.
-- Repeat the last region in one step. Move or resize the selection by pixels with the arrow keys, enter exact dimensions, or lock its aspect ratio.
-- Use the dismissible quick result overlay to copy, save, annotate, pin, or drag a finished capture into another app.
-- Create pins from local image files, use the `pinboardshot://` URL scheme, or run macOS Shortcuts actions.
-- Display a frozen screen snapshot while selecting an area so PinboardShot's own overlays and windows do not appear in the result.
-- Refine the selection with eight resize handles; double-click the selection to copy it immediately.
-- Choose whether the pointer is included in area and full-display captures.
-- Disable the lightweight entrance animation shown when a capture starts.
-- Choose Native Retina, 720p, 1080p, 2K, 4K, or 8K output; 1080p is the default.
-- Standard quality presets preserve the aspect ratio and only upscale when the selected preset is larger than the source; existing native pixels are not downscaled.
+PinboardShot is a free, open-source native macOS screenshot and pinboard app. Capture screen content, mark what matters, and keep the image above other windows so you can refer to documents, compare designs, or explain a problem without repeatedly switching windows.
 
-#### Capture annotations
+The app lives in the menu bar without occupying the Dock. Captures, history, and default OCR are processed on your Mac. The interface supports Simplified Chinese, Traditional Chinese, and English.
 
-After selecting an area, you can enter annotation mode directly without saving a file first. The current tools include:
+### What you can use it for
 
-- Mosaic, pen, rectangle, ellipse, line, numbered step, highlight, arrow, and text.
-- On-device OCR by default, with optional declarative remote plugins for actively selected OCR regions. Color picking, history indexing, and smart redaction based on text, barcodes, and faces remain on-device.
-- Crop and rotate clockwise.
-- Custom colors and stroke widths.
-- Undo, redo, and clear-all actions.
-- Re-edit, restyle, and reposition existing text.
-- Copy or pin the annotated result directly.
-- Composite annotations onto the native crop before applying the selected output-quality preset.
-
-#### Capture tools and documents
+- **Keep references in view**: pin a document excerpt, code snippet, or image beside your work.
+- **Explain problems and share feedback**: add arrows, text, numbers, and highlights, then mask sensitive areas before copying or saving.
+- **Compare designs and implementations**: view two pins side by side, or inspect details with difference and blend modes.
+- **Organize long content and instructions**: capture scrolling content, edit long images, and turn screenshots and descriptions into exportable step documents.
+- **Find earlier captures**: browse local history and enable OCR indexing to search for text inside images.
 
-Open **Capture tools** from the menu bar, the capture-result menu, or a history item's menu.
-
-- Editable drafts: enable them in history settings or in the annotation editor. Drafts preserve the source image, annotations, and logical dimensions for **Continue editing** in history. Disabled history and excluded source apps prevent saving drafts. Mosaic or redaction flattens the entire image without retaining concealed content; crop and rotation also bake existing annotations.
-- Long images: drag a band or enter pixel rows to remove a middle section, undo or redo, and export continuous PNG pages or a PDF at a chosen page height.
-- Step guides: capture steps manually, add titles and descriptions, reorder them, save a reopenable JSON draft, and export Markdown with images or PDF. Up to 100 steps; no automatic click monitoring. Optional local crash recovery keeps a temporary unfinished draft; save the document manually for long-term use.
-- Structured OCR: on-device recognition with editable plain text, layout-preserving text, TSV, and Markdown-table previews. Columns are inferred from text positions, so complex merged cells need review.
-- QR codes: open a recent capture directly, or load a history image, clipboard image, or local file in Capture tools. Recognize multiple codes on-device, copy their original contents, and open web links only when you choose to.
-- Ruler: measure distance and horizontal/vertical spacing in pixels or points, and draw horizontal or vertical guides in the standalone annotation editor. Point measurements for imported images depend on their logical size metadata.
-- Region recordings: silent H.264 MP4, up to 60 seconds and 1920 × 1080 at 30 fps, with preview and start/end trimming before saving. PinboardShot windows are excluded. Closing the preview discards unsaved video. GIF, audio, and video history are not included in this version.
-
-#### Pins
+### Main features
 
-- Create any number of pins and keep them visible across all desktop spaces and above full-screen applications.
-- Drag a pin to move it. Drag a window edge or use a two-finger trackpad pinch to resize it while preserving the original aspect ratio.
-- Show or hide all pins, close all pins, or restore pointer interaction for all pins at once.
-- Toggle click-through separately for each pin.
-- Tune a pin's opacity, lock its position, limit it to the current Space or app, or fade it temporarily on hover.
-- Operate pins with `⌘C`, `⌘S`, `⌘+`, `⌘-`, `⌘0`, and the arrow keys.
-- Enable or disable shadows for all pins.
-- Right-click a pin to zoom in, zoom out, restore its original position, size, and interaction state, or copy, save, toggle click-through, or close it.
-- Compare a pin with another pin side by side, as a difference view, or with an adjustable blend from the context menu.
-- Add notes and tags to each pin and preserve them in workspaces and session-recovery snapshots.
-- Search, sort, rename, duplicate, and restore recent pin workspaces, or export them as images, PDF, or Markdown.
+| Feature | What you can do |
+| --- | --- |
+| Capture | Capture a region, display, or window; use a delay or repeat the last region; adjust selections precisely and choose output quality |
+| Scrolling capture | Select content, scroll downward, and watch the stitched preview; use the optional Chrome extension for long web pages |
+| Annotation and editing | Use mosaic, pen, shapes, numbers, highlights, arrows, and text; crop, rotate, undo, and redo |
+| Text and recognition | Use on-device OCR, structured text and table output, QR recognition, color picking, and smart redaction |
+| Desktop pins | Pin captures, clipboard images, or local files; resize, adjust opacity, lock positions, enable click-through, and control where pins appear |
+| Pin workspaces | Add notes and tags, save and restore workspaces, compare images, and export images, PDF, or Markdown |
+| History and boards | Set count and retention limits, search OCR text, and arrange captures into horizontal, vertical, or grid boards |
+| Capture tools | Save editable annotation drafts, process long-image segments, create step documents, measure with a ruler, and record a silent region video for up to 60 seconds |
+| Everyday controls | Configure global shortcuts, use macOS Shortcuts, launch at login, and check for in-app updates |
 
-#### Shortcuts and history
+Scrolling capture needs overlap between adjacent views and pauses when it cannot confirm placement. Dynamic pages and complex scrolling areas may not be captured completely. Region recording currently includes neither audio nor GIF output. See the [release notes](https://github.com/agent-club/PinboardShot/releases) for features and limits in each version.
 
-- Add, edit, delete, or clear bindings in the shortcut center.
-- Assign multiple shortcuts to the same action.
-- Reject conflicting or unsafe global shortcuts automatically. Ordinary letter combinations must include `⌘`, `⌥`, or `⌃`; function keys can also be used directly.
-- Show shortcuts that could not be registered in the menu, making system-level conflicts easier to diagnose.
-- Keep 10–250 captures for 1, 7, 30, or 90 days, or with no time limit (the default), then inspect, copy, save, delete, or pin them again.
-- Apply history retention at startup and hourly while running, removing expired images and their OCR index together; cleanup failures appear in history settings.
-- Build an on-device OCR index, search recognized text, inspect recognition status, copy text, open details, or retry failed recognition.
-- Combine history items into horizontal, vertical, or grid boards with configurable backgrounds, spacing, corners, shadows, and titles.
-- Clear history manually, by age, or automatically when the app quits; preview storage usage and exclude selected source apps.
-- Optionally recover pin sessions after a crash or restart. Recovery is off by default, and snapshots are retained for at most 24 hours.
+### Download and install
 
-#### System integration and languages
+Requires **macOS 14 or later**, with both **Apple Silicon and Intel** architectures included.
 
-- Remain in the menu bar without occupying the Dock.
-- Offer static and animated menu-bar icons, with separate monochrome and color choices in Settings. Animated icons remain still when Reduce Motion is enabled.
-- Explain the menu-bar entry point, the fact that shortcuts are disabled by default, and the purpose of screen-recording permission on first launch before asking whether to request permission.
-- Launch automatically at login, with a direct link to Login Items settings when macOS confirmation is required.
-- Follow the system language or use Simplified Chinese, Traditional Chinese, or English.
-- Keep all captures, history, and preferences on the Mac.
-- Check for updates manually from the menu, or enable automatic checks every hour, 6 hours, 12 hours, day, 3 days, or week.
+1. Download the DMG from the [website](https://pinboardshot.agentclub.dev/en) or the [latest GitHub release](https://github.com/agent-club/PinboardShot/releases/latest).
+2. Open the DMG, drag **PinboardShot** into **Applications**, and launch it from Applications.
+3. Grant Screen Recording permission during onboarding, or enable it later in System Settings → Privacy & Security. If capture still fails after permission is granted, quit and reopen the app.
 
-### Shortcuts
+Official releases are Developer ID signed and Apple notarized. Existing users can check for updates from the menu or enable automatic checks in Settings.
 
-PinboardShot enables no global shortcuts by default, avoiding conflicts with other applications. Add shortcuts for the actions you need under Settings → Shortcuts. Multiple bindings can be assigned to the same action.
+### Get started
 
-Function keys can be used directly. Ordinary letter combinations must include `⌘`, `⌥`, or `⌃`. Whether a function key also requires `fn` depends on the macOS keyboard settings.
+1. Click the PinboardShot menu-bar icon, choose Area Capture, and drag to select content.
+2. Refine the selection using its edges or corners. Double-click to copy immediately, or use the toolbar to annotate, copy, or pin. Press `Esc` to cancel.
+3. Drag a pin to move it; drag an edge or pinch with two fingers to resize proportionally. Right-click for options such as opacity and click-through.
+4. Assign keys to frequent actions under Settings → Shortcuts. **Global shortcuts are disabled by default**, so you choose the combinations you need.
 
-### Basic usage
+To pin an image already on the clipboard, choose Paste Clipboard Image. Restore interaction for click-through pins from Pin Management in the menu bar.
 
-#### Area capture and annotation
+Chrome webpage capture is optional. Choose store installation or a local download in the app's settings; see the [usage guide](docs/chrome-extension.md) for installation steps and limits.
 
-1. Choose Area Capture from the menu bar and drag to select a region. If you configured a shortcut, you can use it to start the capture instead.
-2. Drag an edge or corner handle to refine the selection when needed.
-3. Double-click the selection to copy it immediately, or use the toolbar to annotate, copy, or pin it.
-4. In annotation mode, choose a tool, color, and stroke width, then copy or pin the result.
+### Privacy and local data
 
-Press `Esc` to cancel. Right-clicking does not exit a normal selection; in color-picker mode, it copies the color and exits. The selection stage exits after 12 seconds of inactivity, with mouse and keyboard input renewing the timeout. After a selection is completed and the toolbar becomes active, the idle timeout extends to five minutes so the overlay cannot remain over the desktop indefinitely.
+- **Captures stay on your Mac**: the app contains no telemetry or analytics services. By default, it accesses the network only to check for and download software updates.
+- **Text recognition is local by default**: history OCR indexing and smart redaction always remain on-device. Only when you explicitly configure and use a remote OCR plugin is the selected OCR region sent to your chosen service. API Keys stay in macOS Keychain. See the [OCR plugin guide](docs/ocr-plugins.md).
+- **You control history**: configure count and retention limits, exclude selected source apps, clear history manually, or clear it when the app quits. Pin session recovery is off by default and can be enabled when needed.
 
-#### Scrolling capture
+Capture history is stored at `~/Library/Application Support/PinboardShot/History`. Read the [privacy policy](https://pinboardshot.agentclub.dev/privacy) and [security policy](SECURITY.md) for more information.
 
-1. Choose Scrolling Capture and select the content area, preferably excluding fixed footers, sidebars, and animation. A fixed top bar can be retained once.
-2. Scroll downward with a wheel or trackpad, retaining at least a quarter viewport of overlap. This MVP does not support upward extension, keyboard paging, or scrollbar dragging.
-3. The preview grows with the confirmed capture; the dimensions describe the original-resolution result. If appending pauses, return to the position shown at the bottom of the preview and scroll down slowly.
-4. Choose Done to generate the continuous image, copy it to the clipboard, and retain it in capture history. If capture is still paused, explicitly keep the confirmed portion or cancel.
+### Feedback and contributions
 
-Only pixels following a high-confidence overlap are appended. Ambiguous repetition, content changes, or large jumps do not trigger automatic gap filling. Size changes require a new selection. A capture is limited to 128 MiB of raw pixels or 32,768 px in height, whichever comes first; final rendering temporarily allocates additional image memory. Rejected views are not archived, replayed, or uploaded; the capture layer retains only the preceding frame for deduplication.
+Report problems or suggest features through [GitHub Issues](https://github.com/agent-club/PinboardShot/issues). Follow the [security policy](SECURITY.md) for vulnerabilities, and remove sensitive content before sharing screenshots or logs.
 
-#### Using pins
+To contribute code, documentation, or translations, read the [contribution guide](CONTRIBUTING.md#english). The project uses the [MIT license](LICENSE); third-party notices are in [NOTICE.md](NOTICE.md).
 
-- Choose Paste Clipboard Image from the menu bar to pin an image from the clipboard. If you configured a shortcut, you can use it instead.
-- Drag a pin to move it; drag an edge or use a two-finger trackpad pinch to resize it proportionally.
-- Right-click a pin to zoom in, zoom out, restore its initial state, copy, save, toggle click-through, or close it.
-- If a pin has click-through enabled, restore interaction for all pins from Pin Management in the menu bar.
+Thanks to the [linux.do](https://linux.do/) community for sharing ideas and feature requests that help improve PinboardShot.
 
-### Settings
+## 中文
 
-The Settings window is divided into Shortcuts, History, Watermark, and Preferences. It includes controls for:
+PinboardShot 是一款免费、开源的原生 macOS 截图与贴图工具。截取屏幕内容，标出重点，再把图片贴在其他窗口上方：查看参考资料、核对设计或说明问题时，不必反复切换窗口。
 
-- Global shortcuts and multiple bindings per action.
-- Capture output quality, pointer inclusion, and the entrance animation.
-- Interface language.
-- Launch at login.
-- Automatic update checks and their interval.
-- Clearing history when the app quits.
-- History limits, retention, OCR indexing, and the quick result overlay.
-- Pin shadows.
-- Screen Recording permission status and recovery actions.
+应用常驻菜单栏，不占用 Dock。截图、历史和默认 OCR 都在本机处理，界面支持简体中文、繁体中文和英文。
 
-Selecting 8K output significantly increases memory usage, clipboard size, and PNG encoding time. Enable it only when the final image genuinely requires that resolution.
+### 适合用来做什么
 
-### System requirements and build
+- **随手留住参考**：把文档片段、代码或图片贴在当前工作窗口旁边，边看边做。
+- **说明问题与反馈**：用箭头、文字、编号和高亮标出重点，遮盖敏感区域后复制或保存。
+- **核对设计与实现**：让两张贴图并排显示，或用差异、混合模式对比细节。
+- **整理长内容和操作步骤**：截取滚动内容、处理长图，把截图与说明整理成可导出的步骤文档。
+- **找回之前的截图**：浏览本地历史，开启 OCR 索引后按图片中的文字搜索。
 
-- macOS 14 or later.
-- Swift 6.2 toolchain.
-- Xcode Command Line Tools.
-- An Apple Development signing certificate is recommended so screen-recording permission remains stable after local rebuilds.
+### 主要功能
 
-```bash
-swift test --no-parallel
-./scripts/build-app.sh
-open .build/app/PinboardShot.app
-```
+| 功能 | 可以做什么 |
+| --- | --- |
+| 截图 | 区域、屏幕、窗口、延迟截图和重复上次区域；支持精确调整选区与多档输出清晰度 |
+| 滚动长截图 | 框选正文后向下滚动，实时查看拼接预览；可选 Chrome 插件用于网页长截图 |
+| 标注与编辑 | 马赛克、画笔、形状、编号、高亮、箭头、文字，以及裁剪、旋转、撤销和重做 |
+| 文字与识别 | 本机 OCR、结构化文字和表格输出、二维码识别、取色与智能脱敏 |
+| 桌面贴图 | 从截图、剪贴板或本地图片创建贴图；缩放、透明度、锁定位置、鼠标穿透与显示范围设置 |
+| 贴图工作区 | 为贴图添加备注与标签，保存和恢复工作区，比较图片，导出图片、PDF 或 Markdown |
+| 历史与拼板 | 配置数量与保留期限，搜索 OCR 文字，将多张截图排成横向、纵向或网格拼板 |
+| 截图工具 | 可编辑标注原稿、长图分段处理、步骤文档、标尺，以及最长 60 秒的无声区域录屏 |
+| 日常操作 | 自定义全局快捷键、macOS 快捷指令、登录时启动和应用内更新 |
 
-`build-app.sh` builds both `arm64` and `x86_64` by default. To build only for the current Apple Silicon architecture, run:
+滚动截图需要保留相邻画面的重叠，无法确认拼接位置时会暂停；动态页面和复杂滚动区域可能无法完整采集。区域录屏目前不包含音频或 GIF。具体版本的功能与限制请查看[更新记录](https://github.com/agent-club/PinboardShot/releases)。
 
-```bash
-PINBOARDSHOT_ARCHS=arm64 ./scripts/build-app.sh
-```
+### 下载与安装
 
-The script tries Developer ID Application and Apple Development identities in that order. If neither is available, it falls back to ad-hoc signing and prints a warning. A stable identity can also be selected explicitly with `PINBOARDSHOT_CODE_SIGN_IDENTITY`. macOS 26 treats each ad-hoc rebuild as a new application identity, so Screen Recording permission may need to be granted again.
+支持 **macOS 14 或更高版本**，包含 **Apple Silicon 与 Intel** 架构。
 
-### Application signing and distribution
+1. 从[官网](https://pinboardshot.agentclub.dev/zh)或 [GitHub 最新版本](https://github.com/agent-club/PinboardShot/releases/latest)下载 DMG。
+2. 打开 DMG，将 **PinboardShot** 拖入 **Applications（应用程序）**，然后从应用程序目录启动。
+3. 在首次启动引导中授予屏幕录制权限；也可以稍后在「系统设置 → 隐私与安全性」中开启。授权后如仍无法截图，退出并重新打开应用。
 
-Local development builds produced by `build-app.sh` still fall back to ad-hoc signing when no Apple certificate is available. Public distributions must use a Developer ID Application certificate and Apple notarization. `prepare-update.sh` does not allow an ad-hoc or Apple Development build to be published as a formal update.
+正式发布的应用使用 Developer ID 签名并通过 Apple 公证。已安装用户可从菜单检查更新，也可在设置中开启自动检查。
 
-For initial setup, create and install a Developer ID Application certificate under Xcode → Settings → Accounts → Manage Certificates. Then run the following command and enter the notarization credentials interactively so they are stored in Keychain. Do not place the Apple ID, Team ID, or app-specific password in the project or a shell script.
+### 开始使用
 
-```bash
-xcrun notarytool store-credentials "PinboardShot-notary"
-```
+1. 点击菜单栏中的 PinboardShot 图标，选择「区域截图」，拖动框选内容。
+2. 拖动边缘或角落微调选区；双击选区可直接复制，也可在工具栏中标注、复制或贴屏。按 `Esc` 取消。
+3. 拖动贴图移动位置，拖动边缘或双指捏合等比缩放；右键可调整透明度、鼠标穿透等选项。
+4. 经常使用的动作可在「设置 → 快捷键」中绑定按键。**默认不启用全局快捷键**，由你选择需要的组合。
 
-Set `PINBOARDSHOT_NOTARY_PROFILE` when a different Keychain profile name is required. The formal update flow is:
+剪贴板中已有图片时，选择「粘贴剪贴板图片」即可贴屏。鼠标穿透开启后，可从菜单栏「贴图管理」恢复交互。
 
-1. Sign the nested Sparkle components and the main app with Developer ID Application, Hardened Runtime, and a secure timestamp.
-2. Submit the app to Apple's notarization service and wait for the result.
-3. Staple the notarization ticket to the app, verify it with Gatekeeper, and only then create the final ZIP.
-4. Sign the final ZIP with Sparkle EdDSA and generate `appcast.xml`.
+Chrome 网页长截图是可选功能，可在应用设置中选择商店安装或下载到本地；安装方法与限制见[使用说明](docs/chrome-extension.md)。
 
-Two preview channels remain available when Developer ID credentials are unavailable or only an internal preview is needed:
+### 隐私与本地数据
 
-1. Source channel: obtain the source from the repository and run `./scripts/build-app.sh` on a Mac.
-2. Preview-package channel: run `./scripts/package-preview.sh` to generate an ad-hoc-signed Universal ZIP and SHA-256 file and synchronize them to `website/public/`.
+- **截图留在本机**：应用不包含遥测或分析服务，默认仅为检查和下载软件更新访问网络。
+- **文字识别默认在本机完成**：历史 OCR 索引与智能脱敏始终在本机执行。只有主动配置并使用远程 OCR 插件时，框选的 OCR 区域才会发送到你指定的服务；API Key 保存在 macOS 钥匙串中。详见 [OCR 插件说明](docs/ocr-plugins.md)。
+- **历史由你管理**：可设置保留数量与期限、排除指定来源 App、手动清空或退出时自动清理。贴图会话恢复默认关闭，可按需开启。
 
-The preview package is not notarized. macOS will show an unidentified-developer warning. Verify the SHA-256 checksum, continue only when the source is trusted, and use Apple's documented Open Anyway flow under System Settings → Privacy & Security. Disabling or bypassing macOS security checks is not recommended.
+截图历史位于 `~/Library/Application Support/PinboardShot/History`。更多信息见[隐私政策](https://pinboardshot.agentclub.dev/privacy)与[安全策略](SECURITY.md)。
 
-### Permissions, privacy, and local data
+### 反馈与贡献
 
-On first launch, the app explains why Screen & System Audio Recording permission is needed and lets the user request it immediately or later. The request can also be started again from the permission notice in the menu. If capture still fails after permission is granted, quit and reopen PinboardShot. During development, also confirm that the app uses a stable signing identity instead of an ad-hoc identity that changes after every rebuild.
+欢迎通过 [GitHub Issues](https://github.com/agent-club/PinboardShot/issues)反馈问题或提出功能建议。涉及安全漏洞请按[安全策略](SECURITY.md)报告；分享截图或日志前请移除敏感内容。
 
-Capture history is stored at:
+想参与开发、改进文档或翻译，请阅读[贡献指南](CONTRIBUTING.md#中文)。项目采用 [MIT 许可证](LICENSE)，第三方组件说明见 [NOTICE.md](NOTICE.md)。
 
-```text
-~/Library/Application Support/PinboardShot/History
-```
-
-By default, PinboardShot accesses the network only to check for and download software updates, and it contains no telemetry or analytics services. A selected image region is sent only after the user explicitly selects and configures a remote OCR plugin and then actively uses the OCR annotation tool. API Keys stay in macOS Keychain. History OCR indexing and smart redaction always remain on-device. History can be cleared manually in Settings or configured to clear automatically when the app quits. See [`docs/ocr-plugins.md`](docs/ocr-plugins.md) for the plugin format.
-
-### Privacy and Security Signals
-
-- Privacy policy: <https://pinboardshot.agentclub.dev/privacy>
-- Security policy: [`SECURITY.md`](SECURITY.md)
-- OpenSSF Scorecard: <https://scorecard.dev/viewer/?uri=github.com/agent-club/PinboardShot>
-- OpenSSF Best Practices Badge: pending official self-certification; no badge is displayed before it is earned.
-- Website checks: before publishing, use Mozilla HTTP Observatory, SSL Labs, and Blacklight to check security headers, TLS configuration, and third-party tracking. These results are public trust signals, not formal privacy certifications.
-- Community review candidates: PrivacySpy and Privacy Guides can be considered for future submission, subject to each community's review process.
-- Maintenance checklist: [`docs/privacy-security-signals.md`](docs/privacy-security-signals.md)
-
-### Optional software-update channel
-
-Sparkle update packages use a separate EdDSA key and do not depend on an Apple Developer account for signature verification. Before publishing, confirm that the private key, appcast, and download URL are all usable. Until that validation chain is complete, the website offers only source and manually downloaded preview packages and does not promise in-app automatic updates.
-
-After the Developer ID certificate, notarization Keychain profile, and Sparkle signing chain are ready, update the version and build in `Resources/Info.plist`, then run:
-
-```bash
-./scripts/prepare-update.sh <version> <build>
-```
-
-The script builds, signs, and notarizes the app, then creates the Sparkle-signed ZIP and `appcast.xml` under `.build/update-feed/`. Upload both files to the same version Release. The update private key remains only in the local Keychain under the `agent-club` account and must never be written to the repository or logs. To select a certificate or notarization profile explicitly, run:
-
-```bash
-PINBOARDSHOT_CODE_SIGN_IDENTITY="Developer ID Application" \
-PINBOARDSHOT_NOTARY_PROFILE="PinboardShot-notary" \
-  ./scripts/prepare-update.sh <version> <build>
-```
-
-### Stability safeguards
-
-- Freeze screen content while excluding the app's own windows before a capture, keeping overlays out of the result.
-- Route every cancellation path through the same cleanup for overlays, event monitors, and cursor state.
-- Reject uniformly dark abnormal frames without replacing the previous clipboard content.
-- Limit high-resolution output to the standard 8K pixel budget instead of allowing unbounded memory allocation.
-- Queue another pin action when a capture is already running to avoid clipboard read/write races.
-
-### Acknowledgments
-
-Thanks to the members of the [linux.do](https://linux.do/) community for sharing ideas, suggestions, and feature requests. Your discussions and feedback have been valuable to PinboardShot's design and ongoing improvement.
+感谢 [linux.do](https://linux.do/) 社区分享思路、提出想法和需求，为 PinboardShot 的持续改进提供参考。
