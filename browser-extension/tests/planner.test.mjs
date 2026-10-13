@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { captureBudget, MAX_CAPTURE_PIXELS, MAX_TILE_PIXELS, nextTarget, progressPercent, validateMetrics } from "../lib/planner.mjs";
+import { captureBudget, MAX_CAPTURE_PIXELS, MAX_TILE_PIXELS, nextTarget, progressPercent, tileCropRect, validateMetrics } from "../lib/planner.mjs";
 
 test("plans overlapping positions from actual page coordinates and reaches the last viewport", () => {
   const positions = [0];
@@ -8,6 +8,22 @@ test("plans overlapping positions from actual page coordinates and reaches the l
   while ((y = nextTarget(y, 1800, 600)) !== null) positions.push(y);
   assert.deepEqual(positions, [0, 510, 1020, 1200]);
   assert.ok(positions.slice(1).every((value, index) => value <= positions[index] + 600));
+});
+
+test("crop geometry uses screenshot scale and rejects clipped or mismatched panes", () => {
+  const metrics = { browserViewportWidth: 1000, browserViewportHeight: 800,
+    captureRect: { x: 120, y: 80, width: 600, height: 500 } };
+  assert.deepEqual(tileCropRect(metrics, 2000, 1600), { x: 240, y: 160, width: 1200, height: 1000 });
+  assert.deepEqual(tileCropRect(metrics, 1250, 1000), { x: 150, y: 100, width: 750, height: 625 });
+  assert.throws(() => tileCropRect(metrics, 2000, 1590), /invalid_crop_geometry/);
+  assert.throws(() => tileCropRect({ ...metrics, captureRect: { ...metrics.captureRect, y: 400 } }, 2000, 1600), /invalid_crop_geometry/);
+});
+
+test("large fixed footers increase overlap and the projected pixel budget", () => {
+  const metrics = { documentHeight: 1800, viewportWidth: 900, viewportHeight: 600, devicePixelRatio: 2 };
+  assert.equal(nextTarget(0, 1800, 600, 0.4), 360);
+  assert.ok(captureBudget({ ...metrics, requiredOverlap: 0.4 }, 0) > captureBudget(metrics, 0));
+  assert.throws(() => captureBudget({ ...metrics, requiredOverlap: 1 }, 0), /invalid_metrics/);
 });
 
 test("recomputes the next target after the document grows", () => {

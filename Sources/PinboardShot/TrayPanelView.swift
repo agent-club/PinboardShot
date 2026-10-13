@@ -15,7 +15,7 @@ enum TrayPanelMetrics {
     }
 }
 
-private enum OrbitalPalette {
+enum OrbitalPalette {
     static let backgroundTop = Color(red: 0.996, green: 0.998, blue: 1.000)
     static let backgroundBottom = Color(red: 0.958, green: 0.972, blue: 0.992)
     static let blue = Color(red: 0.04, green: 0.39, blue: 0.96)
@@ -79,6 +79,7 @@ private enum TrayPanelIcon {
     case includeCursor
     case captureAnimation
     case pinShadow
+    case magneticDesktop
     case permissionWarning
     case hotKeyError
     case updateAvailable
@@ -114,6 +115,7 @@ private enum TrayPanelIcon {
         case .includeCursor: "cursorarrow"
         case .captureAnimation: "play.rectangle"
         case .pinShadow: "shadow"
+        case .magneticDesktop: "rectangle.stack"
         case .permissionWarning: "exclamationmark.triangle.fill"
         case .hotKeyError: "exclamationmark.circle.fill"
         case .updateAvailable: "sparkles"
@@ -126,7 +128,7 @@ private enum TrayPanelIcon {
         case .app, .captureRegion, .captureDelayedRegion, .captureRepeatRegion, .filePin, .captureScrollingRegion, .captureDisplay, .captureWindow, .captureRegionAndPin,
              .clipboardPin, .captureAnimation, .pinShadow:
             .primary
-        case .showPins, .hidePins, .restorePinInteraction:
+        case .showPins, .hidePins, .restorePinInteraction, .magneticDesktop:
             .pin
         case .detectWatermark, .quickStart, .letterToUsers, .legalNotices:
             .utility
@@ -174,13 +176,30 @@ struct TrayPanelView: View {
     let onPinShadowChanged: (Bool) -> Void
     let onDismissUpdateNotice: () -> Void
     let onCommand: (TrayPanelCommand) -> Void
+    var onContentHeightChanged: ((CGFloat) -> Void)? = nil
+    var maximumHeight: CGFloat? = nil
 
     @AppStorage(CaptureQuality.userDefaultsKey)
     private var captureQualityRawValue = CaptureQuality.defaultValue.rawValue
     @AppStorage("captureCursor") private var captureCursor = false
     @AppStorage(OverlaySafetyPolicy.animationDefaultsKey) private var captureEntranceAnimation = true
     @AppStorage(PinWindowManager.shadowDefaultsKey) private var pinWindowShadow = true
+    @AppStorage(TrayMenuConfigurationItem.outputQuality.visibilityKey) private var showsOutputQuality = true
+    @AppStorage(TrayMenuConfigurationItem.includeCursor.visibilityKey) private var showsIncludeCursor = true
+    @AppStorage(TrayMenuConfigurationItem.captureAnimation.visibilityKey) private var showsCaptureAnimation = true
+    @AppStorage(TrayMenuConfigurationItem.pinShadow.visibilityKey) private var showsPinShadow = true
+    @AppStorage(TrayMenuConfigurationItem.magneticDesktop.visibilityKey) private var showsMagneticDesktop = true
+    @AppStorage(MagneticDesktopSettings.enabledKey) private var magneticDesktopEnabled = false
+    @AppStorage(MagneticDesktopSettings.maximumVisibleKey)
+    private var magneticMaximumVisible = MagneticDesktopSettings.defaultMaximumVisible
+    @AppStorage(HistorySettings.enabledDefaultsKey) private var historyEnabled = true
     @State private var isMoreExpanded = false
+    @State private var isQuickSettingsExpanded = true
+    @State private var preferredContentHeight: CGFloat?
+
+    private var showsQuickSettings: Bool {
+        showsIncludeCursor || showsCaptureAnimation || showsPinShadow || showsMagneticDesktop
+    }
 
     private var appVersionLabel: String? {
         guard let version = Bundle.main.object(
@@ -199,7 +218,15 @@ struct TrayPanelView: View {
                     TrayPanelBackdrop()
                     mainPage
                 }
-                .frame(width: TrayPanelMetrics.width, height: height)
+                .frame(width: TrayPanelMetrics.width, height: min(preferredContentHeight ?? height, maximumHeight ?? height))
+                .onPreferenceChange(TrayPanelContentHeightKey.self) { measurements in
+                    guard let header = measurements["header"], let content = measurements["content"] else { return }
+                    let preferredHeight = ceil(header + content + 6 + 10 + 8)
+                    guard preferredHeight.isFinite, preferredHeight > 0 else { return }
+                    // Measure the scroll content itself so hidden rows also release native window space.
+                    preferredContentHeight = preferredHeight
+                    onContentHeightChanged?(min(preferredHeight, maximumHeight ?? height))
+                }
             } else {
                 panelPage(scrolls: false)
                     .fixedSize(horizontal: false, vertical: true)
@@ -219,14 +246,26 @@ struct TrayPanelView: View {
 
     private func panelPage(scrolls: Bool) -> some View {
         VStack(spacing: 6) {
-            header
-            statusNotices
+            VStack(spacing: 6) {
+                header
+                statusNotices
+            }
+            .background {
+                GeometryReader { geometry in
+                    Color.clear.preference(key: TrayPanelContentHeightKey.self, value: ["header": geometry.size.height])
+                }
+            }
 
             if scrolls {
                 ScrollViewReader { scrollProxy in
                     ScrollView {
                         panelContent
                             .padding(.bottom, 8)
+                            .background {
+                                GeometryReader { geometry in
+                                    Color.clear.preference(key: TrayPanelContentHeightKey.self, value: ["content": geometry.size.height])
+                                }
+                            }
                     }
                     .scrollBounceBehavior(.basedOnSize)
                     .scrollIndicators(.hidden)
@@ -249,15 +288,12 @@ struct TrayPanelView: View {
 
     private var panelContent: some View {
         VStack(spacing: 7) {
-            qualityHero
+            if showsOutputQuality { qualityHero }
             pinboardPreview
-            captureSettingsOrbit
-            pinboardSettingsOrbit
             if pinCount > 0 {
                 pinActionsOrbit
             }
             managementToolsOrbit
-            moreOrbit.id("more")
             appInfoOrbit
             quitOrbit
         }
@@ -315,7 +351,7 @@ struct TrayPanelView: View {
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .stroke(OrbitalPalette.nodeEdge.opacity(0.35), lineWidth: 0.6)
                     )
-            }
+            }.clickCursor()
             .buttonStyle(.plain)
         }
         .frame(minHeight: 46)
@@ -497,7 +533,7 @@ struct TrayPanelView: View {
                         .font(.system(size: 12, weight: .semibold))
                         .foregroundStyle(OrbitalPalette.blue)
                         .lineLimit(1)
-                }
+                }.clickCursor()
                 .buttonStyle(.plain)
             }
             .frame(width: 104, alignment: .leading)
@@ -525,8 +561,8 @@ struct TrayPanelView: View {
     }
 
     private var captureSettingsOrbit: some View {
-        TrayModuleShell(title: L10n.text("menu.capture"), tone: .primary) {
-            VStack(spacing: 0) {
+        VStack(spacing: 0) {
+            if showsIncludeCursor {
                 TrayToggleTile(
                     title: L10n.text("tray.setting.includeCursor"),
                     icon: .includeCursor,
@@ -534,7 +570,9 @@ struct TrayPanelView: View {
                     width: 0,
                     height: 0
                 )
-                TrayDivider()
+            }
+            if showsIncludeCursor && showsCaptureAnimation { TrayDivider() }
+            if showsCaptureAnimation {
                 TrayToggleTile(
                     title: L10n.text("tray.setting.captureAnimation"),
                     icon: .captureAnimation,
@@ -546,16 +584,93 @@ struct TrayPanelView: View {
         }
     }
 
-    private var pinboardSettingsOrbit: some View {
-        TrayModuleShell(title: L10n.text("tray.section.pinboard"), tone: .pin) {
+    private var magneticDesktopSettingsOrbit: some View {
+        VStack(alignment: .leading, spacing: 0) {
             TrayToggleTile(
-                title: L10n.text("tray.setting.pinShadow"),
-                icon: .pinShadow,
-                isOn: $pinWindowShadow,
+                title: L10n.text("magnetic.enabled"),
+                icon: .magneticDesktop,
+                isOn: $magneticDesktopEnabled,
                 width: 0,
                 height: 0
             )
+            if magneticDesktopEnabled {
+                TrayDivider()
+                magneticMaximumControl
+                if !historyEnabled {
+                    Text(L10n.text("magnetic.needsHistory"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(OrbitalPalette.secondaryText)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
         }
+    }
+
+    private var magneticMaximumControl: some View {
+        HStack(spacing: 8) {
+            Text(L10n.text("magnetic.maximumLabel"))
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(OrbitalPalette.secondaryText)
+
+            Spacer(minLength: 8)
+
+            HStack(spacing: 0) {
+                Button {
+                    magneticMaximumVisible -= 1
+                } label: {
+                    Image(systemName: "minus")
+                        .font(.system(size: 9, weight: .semibold))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }.clickCursor()
+                .disabled(magneticMaximumVisible <= MagneticDesktopSettings.supportedLimits.lowerBound)
+
+                Text(L10n.text("magnetic.maximumCount", magneticMaximumVisible))
+                    .font(.system(size: 11.3, weight: .semibold))
+                    .monospacedDigit()
+                    .frame(minWidth: 42)
+
+                Button {
+                    magneticMaximumVisible += 1
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.system(size: 9, weight: .semibold))
+                        .frame(width: 24, height: 24)
+                        .contentShape(Rectangle())
+                }.clickCursor()
+                .disabled(magneticMaximumVisible >= MagneticDesktopSettings.supportedLimits.upperBound)
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(OrbitalPalette.text)
+            .background(OrbitalPalette.nodeFill, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(OrbitalPalette.nodeEdge.opacity(0.34), lineWidth: 0.6)
+            )
+        }
+        .frame(height: 34)
+        // Keep the subordinate label aligned with the toggle's text, after its icon and gap.
+        .padding(.leading, 34)
+        .padding(.trailing, 4)
+        .opacity(magneticDesktopEnabled ? 1 : 0.45)
+        .disabled(!magneticDesktopEnabled)
+        .help(L10n.text("magnetic.help"))
+        .accessibilityRepresentation {
+            Stepper(value: $magneticMaximumVisible, in: MagneticDesktopSettings.supportedLimits) {
+                Text(L10n.text("magnetic.maximum", magneticMaximumVisible))
+            }
+            .disabled(!magneticDesktopEnabled)
+        }
+    }
+
+    private var pinboardSettingsOrbit: some View {
+        TrayToggleTile(
+            title: L10n.text("tray.setting.pinShadow"),
+            icon: .pinShadow,
+            isOn: $pinWindowShadow,
+            width: 0,
+            height: 0
+        )
     }
 
     private var pinActionsOrbit: some View {
@@ -590,70 +705,52 @@ struct TrayPanelView: View {
     }
 
     private var managementToolsOrbit: some View {
-        TrayModuleShell(title: L10n.text("tray.section.app"), tone: .neutral) {
-            VStack(spacing: 0) {
-                TrayListRow(title: L10n.text("feature.tools.title"), icon: .toolbarSettings) {
-                    onCommand(.showCaptureTools)
+        VStack(spacing: 0) {
+            if showsQuickSettings {
+                TrayListRow(
+                    title: L10n.text("menu.quickSettings"), icon: .toolbarSettings,
+                    rowHeight: 38, isExpanded: isQuickSettingsExpanded
+                ) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        isQuickSettingsExpanded.toggle()
+                    }
+                }
+                if isQuickSettingsExpanded {
+                    TrayDivider()
+                    if showsIncludeCursor || showsCaptureAnimation { captureSettingsOrbit }
+                    if showsPinShadow {
+                        if showsIncludeCursor || showsCaptureAnimation { TrayDivider() }
+                        pinboardSettingsOrbit
+                    }
+                    if showsMagneticDesktop {
+                        if showsIncludeCursor || showsCaptureAnimation || showsPinShadow { TrayDivider() }
+                        magneticDesktopSettingsOrbit
+                    }
                 }
                 TrayDivider()
-                TrayListRow(title: PreferencesSection.shortcuts.title, icon: .shortcuts) {
-                    onCommand(.showPreferences(.shortcuts))
-                }
-                TrayDivider()
-                TrayListRow(title: PreferencesSection.history.title, icon: .history) {
-                    onCommand(.showPreferences(.history))
-                }
-                TrayDivider()
-                TrayListRow(title: PreferencesSection.watermark.title, icon: .watermarkSettings) {
-                    onCommand(.showPreferences(.watermark))
-                }
-                TrayDivider()
-                TrayListRow(title: L10n.text("tray.customizeToolbar"), icon: .toolbarSettings) {
-                    onCommand(.showPreferences(.toolbar))
-                }
-                TrayDivider()
-                TrayListRow(title: PreferencesSection.general.title, icon: .generalSettings) {
-                    onCommand(.showPreferences(.general))
-                }
             }
+            TrayListRow(title: PreferencesSection.general.title, icon: .generalSettings, rowHeight: 38) {
+                onCommand(.showPreferences(.general))
+            }
+            TrayDivider()
+            moreOrbit.id("more")
         }
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
+        .background(Color.white.opacity(0.64), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 9, style: .continuous)
+                .stroke(OrbitalPalette.nodeEdge.opacity(0.32), lineWidth: 0.6)
+        )
     }
 
     private var moreOrbit: some View {
         VStack(spacing: 0) {
-            Button {
+            TrayListRow(title: L10n.text("menu.more"), icon: .detectWatermark, rowHeight: 38, isExpanded: isMoreExpanded) {
                 withAnimation(.easeInOut(duration: 0.18)) {
                     isMoreExpanded.toggle()
                 }
-            } label: {
-                HStack(spacing: 10) {
-                    Image(systemName: TrayPanelIcon.detectWatermark.systemName)
-                        .font(.system(size: 13, weight: .medium))
-                        .foregroundStyle(OrbitalPalette.secondaryText)
-                        .frame(width: 23, height: 23)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(L10n.text("menu.more"))
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(OrbitalPalette.text)
-                        Text(L10n.text("tray.more.subtitle"))
-                            .font(.system(size: 10.5))
-                            .foregroundStyle(OrbitalPalette.secondaryText)
-                    }
-
-                    Spacer(minLength: 4)
-
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundStyle(OrbitalPalette.secondaryText)
-                        .rotationEffect(.degrees(isMoreExpanded ? 90 : 0))
-                }
-                .frame(minHeight: 34)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(L10n.text("menu.more"))
-            .accessibilityValue(isMoreExpanded ? L10n.text("common.enabled") : L10n.text("common.disabled"))
 
             if isMoreExpanded {
                 TrayDivider()
@@ -674,13 +771,6 @@ struct TrayPanelView: View {
                 }
             }
         }
-        .padding(.horizontal, 9)
-        .padding(.vertical, 8)
-        .background(Color.white.opacity(0.64), in: RoundedRectangle(cornerRadius: 9, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 9, style: .continuous)
-                .stroke(OrbitalPalette.nodeEdge.opacity(0.32), lineWidth: 0.6)
-        )
     }
 
     private var appInfoOrbit: some View {
@@ -732,7 +822,7 @@ struct TrayPanelView: View {
                     .stroke(OrbitalPalette.red.opacity(0.10), lineWidth: 0.6)
             )
             .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        }
+        }.clickCursor()
         .buttonStyle(.plain)
         .keyboardShortcut("q", modifiers: .command)
         .accessibilityLabel(L10n.text("menu.quit"))
@@ -774,7 +864,7 @@ private struct QualityRulerControl: View {
                             in: RoundedRectangle(cornerRadius: 7, style: .continuous)
                         )
                         .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-                }
+                }.clickCursor()
                 .buttonStyle(.plain)
                 .accessibilityLabel(quality.title)
             }
@@ -897,7 +987,7 @@ private struct TrayCommandTile: View {
                     .stroke(tone.color.opacity(isHovering ? 0.70 : 0.22), lineWidth: icon == .captureRegion ? 1.0 : 0.55)
             )
             .contentShape(RoundedRectangle(cornerRadius: 9, style: .continuous))
-        }
+        }.clickCursor()
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.46)
@@ -942,7 +1032,7 @@ private struct TrayToggleTile: View {
             .frame(height: 30)
             .padding(.horizontal, 4)
             .contentShape(Rectangle())
-        }
+        }.clickCursor()
         .buttonStyle(.plain)
         .accessibilityLabel(title)
         .accessibilityRepresentation {
@@ -994,6 +1084,8 @@ private struct TrayListRow: View {
     let icon: TrayPanelIcon
     var detail: String? = nil
     var isEnabled = true
+    var rowHeight: CGFloat = 22
+    var isExpanded: Bool? = nil
     let action: () -> Void
 
     @State private var isHovering = false
@@ -1038,17 +1130,27 @@ private struct TrayListRow: View {
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9.6, weight: .semibold))
                     .foregroundStyle(OrbitalPalette.secondaryText.opacity(0.82))
+                    .rotationEffect(.degrees(isExpanded == true ? 90 : 0))
             }
-            .frame(height: 22)
+            .frame(height: rowHeight)
             .padding(.horizontal, 4)
             .background(isHovering ? OrbitalPalette.blue.opacity(0.055) : Color.clear, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
             .contentShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
-        }
+        }.clickCursor()
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.48)
         .accessibilityLabel([title, detail].compactMap { $0 }.joined(separator: " "))
+        .accessibilityValue(isExpanded.map { L10n.text($0 ? "common.enabled" : "common.disabled") } ?? "")
         .onHover { isHovering = $0 && isEnabled }
+    }
+}
+
+private struct TrayPanelContentHeightKey: PreferenceKey {
+    static let defaultValue: [String: CGFloat] = [:]
+
+    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, next in next })
     }
 }
 
@@ -1093,7 +1195,7 @@ private struct TrayActionCell: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(OrbitalPalette.nodeEdge.opacity(isHovering ? 0.40 : 0.22), lineWidth: 0.55)
             )
-        }
+        }.clickCursor()
         .buttonStyle(.plain)
         .disabled(!isEnabled)
         .opacity(isEnabled ? 1 : 0.48)
@@ -1128,7 +1230,7 @@ private struct TrayNoticeRow: View {
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .stroke(icon.tone.color.opacity(0.24), lineWidth: 0.6)
             )
-        }
+        }.clickCursor()
         .buttonStyle(.plain)
         .accessibilityLabel(title)
     }
@@ -1182,7 +1284,7 @@ private struct TrayUpdateNotice: View {
                             .minimumScaleFactor(0.78)
                             .frame(maxWidth: .infinity, minHeight: 27)
                             .background(OrbitalPalette.green, in: RoundedRectangle(cornerRadius: 7, style: .continuous))
-                    }
+                    }.clickCursor()
                     .buttonStyle(.plain)
 
                     Button(action: dismissAction) {
@@ -1197,7 +1299,7 @@ private struct TrayUpdateNotice: View {
                                 RoundedRectangle(cornerRadius: 7, style: .continuous)
                                     .stroke(OrbitalPalette.nodeEdge.opacity(0.34), lineWidth: 0.6)
                             )
-                    }
+                    }.clickCursor()
                     .buttonStyle(.plain)
                 }
                 .frame(height: 27)
@@ -1241,7 +1343,7 @@ private struct TraySolCraftedBadge: View {
     }
 }
 
-private struct TrayPanelBackdrop: View {
+struct TrayPanelBackdrop: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
             .fill(

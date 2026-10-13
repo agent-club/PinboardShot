@@ -217,22 +217,22 @@ private struct CaptureToolsView: View {
     var body: some View {
         VStack(spacing: 12) {
             HStack {
-                Button(L10n.text("feature.tools.open"), systemImage: "photo") { openImage() }
+                Button(L10n.text("feature.tools.open"), systemImage: "photo") { openImage() }.clickCursor()
                 Button(L10n.text("feature.tools.paste"), systemImage: "doc.on.clipboard") {
                     image = ImageClipboard().read()
                     if image == nil { message = L10n.text("error.clipboardHasNoImage") }
-                }
+                }.clickCursor()
                 Spacer()
-                Button(L10n.text("feature.draft.edit"), systemImage: "pencil.tip.crop.circle") { if let image { edit(image, false) } }.disabled(image == nil)
-                Button(L10n.text("annotation.tool.ruler"), systemImage: "ruler") { if let image { edit(image, true) } }.disabled(image == nil)
-                Button(L10n.text("feature.record.start"), systemImage: "record.circle") { record() }
+                Button(L10n.text("feature.draft.edit"), systemImage: "pencil.tip.crop.circle") { if let image { edit(image, false) } }.clickCursor().disabled(image == nil)
+                Button(L10n.text("annotation.tool.ruler"), systemImage: "ruler") { if let image { edit(image, true) } }.clickCursor().disabled(image == nil)
+                Button(L10n.text("feature.record.start"), systemImage: "record.circle") { record() }.clickCursor()
             }
             Picker("", selection: $tab) {
                 Text(L10n.text("feature.long.title")).tag(0)
                 Text(L10n.text("feature.ocr.title")).tag(1)
                 Text(L10n.text("feature.guide.title")).tag(2)
                 Text(L10n.text("feature.qr.title")).tag(3)
-            }.pickerStyle(.segmented)
+            }.clickCursor().pickerStyle(.segmented)
             ZStack {
                 CaptureGuideView(model: guideModel, currentImage: image, capture: capture)
                     .opacity(tab == 2 ? 1 : 0).allowsHitTesting(tab == 2).disabled(tab != 2).accessibilityHidden(tab != 2)
@@ -280,7 +280,7 @@ private struct QRCodeRecognitionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Button(L10n.text("feature.qr.recognize")) { recognize() }.disabled(busy)
+                Button(L10n.text("feature.qr.recognize")) { recognize() }.clickCursor().disabled(busy)
                 if busy { ProgressView().controlSize(.small) }
                 Spacer()
             }
@@ -300,11 +300,11 @@ private struct QRCodeRecognitionView: View {
                                     Button(L10n.text("annotation.copy")) {
                                         NSPasteboard.general.clearContents()
                                         NSPasteboard.general.setString(entry.element, forType: .string)
-                                    }
+                                    }.clickCursor()
                                     if let url = webURL(for: entry.element) {
                                         Button(L10n.text("feature.qr.open")) {
                                             NSWorkspace.shared.open(url)
-                                        }
+                                        }.clickCursor()
                                     }
                                 }
                             }
@@ -376,10 +376,10 @@ private struct LongImageView: View {
                     run {
                         if document.removeRows(from: start, to: end) { preview = try document.render(); start = 0; end = 0 }
                     }
-                }.disabled(selectedRows.isEmpty || selectedRows.count >= document.height)
-                Button { run { document.undo(); preview = try document.render(); start = 0; end = 0 } } label: { Image(systemName: "arrow.uturn.backward") }
+                }.clickCursor().disabled(selectedRows.isEmpty || selectedRows.count >= document.height)
+                Button { run { document.undo(); preview = try document.render(); start = 0; end = 0 } } label: { Image(systemName: "arrow.uturn.backward") }.clickCursor()
                     .help(L10n.text("annotation.undo")).disabled(!document.canUndo)
-                Button { run { document.redo(); preview = try document.render(); start = 0; end = 0 } } label: { Image(systemName: "arrow.uturn.forward") }
+                Button { run { document.redo(); preview = try document.render(); start = 0; end = 0 } } label: { Image(systemName: "arrow.uturn.forward") }.clickCursor()
                     .help(L10n.text("annotation.redo")).disabled(!document.canRedo)
                 Spacer()
                 Text("\(preview.width) × \(preview.height) px").monospacedDigit()
@@ -408,11 +408,11 @@ private struct LongImageView: View {
                 Text(L10n.text("feature.long.pageHeight"))
                 TextField("", value: $pageHeight, format: .number).frame(width: 80)
                 Text("px")
-                Button(L10n.text("feature.long.exportPages")) { exportPages(pdf: false) }.disabled(pageHeight <= 0)
-                Button(L10n.text("feature.export.pdf")) { exportPages(pdf: true) }.disabled(pageHeight <= 0)
+                Button(L10n.text("feature.long.exportPages")) { exportPages(pdf: false) }.clickCursor().disabled(pageHeight <= 0)
+                Button(L10n.text("feature.export.pdf")) { exportPages(pdf: true) }.clickCursor().disabled(pageHeight <= 0)
                 Spacer()
-                Button(L10n.text("pin.save")) { run { _ = try ImageFileExporter.save(NSImage(cgImage: preview, size: CGSize(width: preview.width, height: preview.height))) } }
-                Button(L10n.text("feature.long.use")) { useImage(NSImage(cgImage: preview, size: CGSize(width: preview.width, height: preview.height))) }
+                Button(L10n.text("pin.save")) { run { _ = try ImageFileExporter.save(NSImage(cgImage: preview, size: CGSize(width: preview.width, height: preview.height))) } }.clickCursor()
+                Button(L10n.text("feature.long.use")) { useImage(NSImage(cgImage: preview, size: CGSize(width: preview.width, height: preview.height))) }.clickCursor()
             }
             if let message { Text(message).foregroundStyle(.secondary).textSelection(.enabled) }
         }.textFieldStyle(.roundedBorder)
@@ -457,14 +457,14 @@ private struct StructuredOCRView: View {
             HStack {
                 Picker(L10n.text("feature.ocr.format"), selection: $format) {
                     ForEach(StructuredOCRFormat.allCases) { Text($0.title).tag($0) }
-                }.frame(width: 320)
-                Button(L10n.text("feature.ocr.recognize")) { recognize() }.disabled(busy)
+                }.clickCursor().frame(width: 320)
+                Button(L10n.text("feature.ocr.recognize")) { recognize() }.clickCursor().disabled(busy)
                 if busy { ProgressView().controlSize(.small) }
                 Spacer()
                 Button(L10n.text("annotation.copy")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(drafts[format] ?? "", forType: .string)
-                }.disabled((drafts[format] ?? "").isEmpty || busy)
+                }.clickCursor().disabled((drafts[format] ?? "").isEmpty || busy)
             }
             Text(L10n.text("feature.ocr.help")).foregroundStyle(.secondary)
             HSplitView {
@@ -513,22 +513,22 @@ private struct CaptureGuideView: View {
                 Toggle(L10n.text("feature.guide.recoveryToggle"), isOn: Binding(
                     get: { model.recoveryEnabled },
                     set: { model.setRecoveryEnabled($0) }
-                ))
+                )).clickCursor()
                 .toggleStyle(.switch)
                 if model.hasRecoveryDraft {
-                    Button(L10n.text("feature.guide.restoreRecovery")) { replace(.recover) }
+                    Button(L10n.text("feature.guide.restoreRecovery")) { replace(.recover) }.clickCursor()
                     Button(L10n.text("feature.guide.deleteRecovery")) {
                         Task { await model.clearRecovery() }
-                    }
+                    }.clickCursor()
                 }
             }
             Text(L10n.text("feature.guide.recoveryHelp"))
                 .font(.caption)
                 .foregroundStyle(.secondary)
             HStack {
-                Toggle(L10n.text("feature.guide.collect"), isOn: $model.isCollecting).toggleStyle(.switch)
-                Button(L10n.text("feature.guide.capture")) { model.isCollecting = true; capture() }
-                Button(L10n.text("feature.guide.addCurrent")) { if let currentImage { run { try model.append(currentImage) } } }.disabled(currentImage == nil || model.guide.steps.count >= 100)
+                Toggle(L10n.text("feature.guide.collect"), isOn: $model.isCollecting).clickCursor().toggleStyle(.switch)
+                Button(L10n.text("feature.guide.capture")) { model.isCollecting = true; capture() }.clickCursor()
+                Button(L10n.text("feature.guide.addCurrent")) { if let currentImage { run { try model.append(currentImage) } } }.clickCursor().disabled(currentImage == nil || model.guide.steps.count >= 100)
                 Spacer()
                 Text(L10n.text("feature.guide.count", model.guide.steps.count))
             }
@@ -549,13 +549,13 @@ private struct CaptureGuideView: View {
                             ScrollView { Image(nsImage: image).resizable().scaledToFit() }
                         }
                         HStack {
-                            Button(L10n.text("feature.guide.up")) { model.guide.move(id: model.guide.steps[index].id, by: -1) }.disabled(index == 0)
-                            Button(L10n.text("feature.guide.down")) { model.guide.move(id: model.guide.steps[index].id, by: 1) }.disabled(index == model.guide.steps.count - 1)
+                            Button(L10n.text("feature.guide.up")) { model.guide.move(id: model.guide.steps[index].id, by: -1) }.clickCursor().disabled(index == 0)
+                            Button(L10n.text("feature.guide.down")) { model.guide.move(id: model.guide.steps[index].id, by: 1) }.clickCursor().disabled(index == model.guide.steps.count - 1)
                             Spacer()
                             Button(L10n.text("feature.guide.remove"), role: .destructive) {
                                 model.guide.steps.remove(at: index)
                                 model.selectedID = model.guide.steps.first?.id
-                            }
+                            }.clickCursor()
                         }
                     }.padding(8)
                 } else {
@@ -563,13 +563,13 @@ private struct CaptureGuideView: View {
                 }
             }
             HStack {
-                Button(L10n.text("feature.guide.new")) { replace(.new) }
-                Button(L10n.text("feature.guide.open")) { replace(.open) }
-                Button(L10n.text("feature.guide.save")) { save() }
+                Button(L10n.text("feature.guide.new")) { replace(.new) }.clickCursor()
+                Button(L10n.text("feature.guide.open")) { replace(.open) }.clickCursor()
+                Button(L10n.text("feature.guide.save")) { save() }.clickCursor()
                 if model.hasUnsavedChanges { Text(L10n.text("feature.guide.unsaved")).foregroundStyle(.secondary) }
                 Spacer()
-                Button(L10n.text("feature.export.markdown")) { export(pdf: false) }.disabled(model.guide.steps.isEmpty)
-                Button(L10n.text("feature.export.pdf")) { export(pdf: true) }.disabled(model.guide.steps.isEmpty)
+                Button(L10n.text("feature.export.markdown")) { export(pdf: false) }.clickCursor().disabled(model.guide.steps.isEmpty)
+                Button(L10n.text("feature.export.pdf")) { export(pdf: true) }.clickCursor().disabled(model.guide.steps.isEmpty)
             }
             if let message { Text(message).foregroundStyle(.secondary).textSelection(.enabled) }
             if let error = model.recoveryError { Text(error).foregroundStyle(.red) }

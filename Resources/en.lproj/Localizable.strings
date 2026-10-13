@@ -116,6 +116,12 @@
 "legalNotices.missingTitle" = "License and notices file was not found";
 "legalNotices.missingMessage" = "Please reinstall the latest PinboardShot build, or view LICENSE and NOTICE in the GitHub repository.";
 "annotation.title" = "Annotate Image";
+"annotation.zoom.in" = "Zoom in (⌘+)";
+"annotation.zoom.out" = "Zoom out (⌘−)";
+"annotation.zoom.fit" = "Fit";
+"annotation.zoom.fitHelp" = "Fit to window (⌘0)";
+"annotation.zoom.actualHelp" = "Show at 100% (⌘1)";
+"annotation.zoom.navigationHelp" = "Pinch to zoom; ⌘+scroll to zoom; scroll or hold Space and drag to pan";
 "annotation.tool.mosaic" = "Mosaic";
 "annotation.tool.pen" = "Pen";
 "annotation.tool.rectangle" = "Rectangle";
@@ -241,6 +247,8 @@
 "preferences.outputQuality" = "Output Quality";
 "preferences.includeCursor" = "Include Pointer in Display and Region Captures";
 "preferences.captureAnimation" = "Show a Subtle Animation When Capture Starts";
+"preferences.captureSelectionAlwaysOnTop" = "Keep Capture Selection on Top";
+"preferences.captureSelectionAlwaysOnTopHelp" = "Show the capture selection above other apps’ dialogs and menus. Turn off to use the standard floating level.";
 "preferences.quickCaptureOverlay" = "Show Quick Actions After Capture";
 "preferences.quickCaptureOverlayHelp" = "Briefly show a preview for copying, saving, annotating, pinning, or dragging into another app.";
 "common.close" = "Close";
@@ -660,13 +668,13 @@
 "scrollCapture.auto.permission" = "Auto scroll needs Accessibility access. Allow PinboardShot in System Settings → Privacy & Security → Accessibility, then start scrolling capture again.";
 
 "browserExtension.title" = "Chrome webpage capture";
-"browserExtension.help" = "Capture webpages at their actual scroll positions and edit them locally in PinboardShot. Enable the extension in Chrome first.";
-"browserExtension.prepare" = "Download Chrome extension";
+"browserExtension.help" = "Download the bundled extension locally or install it from the Chrome Web Store. PinboardShot connects automatically after the extension is installed and enabled.";
+"browserExtension.prepare" = "Connect local app";
 "browserExtension.setupTitle" = "Install the Chrome capture extension first";
-"browserExtension.setupHelp" = "Chrome webpage capture requires the extension. Download it with one click into Downloads, then install and enable it in Chrome. Start a new long capture after installation. If it is already installed and enabled, confirm to start capture.";
-"browserExtension.connect" = "Download extension";
-"browserExtension.readyTitle" = "Extension exported to Downloads";
-"browserExtension.readyHelp" = "Extension downloaded and path copied:\n%@\n\nOpen chrome://extensions, enable Developer mode, and click Load unpacked. Select this PinboardShot-Chrome folder in Downloads, or press ⌘⇧G and paste the copied path. Keep this folder: Chrome runs the extension from it.\n\nAfter installing and enabling it, return to the target webpage, start a new long capture, and confirm “Installed — start capture”.";
+"browserExtension.setupHelp" = "Install and enable PinboardShot Browser Capture from the Chrome Web Store. “Install Chrome extension” connects the local app and opens the store. After installation, return to the target page and start a new capture. If the store extension is already installed, choose “Installed — start capture”. If you used the development extension, remove it in Chrome before installing the store version.";
+"browserExtension.connect" = "Connect local app";
+"browserExtension.readyTitle" = "Local connection is ready";
+"browserExtension.readyHelp" = "The local channel now accepts both store-installed and locally loaded extensions. Open the Chrome extension panel to check the connection automatically, then capture from its button or ⌘⇧Y.";
 "browserExtension.importFailed" = "Could not import the webpage capture. Its dimensions changed, image data is incomplete, or the size limit was exceeded. Capture it again.";
 
 "browserExtension.start" = "Start Chrome webpage capture";
@@ -682,6 +690,63 @@
 "scrollCapture.paused" = "Capture paused";
 "scrollCapture.stopping" = "Stopping and saving capture…";
 "browserExtension.controlWaiting" = "Waiting for the Chrome capture extension…";
-"browserExtension.controlUnavailable" = "Could not connect to the Chrome capture extension. Check that it is installed and enabled; reload it after an update. Then start a new long capture.";
+"browserExtension.controlUnavailable" = "Could not connect to the Chrome capture extension. Open its panel to check the local connection, confirm the extension is enabled and its shortcut is ⌘⇧Y, then retry.";
 
 "browserExtension.installedStart" = "Installed — start capture";
+"browserExtension.install" = "Install Chrome extension";
+
+"browserExtension.connected" = "Chrome extension connection detected";
+
+"browserExtension.notDetected" = "No recent connection detected. Open Chrome and its extension panel; detection retries automatically.";
+
+
+"browserExtension.downloadLocal" = "Download locally";
+
+"browserExtension.installFromStore" = "Install from Chrome Web Store";
+
+"browserExtension.localHelp" = "If the store is unavailable, enable Developer mode in Chrome’s Extensions page and load the downloaded folder. Local extensions update with the app; keep the loaded folder.";
+
+"browserExtension.localReadyTitle" = "Local extension downloaded";
+
+"browserExtension.localReadyHelp" = "The extension folder is saved in Downloads and selected in Finder. Open chrome://extensions in Chrome, enable Developer mode, choose Load unpacked, and select that folder. It connects automatically without using the store. Keep the folder; after an app update, download again and load the new extension folder.";
+
+/* Magnetic Desktop */
+"magnetic.enabled" = "Enable Magnetic Desktop";
+"magnetic.maximum" = "Fan capacity: %d screenshots";
+"magnetic.maximumLabel" = "Fan capacity";
+"magnetic.maximumCount" = "%d screenshots";
+"magnetic.help" = "Recent screenshots snap to the main screen edge. Fan capacities above 10 use browsable groups; screenshots beyond the capacity stay in the box. Click the box to browse all screenshots by page. History retention and app exclusions still apply. Turning this mode off does not delete images.";
+"magnetic.needsHistory" = "Enable screenshot history to display captures on the Magnetic Desktop.";
+"magnetic.card" = "Screenshot: %d × %d. Click to pull out or drag.";
+"magnetic.cardHelp" = "Hover to preview. Drag onto the desktop to create a pin. Double-click or throw right to return to its source, or use Return all to gather every pin.";
+"magnetic.extract" = "Pull out screenshot";
+"magnetic.return" = "Snap back to edge";
+"magnetic.openPin" = "Open as regular pin";
+"magnetic.box" = "Photo box";
+"magnetic.boxCount" = "Photo box · %d screenshots";
+"magnetic.boxHelp" = "Drag the tray to move it, or click to browse all screenshots. Select an image to locate it in the fan, then click or drag it onto the desktop as a pin.";
+"magnetic.browseBox" = "Browse";
+"magnetic.emptyBox" = "The box is empty";
+"magnetic.edit" = "Edit";
+"magnetic.collapse" = "Fold Magnetic Desktop and photo box";
+"magnetic.expandCount" = "Expand Magnetic Desktop · %d screenshots";
+
+"magnetic.centerGroup" = "Center desktop group";
+"magnetic.returnAll" = "Return all desktop cards";
+"magnetic.returnBox" = "Return to photo box";
+"magnetic.returnHelp" = "Double-click a pin to return it to its source. Right-click to edit or return all.";
+
+"preferences.menuDisplay" = "Menu Display";
+
+"preferences.menuDisplayHelp" = "Choose which settings appear directly in the menu bar panel. Hiding a setting does not change its value.";
+
+"tray.section.magneticDesktop" = "Magnetic Desktop";
+
+"magnetic.previousGroup" = "Previous group";
+"magnetic.nextGroup" = "Next group";
+"magnetic.pageRange" = "%d–%d / %d";
+"magnetic.collectionTitle" = "All screenshots · %d";
+"magnetic.previousPage" = "Previous page";
+"magnetic.nextPage" = "Next page";
+"magnetic.collectionPage" = "%d / %d";
+"magnetic.locate" = "Locate in fan";

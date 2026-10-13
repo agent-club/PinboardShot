@@ -209,7 +209,7 @@ struct LiveTextInteractionPolicyTests {
 
     @Test("贴图窗口直接接管右键菜单事件")
     @MainActor
-    func pinPanelRoutesRightClickToContextMenu() throws {
+    func pinPanelRoutesRightClickToContextMenu() async throws {
         _ = NSApplication.shared
         let controller = PinWindowController(
             id: UUID(),
@@ -222,8 +222,11 @@ struct LiveTextInteractionPolicyTests {
 
         let window = try #require(controller.window as? PinPanel)
         var requestCount = 0
-        window.onContextMenuRequested = { _ in requestCount += 1 }
-        window.sendEvent(try #require(NSEvent.mouseEvent(
+        window.onContextMenuRequested = { _ in
+            #expect(window.firstResponder === window.contentView)
+            requestCount += 1
+        }
+        let rightClick = try #require(NSEvent.mouseEvent(
             with: .rightMouseDown,
             location: CGPoint(x: 120, y: 90),
             modifierFlags: [],
@@ -233,9 +236,68 @@ struct LiveTextInteractionPolicyTests {
             eventNumber: 1,
             clickCount: 1,
             pressure: 1
-        )))
-
+        ))
+        window.sendEvent(rightClick)
+        // Menu tracking must start after sendEvent returns, and duplicate pending clicks must coalesce.
+        #expect(requestCount == 0)
+        window.sendEvent(rightClick)
+        for _ in 0..<100 where requestCount == 0 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
         #expect(requestCount == 1)
+
+        controller.hide()
+        controller.showWithoutActivating()
+        window.sendEvent(rightClick)
+        for _ in 0..<100 where requestCount == 1 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(requestCount == 2)
+
+        window.sendEvent(rightClick)
+        controller.hide()
+        try await Task.sleep(for: .milliseconds(30))
+        #expect(requestCount == 2)
+        controller.showWithoutActivating()
+        window.sendEvent(rightClick)
+        for _ in 0..<100 where requestCount == 2 {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(requestCount == 3)
+    }
+
+    @Test("菜单跟踪中的鼠标进出事件不能按键盘事件读取")
+    @MainActor
+    func pinPanelHandlesMenuTrackingEvents() throws {
+        _ = NSApplication.shared
+        let controller = PinWindowController(id: UUID(),
+            image: NSImage(size: CGSize(width: 320, height: 180)), hasShadow: true,
+            onClose: { _ in })
+        defer { controller.close() }
+        controller.show(near: CGPoint(x: 400, y: 400))
+        let panel = try #require(controller.window as? PinPanel)
+        for type in [NSEvent.EventType.mouseEntered, .mouseExited] {
+            let event = try #require(NSEvent.enterExitEvent(with: type,
+                location: CGPoint(x: 120, y: 90), modifierFlags: [], timestamp: 1,
+                windowNumber: panel.windowNumber, context: nil, eventNumber: 1,
+                trackingNumber: 0, userData: nil))
+            panel.sendEvent(event)
+        }
+        for type in [NSEvent.EventType.mouseMoved, .rightMouseUp] {
+            let event = try #require(NSEvent.mouseEvent(with: type,
+                location: CGPoint(x: 120, y: 90), modifierFlags: [], timestamp: 2,
+                windowNumber: panel.windowNumber, context: nil, eventNumber: 2,
+                clickCount: 1, pressure: 0))
+            panel.sendEvent(event)
+        }
+        #expect(!panel.isSpaceMoveActive)
+        for type in [NSEvent.EventType.keyDown, .keyUp] {
+            let space = try #require(NSEvent.keyEvent(with: type, location: .zero,
+                modifierFlags: [], timestamp: 3, windowNumber: panel.windowNumber, context: nil,
+                characters: " ", charactersIgnoringModifiers: " ", isARepeat: false, keyCode: 49))
+            panel.sendEvent(space)
+            #expect(panel.isSpaceMoveActive == (type == .keyDown))
+        }
     }
 
     @Test("顶部拖动把手避开缩放边缘并提供更大的命中区")

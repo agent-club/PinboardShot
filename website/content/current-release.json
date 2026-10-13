@@ -1,43 +1,47 @@
 {
-  "version": "0.14.1",
-  "build": "50",
-  "date": "2026.09.29",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.14.1",
+  "version": "0.15.0",
+  "build": "53",
+  "date": "2026.10.14",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.15.0",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.14.1-50.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.1/PinboardShot-0.14.1-50.dmg",
-      "sha256": "9325a6b99c5d71f8aa37241db0ac4ea5997be4f5db56208ca71b5abb4639d258"
+      "name": "PinboardShot-0.15.0-53.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.15.0/PinboardShot-0.15.0-53.dmg",
+      "sha256": "cfa1cb5042af3b5bb5ce803a43f6783f9c9ccc89a86bd463588eb4c44a434069"
     },
     "zip": {
-      "name": "PinboardShot-0.14.1-50.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.1/PinboardShot-0.14.1-50.zip",
-      "sha256": "6653c6cce7d1d83060977ccf807bee874ce05ee269a11a3ce09752490624d195"
+      "name": "PinboardShot-0.15.0-53.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.15.0/PinboardShot-0.15.0-53.zip",
+      "sha256": "3832e466c88d4c2a4982386973c11aa4d85883da1b285f37d913a6ef4576e908"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.14.1/appcast.xml",
-      "sha256": "64d1ab07921cb59257215f0d746110c63ccc2d020f9908c67556583fad5f9792"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.15.0/appcast.xml",
+      "sha256": "11ae269251429d5742d7ee5515ed533ac85c4f51c12ffe72c7ed0dfbf1332f30"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "Chrome 长截图稳定性修复",
+    "title": "磁力桌面扇形收纳与渐进浏览",
     "changes": [
-      "侧栏切换到未授权的新标签页时，提示在当前网页重新点击插件图标",
-      "Chrome 截图或网页响应超时后结束采集；取消操作可及时恢复网页状态",
-      "Chrome 插件更新至 0.2.1，更新 App 后需重新导出并加载；仍仅支持文档滚动",
-      "应用与 DMG 已通过 Apple 公证，Sparkle 更新包带有签名"
+      "扇子式收放；扇面容量 1–100 张，每组最多 10 张",
+      "默认 10 张不显示切换器，截图盒中的图片不参与扇面分组计数",
+      "全集每页 20 张，支持跳页、旁侧预览和定位到扇面",
+      "修复右键菜单失效、闪退、悬浮穿透和收起抢输入焦点",
+      "桌面贴图可整体居中并保留相对位置，浏览分组不移动桌面贴图",
+      "磁力桌面依赖截图历史；应用与 DMG 已通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Chrome long capture reliability",
+    "title": "Magnetic Desktop fan storage and progressive browsing",
     "changes": [
-      "When the side panel moves to a new tab without access, it asks you to click the extension icon on that tab.",
-      "Capture ends when Chrome screenshots or page responses time out; Cancel can promptly restore the page.",
-      "The Chrome extension is updated to 0.2.1; export and reload it after updating the App. Only document scrolling is supported.",
-      "The App and DMG are Apple-notarized, and the Sparkle update package is signed."
+      "Folding fan animation; capacity of 1–100 screenshots, with up to 10 per group.",
+      "The default 10-image fan has no switcher; boxed screenshots are excluded from fan groups and counts.",
+      "Browse all screenshots in pages of 20, with page selection, side previews and location in the fan.",
+      "Fixed unresponsive context menus, crashes, hover through the box, and folding that interrupted input focus.",
+      "Center desktop pins as a group while preserving relative positions; browsing groups keeps desktop pins in place.",
+      "Magnetic Desktop requires screenshot history. The app and DMG are Apple-notarized."
     ]
   }
 }
