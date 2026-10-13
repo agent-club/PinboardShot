@@ -34,6 +34,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
             windowController = NSWindowController(window: window)
             windowController?.showWindow(nil)
             window.makeKeyAndOrderFront(nil)
+            window.makeFirstResponder(canvas)
         }
     }
 
@@ -53,6 +54,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         let root = NSView(frame: window.contentLayoutRect)
         root.autoresizingMask = [.width, .height]
         let canvas = AnnotationCanvasView(sourceImage: source, logicalSize: logicalSize, initialStrokes: strokes)
+        canvas.allowsViewportNavigation = true
         canvas.translatesAutoresizingMaskIntoConstraints = false
         canvas.onHistoryChanged = { [weak self] canUndo, canRedo in
             self?.undoButton?.isEnabled = canUndo
@@ -60,7 +62,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         }
         self.canvas = canvas
 
-        let tools = NSSegmentedControl(labels: AnnotationTool.editorTools.map { L10n.text($0.titleKey) }, trackingMode: .selectOne, target: self, action: #selector(toolChanged(_:)))
+        let tools = ActionSegmentedControl(labels: AnnotationTool.editorTools.map { L10n.text($0.titleKey) }, trackingMode: .selectOne, target: self, action: #selector(toolChanged(_:)))
         tools.selectedSegment = 0
         tools.controlSize = .small
         toolControl = tools
@@ -121,29 +123,51 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         toolbarScroll.drawsBackground = false
         toolbarScroll.documentView = topBar
 
-        let draftCheckbox = NSButton(checkboxWithTitle: L10n.text("feature.draft.keep"), target: nil, action: nil)
+        let draftCheckbox = ActionButton(checkboxWithTitle: L10n.text("feature.draft.keep"), target: nil, action: nil)
         draftCheckbox.toolTip = L10n.text("feature.draft.privacy")
         self.draftCheckbox = draftCheckbox
-        let rulerUnit = NSPopUpButton()
+        let rulerUnit = ActionPopUpButton()
         rulerUnit.addItems(withTitles: RulerUnit.allCases.map(\.title))
         rulerUnit.target = self
         rulerUnit.action = #selector(rulerUnitChanged(_:))
         rulerUnit.toolTip = L10n.text("feature.ruler.units")
-        let rulerMode = NSPopUpButton()
+        let rulerMode = ActionPopUpButton()
         rulerMode.addItems(withTitles: RulerMode.allCases.map(\.title))
         rulerMode.target = self
         rulerMode.action = #selector(rulerModeChanged(_:))
         rulerMode.toolTip = L10n.text("feature.ruler.modes")
 
-        let cancel = NSButton(title: L10n.text("common.cancel"), target: self, action: #selector(cancel))
-        let copy = NSButton(title: L10n.text("annotation.copy"), target: self, action: #selector(copyResult))
-        let pin = NSButton(title: L10n.text("annotation.pin"), target: self, action: #selector(pinResult))
+        let cancel = ActionButton(title: L10n.text("common.cancel"), target: self, action: #selector(cancel))
+        let copy = ActionButton(title: L10n.text("annotation.copy"), target: self, action: #selector(copyResult))
+        let pin = ActionButton(title: L10n.text("annotation.pin"), target: self, action: #selector(pinResult))
         copy.keyEquivalent = "\r"
         pin.bezelStyle = .rounded
         let rulerBar = NSStackView(views: [NSTextField(labelWithString: L10n.text("annotation.tool.ruler")), rulerUnit, rulerMode])
         rulerBar.orientation = .horizontal
         rulerBar.spacing = 10
         rulerBar.translatesAutoresizingMaskIntoConstraints = false
+        let zoomOut = button(titleKey: "annotation.zoom.out", symbol: "minus.magnifyingglass", action: #selector(zoomOut))
+        let zoomIn = button(titleKey: "annotation.zoom.in", symbol: "plus.magnifyingglass", action: #selector(zoomIn))
+        let zoomLabel = NSTextField(labelWithString: "100%")
+        zoomLabel.font = .monospacedDigitSystemFont(ofSize: NSFont.smallSystemFontSize, weight: .regular)
+        zoomLabel.alignment = .center
+        zoomLabel.widthAnchor.constraint(equalToConstant: 56).isActive = true
+        let zoomFit = ActionButton(title: L10n.text("annotation.zoom.fit"), target: self, action: #selector(zoomToFit))
+        zoomFit.toolTip = L10n.text("annotation.zoom.fitHelp")
+        let zoomActual = ActionButton(title: "100%", target: self, action: #selector(zoomToActualSize))
+        zoomActual.toolTip = L10n.text("annotation.zoom.actualHelp")
+        let zoomBar = NSStackView(views: [zoomOut, zoomLabel, zoomIn, zoomFit, zoomActual])
+        zoomBar.orientation = .horizontal
+        zoomBar.alignment = .centerY
+        zoomBar.spacing = 8
+        zoomBar.translatesAutoresizingMaskIntoConstraints = false
+        zoomBar.toolTip = L10n.text("annotation.zoom.navigationHelp")
+        canvas.onZoomChanged = { [weak canvas, weak zoomLabel, weak zoomOut, weak zoomIn] scale in
+            guard let canvas else { return }
+            zoomLabel?.stringValue = String(format: scale < 0.1 ? "%.1f%%" : "%.0f%%", scale * 100)
+            zoomOut?.isEnabled = scale > canvas.minimumZoomScale
+            zoomIn?.isEnabled = scale < canvas.maximumZoomScale
+        }
         let bottomBar = NSStackView(views: [draftCheckbox, NSView(), cancel, copy, pin])
         bottomBar.orientation = .horizontal
         bottomBar.alignment = .centerY
@@ -154,6 +178,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         root.addSubview(canvas)
         root.addSubview(bottomBar)
         root.addSubview(rulerBar)
+        root.addSubview(zoomBar)
         NSLayoutConstraint.activate([
             toolbarScroll.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
             toolbarScroll.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
@@ -169,6 +194,9 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
             rulerBar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
             rulerBar.bottomAnchor.constraint(equalTo: bottomBar.topAnchor, constant: -10),
             rulerBar.heightAnchor.constraint(equalToConstant: 26),
+            zoomBar.leadingAnchor.constraint(greaterThanOrEqualTo: rulerBar.trailingAnchor, constant: 12),
+            zoomBar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
+            zoomBar.centerYAnchor.constraint(equalTo: rulerBar.centerYAnchor),
             bottomBar.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 14),
             bottomBar.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -14),
             bottomBar.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12),
@@ -181,7 +209,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
     }
 
     private func button(titleKey: String, symbol: String, action: Selector) -> NSButton {
-        let button = NSButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: L10n.text(titleKey))!, target: self, action: action)
+        let button = ActionButton(image: NSImage(systemSymbolName: symbol, accessibilityDescription: L10n.text(titleKey))!, target: self, action: action)
         button.bezelStyle = .texturedRounded
         button.toolTip = L10n.text(titleKey)
         return button
@@ -216,6 +244,10 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
         guard canvas?.cropToSelectedRectangle() == true else { NSSound.beep(); return }
     }
     @objc private func rotateClockwise() { canvas?.rotateClockwise() }
+    @objc private func zoomIn() { canvas?.setZoomScale((canvas?.zoomScale ?? 1) * 1.25) }
+    @objc private func zoomOut() { canvas?.setZoomScale((canvas?.zoomScale ?? 1) / 1.25) }
+    @objc private func zoomToFit() { canvas?.zoomToFit() }
+    @objc private func zoomToActualSize() { canvas?.setZoomScale(1) }
     @objc private func rulerUnitChanged(_ sender: NSPopUpButton) {
         canvas?.rulerUnit = RulerUnit.allCases[sender.indexOfSelectedItem]
     }
@@ -269,6 +301,7 @@ final class AnnotationEditorController: NSObject, NSWindowDelegate {
     }
 
     func windowWillClose(_ notification: Notification) { finish(nil, closeWindow: false) }
+    func windowDidResignKey(_ notification: Notification) { canvas?.cancelViewportNavigation() }
 }
 
 final class AnnotationTextField: NSTextField {
@@ -372,6 +405,18 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     var strokes: [AnnotationStroke] { history.strokes }
     var currentRenderedImage: NSImage { cachedImage }
     var sourceImageForAnalysis: CGImage { sourceImage }
+    // 选区浮层复用此视图；仅独立标注编辑器启用缩放和平移，避免拦截选区手势。
+    var allowsViewportNavigation = false
+    var onZoomChanged: ((CGFloat) -> Void)?
+    var zoomScale: CGFloat { requestedZoomScale ?? fitZoomScale }
+    var minimumZoomScale: CGFloat { min(0.1, fitZoomScale) }
+    var maximumZoomScale: CGFloat { max(8, fitZoomScale) }
+    private var requestedZoomScale: CGFloat?
+    private var panOffset = CGPoint.zero
+    private var panStartPoint: CGPoint?
+    private var panStartOffset = CGPoint.zero
+    private var isSpacePressed = false
+    private var previousViewportSize: CGSize?
 
     private var sourceImage: CGImage
     private var logicalSize: CGSize
@@ -382,7 +427,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     private var pendingStroke: AnnotationStroke?
     private var currentStroke: AnnotationStroke?
     private var cachedImage: NSImage
-    // 预先缓存像素化底图，拖动时只裁切当前笔迹区域，避免每帧重算整张 Retina 图。
+    // 首次马赛克笔迹才生成底图，随后拖动复用，避免打开普通标注时处理整张 Retina 图。
     private var pixelatedPreviewImage: NSImage?
     private var doubleClickTracker = SelectionDoubleClickTracker()
     // 输入框只承载临时编辑；索引区分新增与替换，选中索引负责画布反馈和工具栏样式回填。
@@ -412,9 +457,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         self.contentInset = contentInset
         history = AnnotationHistory(strokes: initialStrokes)
         cachedImage = NSImage(cgImage: sourceImage, size: logicalSize)
-        pixelatedPreviewImage = AnnotationRenderer.makePixelated(sourceImage).map {
-            NSImage(cgImage: $0, size: logicalSize)
-        }
+        pixelatedPreviewImage = nil
         super.init(frame: .zero)
         wantsLayer = true
         layer?.backgroundColor = NSColor.windowBackgroundColor.cgColor
@@ -425,6 +468,133 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
 
     required init?(coder: NSCoder) { nil }
     override var acceptsFirstResponder: Bool { true }
+
+    override func layout() {
+        super.layout()
+        guard allowsViewportNavigation else { return }
+        if previousViewportSize != bounds.size {
+            // 窗口改变尺寸前结束临时编辑，避免输入框继续使用旧的显示坐标。
+            prepareForViewportChange()
+            previousViewportSize = bounds.size
+        }
+        panOffset = clampedPanOffset(panOffset)
+        onZoomChanged?(zoomScale)
+        window?.invalidateCursorRects(for: self)
+        needsDisplay = true
+    }
+
+    func setZoomScale(_ scale: CGFloat, anchoredAt point: CGPoint? = nil) {
+        guard allowsViewportNavigation, scale.isFinite, scale > 0 else { return }
+        prepareForViewportChange()
+        let anchor = point ?? CGPoint(x: bounds.midX, y: bounds.midY)
+        let oldRect = imageRect
+        let oldScale = zoomScale
+        requestedZoomScale = min(max(scale, minimumZoomScale), maximumZoomScale)
+        // 保持指针下的原图坐标不变；缩放只改变显示变换，不写入笔迹或导出尺寸。
+        let ratio = zoomScale / max(oldScale, 0.0001)
+        panOffset = clampedPanOffset(CGPoint(
+            x: anchor.x + (oldRect.midX - anchor.x) * ratio - bounds.midX,
+            y: anchor.y + (oldRect.midY - anchor.y) * ratio - bounds.midY
+        ))
+        viewportDidChange()
+    }
+
+    func zoomToFit() {
+        guard allowsViewportNavigation else { return }
+        prepareForViewportChange()
+        requestedZoomScale = nil
+        panOffset = .zero
+        viewportDidChange()
+    }
+
+    private func prepareForViewportChange() {
+        cancelDrawingGesture()
+        finishTextDrag(commit: false)
+        finishRectangleDrag(commit: false)
+        commitPendingText()
+        panStartPoint = nil
+        window?.makeFirstResponder(self)
+    }
+
+    private func viewportDidChange() {
+        doubleClickTracker.reset()
+        onZoomChanged?(zoomScale)
+        window?.invalidateCursorRects(for: self)
+        needsDisplay = true
+    }
+
+    private func clampedPanOffset(_ offset: CGPoint) -> CGPoint {
+        let viewport = bounds.insetBy(dx: contentInset, dy: contentInset)
+        let maxX = max(0, (logicalSize.width * zoomScale - viewport.width) / 2)
+        let maxY = max(0, (logicalSize.height * zoomScale - viewport.height) / 2)
+        return CGPoint(x: min(max(offset.x, -maxX), maxX), y: min(max(offset.y, -maxY), maxY))
+    }
+
+    override func magnify(with event: NSEvent) {
+        guard allowsViewportNavigation else { super.magnify(with: event); return }
+        setZoomScale(zoomScale * max(0.1, 1 + event.magnification),
+                     anchoredAt: convert(event.locationInWindow, from: nil))
+    }
+
+    override func scrollWheel(with event: NSEvent) {
+        guard allowsViewportNavigation else { super.scrollWheel(with: event); return }
+        if event.modifierFlags.contains(.command) {
+            setZoomScale(zoomScale * exp(event.scrollingDeltaY * 0.01),
+                         anchoredAt: convert(event.locationInWindow, from: nil))
+        } else {
+            prepareForViewportChange()
+            let multiplier: CGFloat = event.hasPreciseScrollingDeltas ? 1 : 10
+            panOffset = clampedPanOffset(CGPoint(
+                x: panOffset.x + event.scrollingDeltaX * multiplier,
+                y: panOffset.y + event.scrollingDeltaY * multiplier
+            ))
+            viewportDidChange()
+        }
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        guard allowsViewportNavigation, event.modifierFlags.contains(.command), activeTextField == nil else {
+            return super.performKeyEquivalent(with: event)
+        }
+        switch event.charactersIgnoringModifiers {
+        case "+", "=": setZoomScale(zoomScale * 1.25)
+        case "-": setZoomScale(zoomScale / 1.25)
+        case "0": zoomToFit()
+        case "1": setZoomScale(1)
+        default: return super.performKeyEquivalent(with: event)
+        }
+        return true
+    }
+
+    override func keyDown(with event: NSEvent) {
+        if allowsViewportNavigation, event.keyCode == 49 {
+            isSpacePressed = true
+            window?.invalidateCursorRects(for: self)
+        } else {
+            super.keyDown(with: event)
+        }
+    }
+
+    override func keyUp(with event: NSEvent) {
+        if allowsViewportNavigation, event.keyCode == 49 {
+            isSpacePressed = false
+            window?.invalidateCursorRects(for: self)
+        } else {
+            super.keyUp(with: event)
+        }
+    }
+
+    override func resignFirstResponder() -> Bool {
+        cancelViewportNavigation()
+        return super.resignFirstResponder()
+    }
+
+    func cancelViewportNavigation() {
+        // 切走窗口时可能收不到空格的 keyUp，不能把平移状态带到下一次标注。
+        isSpacePressed = false
+        panStartPoint = nil
+        window?.invalidateCursorRects(for: self)
+    }
 
     override func draw(_ dirtyRect: NSRect) {
         super.draw(dirtyRect)
@@ -450,6 +620,10 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
 
     override func resetCursorRects() {
         super.resetCursorRects()
+        if allowsViewportNavigation, isSpacePressed {
+            addCursorRect(bounds, cursor: panStartPoint == nil ? .openHand : .closedHand)
+            return
+        }
         if tool == .text, activeTextField == nil {
             for stroke in history.strokes where stroke.tool == .text {
                 addCursorRect(textBounds(for: stroke, in: imageRect).insetBy(dx: -6, dy: -6), cursor: .openHand)
@@ -465,7 +639,15 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         pendingStroke = nil
         currentStroke = nil
         let point = convert(event.locationInWindow, from: nil)
+        if allowsViewportNavigation, isSpacePressed {
+            prepareForViewportChange()
+            panStartPoint = point
+            panStartOffset = panOffset
+            NSCursor.closedHand.set()
+            return
+        }
         guard imageRect.contains(point) else { return }
+        if allowsViewportNavigation, tool != .text { window?.makeFirstResponder(self) }
         if tool == .text {
             commitPendingText()
             if let index = textStrokeIndex(at: point) {
@@ -515,6 +697,10 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseDragged(with event: NSEvent) {
+        if panStartPoint != nil {
+            updatePan(to: convert(event.locationInWindow, from: nil))
+            return
+        }
         if textDragIndex != nil {
             updateTextDrag(to: convert(event.locationInWindow, from: nil))
             return
@@ -528,6 +714,12 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     }
 
     override func mouseUp(with event: NSEvent) {
+        if panStartPoint != nil {
+            updatePan(to: convert(event.locationInWindow, from: nil))
+            panStartPoint = nil
+            window?.invalidateCursorRects(for: self)
+            return
+        }
         if textDragIndex != nil {
             finishTextDrag(commit: true)
             return
@@ -598,6 +790,15 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         if stroke.tool == .ruler { updateRuler(&stroke) }
         currentStroke = stroke
         needsDisplay = true
+    }
+
+    private func updatePan(to point: CGPoint) {
+        guard let start = panStartPoint else { return }
+        panOffset = clampedPanOffset(CGPoint(
+            x: panStartOffset.x + point.x - start.x,
+            y: panStartOffset.y + point.y - start.y
+        ))
+        viewportDidChange()
     }
 
     private func hasDrawableGeometry(_ stroke: AnnotationStroke) -> Bool {
@@ -700,9 +901,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         finishTextDrag(commit: false)
         sourceImage = image
         self.logicalSize = logicalSize
-        pixelatedPreviewImage = AnnotationRenderer.makePixelated(image).map {
-            NSImage(cgImage: $0, size: logicalSize)
-        }
+        pixelatedPreviewImage = nil
         rebuildCache()
     }
 
@@ -789,10 +988,9 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     }
 
     private func refreshSourceCaches() {
+        zoomToFit()
         cachedImage = NSImage(cgImage: sourceImage, size: logicalSize)
-        pixelatedPreviewImage = AnnotationRenderer.makePixelated(sourceImage).map {
-            NSImage(cgImage: $0, size: logicalSize)
-        }
+        pixelatedPreviewImage = nil
         onHistoryChanged?(false, false)
         needsDisplay = true
     }
@@ -825,11 +1023,18 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         needsDisplay = true
     }
 
+    private var fitZoomScale: CGFloat {
+        let inset = bounds.insetBy(dx: contentInset, dy: contentInset)
+        return max(0.0001, min(inset.width / logicalSize.width, inset.height / logicalSize.height))
+    }
+
     private var imageRect: CGRect {
         let inset = bounds.insetBy(dx: contentInset, dy: contentInset)
-        let scale = min(inset.width / logicalSize.width, inset.height / logicalSize.height)
+        let scale = allowsViewportNavigation ? zoomScale : fitZoomScale
         let size = CGSize(width: logicalSize.width * scale, height: logicalSize.height * scale)
-        return CGRect(x: inset.midX - size.width / 2, y: inset.midY - size.height / 2, width: size.width, height: size.height)
+        let offset = allowsViewportNavigation ? clampedPanOffset(panOffset) : .zero
+        return CGRect(x: inset.midX - size.width / 2 + offset.x,
+                      y: inset.midY - size.height / 2 + offset.y, width: size.width, height: size.height)
     }
 
     private func normalizedPoint(_ point: CGPoint) -> CGPoint {
@@ -850,16 +1055,16 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
             brushPixelWidth = brushWidth(forTextStroke: existingStroke)
             isSynchronizingTextStyle = false
         }
-        let fontSize = textFontPointSize(forBrushWidth: brushPixelWidth)
+        let fontSize = textFontPointSize(forBrushWidth: brushPixelWidth) * textDisplayScale
         let existingText = existingStroke?.text ?? ""
         let measuredWidth = (existingText as NSString).size(
             withAttributes: [.font: NSFont.systemFont(ofSize: fontSize, weight: .medium)]
         ).width
-        let availableWidth = max(80, imageRect.maxX - anchorPoint.x)
+        let availableWidth = max(80, min(imageRect.maxX, bounds.maxX) - anchorPoint.x)
         let fieldWidth = min(280, availableWidth, max(120, measuredWidth + 34))
         let field = AnnotationTextField(frame: CGRect(
             x: anchorPoint.x,
-            y: min(max(anchorPoint.y - 7, imageRect.minY), imageRect.maxY - fontSize - 12),
+            y: min(max(anchorPoint.y - 7, max(imageRect.minY, bounds.minY)), min(imageRect.maxY, bounds.maxY) - fontSize - 12),
             width: fieldWidth,
             height: fontSize + 12
         ))
@@ -1032,7 +1237,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         if let field = activeTextField {
             field.textColor = annotationColor
             field.font = .systemFont(
-                ofSize: textFontPointSize(forBrushWidth: brushPixelWidth),
+                ofSize: textFontPointSize(forBrushWidth: brushPixelWidth) * textDisplayScale,
                 weight: .medium
             )
             return
@@ -1078,7 +1283,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
     private func textBounds(for stroke: AnnotationStroke, in rect: CGRect) -> CGRect {
         guard let anchor = stroke.points.first else { return .zero }
         let text = stroke.text ?? ""
-        let fontSize = textFontPointSize(for: stroke)
+        let fontSize = textFontPointSize(for: stroke) * textDisplayScale
         let font = NSFont.systemFont(ofSize: fontSize, weight: .medium)
         let size = (text as NSString).size(withAttributes: [.font: font])
         return CGRect(
@@ -1228,7 +1433,7 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         (text as NSString).draw(
             at: point,
             withAttributes: [
-                .font: NSFont.systemFont(ofSize: textFontPointSize(for: stroke), weight: .medium),
+                .font: NSFont.systemFont(ofSize: textFontPointSize(for: stroke) * textDisplayScale, weight: .medium),
                 .foregroundColor: stroke.color.nsColor
             ]
         )
@@ -1244,6 +1449,8 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         let scaleY = CGFloat(sourceImage.height) / max(1, logicalSize.height)
         return max(1, min(scaleX, scaleY))
     }
+
+    private var textDisplayScale: CGFloat { allowsViewportNavigation ? zoomScale : 1 }
 
     private func textFontPointSize(forBrushWidth width: CGFloat) -> CGFloat {
         max(14, width * 2)
@@ -1334,6 +1541,11 @@ final class AnnotationCanvasView: NSView, NSTextFieldDelegate {
         path.lineCapStyle = .round
         path.lineJoinStyle = .round
         path.lineWidth = max(1, stroke.width * min(rect.width, rect.height))
+        if stroke.tool == .mosaic, pixelatedPreviewImage == nil {
+            pixelatedPreviewImage = AnnotationRenderer.makePixelated(sourceImage).map {
+                NSImage(cgImage: $0, size: logicalSize)
+            }
+        }
         if stroke.tool == .mosaic, let pixelatedPreviewImage,
            let context = NSGraphicsContext.current?.cgContext {
             // 用当前未提交笔迹作为 clip，鼠标移动时直接露出像素化底图。

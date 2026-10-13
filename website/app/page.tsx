@@ -34,6 +34,13 @@ const featureGuideLinks = [
     enBody: "Manual scrolling, live preview, and local overlap stitching.",
   },
   {
+    href: "/chrome-extension",
+    zhTitle: "Chrome 网页长截图扩展",
+    enTitle: "Chrome web capture extension",
+    zhBody: "自动采集当前网页，在 Mac 上合成并编辑。",
+    enBody: "Capture the active web page and edit it in the Mac app.",
+  },
+  {
     href: "/features/screen-pinning",
     zhTitle: "屏幕贴图",
     enTitle: "Screen pinning",
@@ -540,10 +547,10 @@ export function PinboardShotHome({
             <article key={title}><span>0{index + 5}</span><h3>{title}</h3><p>{body}</p></article>
           ))}
         </div>
-        <div className="topic-link-grid" aria-label={language === "zh" ? "功能专题" : "Feature guides in Chinese"}>
+        <div className="topic-link-grid" aria-label={language === "zh" ? "功能专题" : "Feature guides"}>
           {featureGuideLinks.map((guide) => (
             <a href={guide.href} key={guide.href}>
-              <small>{language === "zh" ? "功能专题" : "Chinese guide"}</small>
+              <small>{language === "zh" ? "功能专题" : guide.href === "/chrome-extension" ? "English and Chinese" : "Chinese guide"}</small>
               <strong>{language === "zh" ? guide.zhTitle : guide.enTitle}</strong>
               <p>{language === "zh" ? guide.zhBody : guide.enBody}</p>
               <span>{language === "zh" ? "查看详情 →" : "Read the guide →"}</span>

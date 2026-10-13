@@ -4,6 +4,9 @@ import CoreImage
 import CoreImage.CIFilterBuiltins
 
 enum AnnotationRenderer {
+    // CIContext is reusable across threads; filters remain local to each render.
+    private static let pixelationContext = CIContext(options: [.cacheIntermediates: false])
+
     static func render(image: CGImage, strokes: [AnnotationStroke]) throws -> CGImage {
         guard !strokes.isEmpty else { return image }
         guard let context = CGContext(
@@ -18,7 +21,8 @@ enum AnnotationRenderer {
 
         let bounds = CGRect(x: 0, y: 0, width: image.width, height: image.height)
         context.draw(image, in: bounds)
-        let pixelated = makePixelated(image)
+        // Other tools never sample the mosaic bitmap; avoid processing the full image for them.
+        let pixelated = strokes.contains { $0.tool == .mosaic } ? makePixelated(image) : nil
         for stroke in strokes {
             draw(stroke, in: context, bounds: bounds, pixelated: pixelated)
         }
@@ -203,7 +207,7 @@ enum AnnotationRenderer {
         filter.inputImage = CIImage(cgImage: image)
         filter.scale = 14
         return filter.outputImage.flatMap {
-            CIContext(options: [.cacheIntermediates: false]).createCGImage(
+            pixelationContext.createCGImage(
                 $0, from: CGRect(x: 0, y: 0, width: image.width, height: image.height)
             )
         }

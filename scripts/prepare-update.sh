@@ -21,6 +21,7 @@ fi
 
 signing_identity="${PINBOARDSHOT_CODE_SIGN_IDENTITY:-Developer ID Application}"
 notary_profile="${PINBOARDSHOT_NOTARY_PROFILE:-PinboardShot-notary}"
+./scripts/check-notary-profile.sh "$notary_profile"
 PINBOARDSHOT_CODE_SIGN_IDENTITY="$signing_identity" ./scripts/build-app.sh
 app_path=".build/app/PinboardShot.app"
 if ! codesign -d --verbose=4 "$app_path" 2>&1 | rg '^Authority=Developer ID Application:' >/dev/null; then

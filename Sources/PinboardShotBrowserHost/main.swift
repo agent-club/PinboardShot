@@ -7,7 +7,7 @@ struct PinboardShotBrowserHost {
     @MainActor
     static func main() {
         guard CommandLine.arguments.count == 2,
-              CommandLine.arguments[1] == BrowserCaptureConfiguration.allowedOrigin else {
+              BrowserCaptureConfiguration.allowedOrigins.contains(CommandLine.arguments[1]) else {
             FileHandle.standardError.write(Data("PinboardShot browser host: extension origin denied\n".utf8))
             exit(EXIT_FAILURE)
         }
@@ -15,9 +15,21 @@ struct PinboardShotBrowserHost {
         let inbox = BrowserCaptureInbox()
         try? inbox.cleanupExpired()
         let processor = BrowserCaptureProtocolProcessor(inbox: inbox)
+        var lastPresenceUpdate = Date.distantPast
         do {
             while let message = try readMessage() {
                 let reply = processor.process(message)
+                if let request = try? JSONSerialization.jsonObject(with: message) as? [String: Any],
+                   let command = request["command"] as? String,
+                   command == "hello" || (command == "control" && Date.now.timeIntervalSince(lastPresenceUpdate) >= 30),
+                   let response = try? JSONSerialization.jsonObject(with: reply.data) as? [String: Any],
+                   response["ok"] as? Bool == true {
+                    // Chrome supplies this origin; never trust a claimed ID in the request body.
+                    let origin = CommandLine.arguments[1]
+                    let extensionID = String(origin.dropFirst("chrome-extension://".count).dropLast())
+                    try? BrowserExtensionPresenceStore(inbox: inbox).record(extensionID: extensionID)
+                    lastPresenceUpdate = .now
+                }
                 if let captureID = reply.captureReadyToOpen {
                     if !openCaptureInInstalledApp(captureID) {
                         try writeMessage(appOpenFailureResponse(from: reply.data, id: captureID))

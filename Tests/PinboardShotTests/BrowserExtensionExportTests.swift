@@ -1,8 +1,39 @@
 import Foundation
+import BrowserCaptureBridge
+import CryptoKit
 import Testing
 @testable import PinboardShot
 
 struct BrowserExtensionExportTests {
+    @Test("The actual bundled runtime exports the fixed local ID and all runtime modules")
+    func exportsActualRuntime() throws {
+        let source = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("browser-extension", isDirectory: true)
+        let downloads = FileManager.default.temporaryDirectory.resolvingSymlinksInPath()
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: downloads) }
+        let exported = try BrowserExtensionSetup.exportExtension(from: source, downloads: downloads)
+        let data = try Data(contentsOf: exported.appendingPathComponent("manifest.json"))
+        #expect(data == (try Data(contentsOf: source.appendingPathComponent("manifest.json"))))
+        let manifest = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        let key = try #require(manifest["key"] as? String)
+        let publicKey = try #require(Data(base64Encoded: key))
+        let id = SHA256.hash(data: publicKey).prefix(16).flatMap { byte in
+            [UnicodeScalar(97 + Int(byte >> 4))!, UnicodeScalar(97 + Int(byte & 15))!]
+        }.map(String.init).joined()
+        #expect(id == BrowserCaptureConfiguration.localExtensionID)
+        for file in ["background.js", "capture.js", "popup.html", "popup.js", "popup.css",
+                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs", "lib/browser-image.mjs", "lib/browser-download.mjs",
+                     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png",
+                     "icons/capture-scene.png", "icons/ui-pause.svg", "icons/ui-play.svg", "icons/ui-stop.svg",
+                     "icons/ui-check.svg", "icons/ui-x.svg", "icons/ui-warning-circle.svg", "icons/ui-scan.svg",
+                     "icons/ui-arrow-right.svg", "icons/Phosphor-LICENSE.txt"] {
+            #expect(try Data(contentsOf: exported.appendingPathComponent(file)) == Data(contentsOf: source.appendingPathComponent(file)))
+        }
+        #expect(!FileManager.default.fileExists(atPath: exported.appendingPathComponent("tests").path))
+    }
+
     private func fixture() throws -> (URL, URL, URL) {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         let source = root.appendingPathComponent("source", isDirectory: true)
@@ -11,8 +42,11 @@ struct BrowserExtensionExportTests {
         try FileManager.default.createDirectory(at: source.appendingPathComponent("icons"), withIntermediateDirectories: true)
         try FileManager.default.createDirectory(at: downloads, withIntermediateDirectories: true)
         for file in ["manifest.json", "background.js", "capture.js", "popup.html", "popup.js", "popup.css",
-                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs",
-                     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png"] {
+                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs", "lib/browser-image.mjs", "lib/browser-download.mjs",
+                     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png",
+                     "icons/capture-scene.png", "icons/ui-pause.svg", "icons/ui-play.svg", "icons/ui-stop.svg",
+                     "icons/ui-check.svg", "icons/ui-x.svg", "icons/ui-warning-circle.svg", "icons/ui-scan.svg",
+                     "icons/ui-arrow-right.svg", "icons/Phosphor-LICENSE.txt"] {
             try Data(file.utf8).write(to: source.appendingPathComponent(file))
         }
         return (root, source, downloads)

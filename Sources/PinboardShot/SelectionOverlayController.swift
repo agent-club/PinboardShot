@@ -8,6 +8,16 @@ enum OverlaySafetyPolicy {
     static let actionTimeout: Duration = .seconds(300)
     static let activityRenewalThrottle: TimeInterval = 0.75
     static let windowLevel: NSWindow.Level = .floating
+    static let alwaysOnTopDefaultsKey = "captureSelectionAlwaysOnTop"
+
+    static func configuredWindowLevel(defaults: UserDefaults = .standard) -> NSWindow.Level {
+        if defaults.object(forKey: alwaysOnTopDefaultsKey) != nil,
+           !defaults.bool(forKey: alwaysOnTopDefaultsKey) {
+            return windowLevel
+        }
+        // 盖住应用弹窗和菜单，仍低于系统屏保，并为选区尺寸对话框留出更高一层。
+        return NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 2)
+    }
     static let selectingDimAlpha: CGFloat = 0.48
     // 圈选完成后仍保留明确的外围暗化，避免深色桌面上蒙版视觉消失。
     static let awaitingActionDimAlpha: CGFloat = 0.44
@@ -519,11 +529,12 @@ final class SelectionOverlayController: NSObject, SelectionOverlayViewDelegate {
         }) else { return nil }
         let overlay = overlayState.window
         overlay.restoreSelectionCaptureMode()
+        // 截图窗口会复用；每次开始都读取设置，切换置顶无需重启。
+        overlay.level = OverlaySafetyPolicy.configuredWindowLevel()
         if overlayState.reused {
             overlay.setFrame(screen.frame, display: false)
         } else {
             // 窗口必须保持不透明，亮区由冻结快照重绘；透明挖洞会把点击穿透到真实桌面。
-            overlay.level = OverlaySafetyPolicy.windowLevel
             overlay.backgroundColor = .black
             overlay.isOpaque = true
             overlay.hasShadow = false
@@ -725,7 +736,7 @@ extension SelectionOverlayViewDelegate {
     func selectionViewDidPrepareActions(_ view: SelectionOverlayView) {}
 }
 
-final class OverlayToolbarButton: NSButton {
+final class OverlayToolbarButton: ActionButton {
     static let tooltipDelay: Duration = .milliseconds(16)
 
     private var hoverTrackingArea: NSTrackingArea?
@@ -1047,7 +1058,7 @@ final class OverlayToolbarDragHandleView: NSView {
 final class ColorPickerPreviewView: NSVisualEffectView {
     private let swatchView = NSView(frame: .zero)
     private let valueField = NSTextField(labelWithString: "")
-    let formatPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let formatPopup = ActionPopUpButton(frame: .zero, pullsDown: false)
     var displayedValue: String { valueField.stringValue }
 
     override init(frame frameRect: NSRect) {
@@ -1251,7 +1262,7 @@ final class OverlayWidthControl: NSControl {
     }
 }
 
-final class AnnotationColorSwatchButton: NSButton {
+final class AnnotationColorSwatchButton: ActionButton {
     let swatchColor: NSColor
     var isSelectedSwatch = false { didSet { needsDisplay = true } }
 
@@ -1401,7 +1412,7 @@ final class SelectionSizeEditorCoordinator: NSObject, NSTextFieldDelegate, NSWin
         self.maximumSize = maximumSize
         widthField = NSTextField(string: String(Int(size.width.rounded())))
         heightField = NSTextField(string: String(Int(size.height.rounded())))
-        ratioControl = NSSegmentedControl(
+        ratioControl = ActionSegmentedControl(
             labels: SelectionAspectRatioPreset.allCases.map { preset in
                 if preset == .current {
                     return L10n.text("overlay.aspect.currentValue", String(format: "%.2f:1", currentRatio))
@@ -1476,7 +1487,10 @@ final class SelectionSizeEditorCoordinator: NSObject, NSTextFieldDelegate, NSWin
             defer: false
         )
         panel.title = L10n.text("overlay.editSelectionSize")
-        panel.level = .modalPanel
+        panel.level = NSWindow.Level(rawValue: max(
+            NSWindow.Level.modalPanel.rawValue,
+            (parent?.level.rawValue ?? NSWindow.Level.normal.rawValue) + 1
+        ))
         panel.isReleasedWhenClosed = false
         panel.hidesOnDeactivate = false
         panel.delegate = self
@@ -1494,14 +1508,14 @@ final class SelectionSizeEditorCoordinator: NSObject, NSTextFieldDelegate, NSWin
         error.isHidden = true
         errorLabel = error
 
-        let cancelButton = NSButton(
+        let cancelButton = ActionButton(
             title: L10n.text("common.cancel"),
             target: self,
             action: #selector(cancelPanel)
         )
         cancelButton.bezelStyle = .rounded
         cancelButton.keyEquivalent = "\u{1b}"
-        let applyButton = NSButton(
+        let applyButton = ActionButton(
             title: L10n.text("common.apply"),
             target: self,
             action: #selector(applyPanel)
@@ -1569,14 +1583,14 @@ final class SelectionSizeEditorCoordinator: NSObject, NSTextFieldDelegate, NSWin
         error.isHidden = true
         errorLabel = error
 
-        let cancelButton = NSButton(
+        let cancelButton = ActionButton(
             title: L10n.text("common.cancel"),
             target: self,
             action: #selector(cancelPanel)
         )
         cancelButton.bezelStyle = .rounded
         cancelButton.keyEquivalent = "\u{1b}"
-        let applyButton = NSButton(
+        let applyButton = ActionButton(
             title: L10n.text("common.apply"),
             target: self,
             action: #selector(applyPanel)
@@ -2265,7 +2279,7 @@ final class SelectionOverlayView: NSView, ImageAnalysisOverlayViewDelegate {
         widthControl.action = #selector(annotationWidthChanged(_:))
         annotationWidthControl = widthControl
 
-        let arrowModeControl = NSSegmentedControl(
+        let arrowModeControl = ActionSegmentedControl(
             images: AnnotationArrowMode.allCases.map { mode in
                 NSImage(
                     systemSymbolName: mode.symbolName,
@@ -2478,7 +2492,7 @@ final class SelectionOverlayView: NSView, ImageAnalysisOverlayViewDelegate {
     }
 
     private func makeColorFormatPopup() -> NSPopUpButton {
-        let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+        let popup = ActionPopUpButton(frame: .zero, pullsDown: false)
         popup.controlSize = .small
         popup.font = .systemFont(ofSize: 11.5, weight: .semibold)
         popup.target = self

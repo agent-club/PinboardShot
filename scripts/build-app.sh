@@ -2,6 +2,11 @@
 set -euo pipefail
 
 cd "${0:A:h:h}"
+# Copying and signing share one app bundle; parallel builds can invalidate each other's signatures.
+mkdir -p .build
+: >> .build/app-build.lock
+zmodload zsh/system
+zsystem flock -f pinboardshot_build_lock_fd .build/app-build.lock
 architectures=(${(s:,:)${PINBOARDSHOT_ARCHS:-arm64,x86_64}})
 requested_signing_identity="${PINBOARDSHOT_CODE_SIGN_IDENTITY:-}"
 allows_adhoc_fallback=$([[ -z "${PINBOARDSHOT_CODE_SIGN_IDENTITY:-}" ]] && print true || print false)

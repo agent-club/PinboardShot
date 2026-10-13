@@ -2,8 +2,11 @@ import Foundation
 
 public enum BrowserCaptureConfiguration {
     public static let hostName = "com.ryanwang.pinboardshot.browser_capture"
-    public static let extensionID = "olghjpagobkdfmiphmabpapcfgjfdeaf"
+    public static let extensionID = "kjpleeeibdicdoljjhoahhnkggncglac"
     public static let allowedOrigin = "chrome-extension://\(extensionID)/"
+    public static let localExtensionID = "olghjpagobkdfmiphmabpapcfgjfdeaf"
+    // The bundled download is a user installation channel, including in release builds.
+    public static let allowedOrigins = [allowedOrigin, "chrome-extension://\(localExtensionID)/"]
     public static let protocolVersion = 1
     public static let maximumMessageBytes = 1 * 1024 * 1024
 }

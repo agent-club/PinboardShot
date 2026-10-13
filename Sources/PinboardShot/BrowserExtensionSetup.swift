@@ -3,6 +3,8 @@ import BrowserCaptureBridge
 import CryptoKit
 
 enum BrowserExtensionSetup {
+    static let storeURL = URL(string: "https://chromewebstore.google.com/detail/pinboardshot-browser-capt/kjpleeeibdicdoljjhoahhnkggncglac")!
+
     struct HostRegistration: Encodable {
         let name: String
         let description: String
@@ -14,14 +16,17 @@ enum BrowserExtensionSetup {
     static func prepare(bundle: Bundle = .main, home: URL = FileManager.default.homeDirectoryForCurrentUser) throws -> URL {
         let applicationURL = URL(fileURLWithPath: "/Applications/PinboardShot.app", isDirectory: true)
         guard bundle.bundleURL.standardizedFileURL == applicationURL,
-              let resources = bundle.resourceURL else { throw BrowserCaptureImportError.invalidImage }
-        let extensionURL = resources.appendingPathComponent("ChromeExtension", isDirectory: true)
+              bundle.resourceURL != nil else { throw BrowserCaptureImportError.invalidImage }
         let hostURL = applicationURL.appendingPathComponent("Contents/MacOS/PinboardShotBrowserHost")
         let manager = FileManager.default
-        guard manager.isExecutableFile(atPath: hostURL.path),
-              manager.fileExists(atPath: extensionURL.appendingPathComponent("manifest.json").path) else {
+        guard manager.isExecutableFile(atPath: hostURL.path) else {
             throw BrowserCaptureImportError.invalidImage
         }
+        return try registerHost(hostURL: hostURL, home: home)
+    }
+
+    static func registerHost(hostURL: URL, home: URL) throws -> URL {
+        let manager = FileManager.default
         let directory = home.appendingPathComponent("Library/Application Support/Google/Chrome/NativeMessagingHosts", isDirectory: true)
         // Do not follow an externally substituted registration folder or manifest.
         var ancestor = directory
@@ -40,16 +45,27 @@ enum BrowserExtensionSetup {
         }
         let registration = HostRegistration(name: BrowserCaptureConfiguration.hostName,
             description: "PinboardShot local browser capture bridge", path: hostURL.path,
-            allowed_origins: [BrowserCaptureConfiguration.allowedOrigin])
+            allowed_origins: BrowserCaptureConfiguration.allowedOrigins)
         try JSONEncoder().encode(registration).write(to: target, options: .atomic)
         try manager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: target.path)
-        return try exportExtension(from: extensionURL, downloads: home.appendingPathComponent("Downloads", isDirectory: true))
+        return target
+    }
+
+    static func download(bundle: Bundle = .main, home: URL = FileManager.default.homeDirectoryForCurrentUser) throws -> URL {
+        _ = try prepare(bundle: bundle, home: home)
+        guard let resources = bundle.resourceURL else { throw BrowserCaptureImportError.invalidImage }
+        // Export the app's own runtime so this installation path needs no store or network.
+        return try exportExtension(from: resources.appendingPathComponent("ChromeExtension", isDirectory: true),
+                                   downloads: home.appendingPathComponent("Downloads", isDirectory: true))
     }
 
     static func exportExtension(from source: URL, downloads: URL) throws -> URL {
         let files = ["manifest.json", "background.js", "capture.js", "popup.html", "popup.js", "popup.css",
-                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs",
-                     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png"]
+                     "lib/planner.mjs", "lib/native-protocol.mjs", "lib/native-client.mjs", "lib/browser-image.mjs", "lib/browser-download.mjs",
+                     "icons/icon16.png", "icons/icon32.png", "icons/icon48.png", "icons/icon128.png",
+                     "icons/capture-scene.png", "icons/ui-pause.svg", "icons/ui-play.svg", "icons/ui-stop.svg",
+                     "icons/ui-check.svg", "icons/ui-x.svg", "icons/ui-warning-circle.svg", "icons/ui-scan.svg",
+                     "icons/ui-arrow-right.svg", "icons/Phosphor-LICENSE.txt"]
         let manager = FileManager.default
         for directory in [source, source.appendingPathComponent("lib"), source.appendingPathComponent("icons")] {
             let info = try directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])

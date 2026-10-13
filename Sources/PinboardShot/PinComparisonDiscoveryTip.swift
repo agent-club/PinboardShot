@@ -174,7 +174,7 @@ private struct NonActivatingTipPanelHostView: View {
                     Image(systemName: "xmark.circle.fill")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
+                }.clickCursor()
                 .buttonStyle(.plain)
             }
         }

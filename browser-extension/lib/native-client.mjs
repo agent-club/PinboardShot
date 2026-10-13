@@ -7,10 +7,12 @@ export class NativeCaptureClient {
     this.port = null;
     this.pending = new Map();
     this.disconnectError = null;
+    this.hello = null;
   }
 
   async connect() {
-    if (this.port) return;
+    if (this.port) return this.hello;
+    this.disconnectError = null;
     this.port = this.chrome.runtime.connectNative(NATIVE_HOST);
     this.port.onMessage.addListener(reply => {
       const pending = this.pending.get(reply?.requestId);
@@ -36,6 +38,8 @@ export class NativeCaptureClient {
       throw new Error("native_protocol_unsupported");
     }
     this.maxChunkChars = hello.maxChunkBytes;
+    this.hello = hello;
+    return hello;
   }
 
   request(command, fields = {}) {

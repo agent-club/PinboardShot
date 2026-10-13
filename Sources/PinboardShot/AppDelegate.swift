@@ -14,10 +14,9 @@ private struct ScrollingCaptureResult {
 }
 
 @MainActor
-final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate {
     private static let firstLaunchDefaultsKey = "hasCompletedFirstLaunchOnboarding"
     private static let permissionDeferredDefaultsKey = "screenCapturePermissionDeferred"
-    private static let browserExtensionInstalledDefaultsKey = "browserExtension.installationConfirmed"
 
     private let shortcutStore = ShortcutStore()
     private let hotKeyManager = HotKeyManager()
@@ -28,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let pinWorkspaceStore = PinWorkspaceStore()
     private let pinWorkspaceExporter = PinWorkspaceExporter()
     private let historyStore = HistoryStore()
+    private lazy var magneticDesktop = MagneticDesktopController(historyStore: historyStore, pinManager: pinManager)
     private let imageClipboard = ImageClipboard()
     private let launchAtLoginManager = LaunchAtLoginManager()
     private let localizationStore = LocalizationStore()
@@ -43,7 +43,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private let appHealth = AppHealthModel()
 
     private var statusItem: NSStatusItem?
-    private let statusPopover = NSPopover()
+    private let statusPanel = TrayPanelController()
     private var preferencesWindowController: NSWindowController?
     private var legalNoticesWindowController: NSWindowController?
     private var failedHotKeyBindings: [ShortcutBinding] = []
@@ -51,7 +51,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var activeTrayIconChoice: TrayIconChoice?
     private var trayIconAnimationFrame = 0
     private var trayIconAnimationTimer: Timer?
-    private var statusPopoverOutsideClickMonitor: Any?
     private var lastExternalApplicationBundleIdentifier: String?
     private var pinSessionRecoverySaveTimer: Timer?
     private var historyRetentionTimer: Timer?
@@ -61,6 +60,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.setActivationPolicy(.accessory)
+        // Refresh the exact host allowlist on launch, including after a local or release upgrade.
+        // A failed registration remains repairable from the explicit connection action in Settings.
+        _ = try? BrowserExtensionSetup.prepare()
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(accessibilityDisplayOptionsDidChange),
@@ -79,6 +81,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self.refreshTrayPanel()
             self.updateStatusItemIcon(.current())
             self.preferencesWindowController?.window?.title = L10n.text("preferences.windowTitle")
+            self.magneticDesktop.refresh(force: true)
         }
         updateManager.onUpdateStateChanged = { [weak self] in
             self?.refreshTrayPanel()
@@ -96,6 +99,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             self?.schedulePinSessionRecoverySave()
         }
         configureStatusItem()
+        magneticDesktop.onCopy = { [weak self] item in
+            guard let self, let image = self.historyStore.image(for: item) else { return }
+            let originalPNG = try? Data(contentsOf: self.historyStore.fileURL(for: item))
+            if !self.imageClipboard.write(image, pngData: originalPNG) {
+                self.present(error: PinboardShotError.imageEncodingFailed)
+            }
+        }
+        magneticDesktop.onEdit = { [weak self] item in
+            guard let self, let image = self.historyStore.image(for: item) else { return }
+            do {
+                let draft = try self.historyStore.draft(for: item)
+                self.editCapture(image, draft: draft,
+                    privacyContext: CapturePrivacyContext(sourceApplicationBundleIdentifier: item.sourceApplicationBundleIdentifier),
+                    hideMagneticDesktop: true)
+            } catch { self.present(error: error) }
+        }
+        magneticDesktop.start()
         captureToolsController.onCaptureStep = { [weak self] in self?.perform(.region) }
         captureToolsController.onEdit = { [weak self] image, ruler in
             self?.editCapture(image, ruler: ruler)
@@ -123,8 +143,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         pinSessionRecoverySaveTimer?.invalidate()
         pinSessionRecoverySaveTimer = nil
         flushPinSessionRecovery()
+        // Persist source associations before stopping the magnetic desktop detaches its pins.
+        magneticDesktop.stop(closeDesktopPins: false)
+        statusPanel.close()
         stopStatusItemIconAnimation()
-        removeStatusPopoverOutsideClickMonitor()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
         hotKeyManager.unregisterAll()
         if UserDefaults.standard.bool(forKey: "clearHistoryOnQuit") {
@@ -202,6 +224,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
         guard let recovery = pinWorkspaceStore.loadRecoverySession() else { return }
         _ = pinManager.restoreWorkspace(recovery.entries)
+        magneticDesktop.restoreSessionPins()
         if !recovery.pinsAreVisible, pinManager.pinsAreVisible {
             pinManager.toggleAll()
         }
@@ -259,11 +282,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func configureStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         statusItem = item
-        item.button?.target = self
-        item.button?.action = #selector(toggleStatusPopover(_:))
-        statusPopover.behavior = .transient
-        statusPopover.animates = false
-        statusPopover.delegate = self
+        if let button = item.button {
+            statusPanel.bind(to: button) { [weak self] sender in
+                self?.toggleStatusPanel(sender)
+            }
+        }
+        statusPanel.onClose = { [weak self] in
+            self?.startStatusItemIconAnimationIfNeeded()
+        }
         refreshTrayPanel()
         updateStatusItemIcon(.current())
     }
@@ -280,7 +306,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private func startStatusItemIconAnimationIfNeeded() {
         guard let activeTrayIconChoice,
               activeTrayIconChoice.isAnimated,
-              !statusPopover.isShown,
+              !statusPanel.isShown,
               !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else { return }
         let timer = Timer(
             timeInterval: TrayIconChoice.animationInterval,
@@ -294,7 +320,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     @objc private func advanceStatusItemIconAnimation() {
-        guard let activeTrayIconChoice, !statusPopover.isShown else { return }
+        guard let activeTrayIconChoice, !statusPanel.isShown else { return }
         trayIconAnimationFrame += 1
         statusItem?.button?.image = activeTrayIconChoice.statusBarImage(frameIndex: trayIconAnimationFrame)
     }
@@ -335,7 +361,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                 },
                 onCommand: { [weak self] command in
                     self?.runTrayCommand(command)
-                }
+                },
+                onContentHeightChanged: { [weak self] height in
+                    self?.statusPanel.resizeContent(to: NSSize(width: TrayPanelMetrics.width, height: height))
+                },
+                maximumHeight: TrayPanelMetrics.height(
+                    preferredHeight: TrayPanelMetrics.measurementHeightLimit,
+                    availableHeight: screenHeight
+                )
             )
         }
 
@@ -357,56 +390,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             width: TrayPanelMetrics.width,
             height: panelHeight
         )
-        statusPopover.contentSize = panelSize
-        statusPopover.contentViewController = NSHostingController(
-            rootView: makePanel(height: panelHeight)
-        )
+        let hostingController = NSHostingController(rootView: makePanel(height: panelHeight))
+        hostingController.sizingOptions = []
+        statusPanel.update(contentViewController: hostingController, size: panelSize)
     }
 
-    @objc private func toggleStatusPopover(_ sender: Any?) {
+    @objc private func toggleStatusPanel(_ sender: Any?) {
         guard let button = statusItem?.button else { return }
-        if statusPopover.isShown {
-            statusPopover.performClose(sender)
+        if statusPanel.isShown {
+            statusPanel.close()
         } else {
             stopStatusItemIconAnimation()
             refreshTrayPanel()
-            NSApp.activate(ignoringOtherApps: true)
-            statusPopover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
-            button.isHighlighted = true
+            statusPanel.show(relativeTo: button)
         }
     }
 
-    func popoverDidShow(_ notification: Notification) {
-        installStatusPopoverOutsideClickMonitor()
-    }
-
-    func popoverDidClose(_ notification: Notification) {
-        removeStatusPopoverOutsideClickMonitor()
-        statusItem?.button?.isHighlighted = false
-        startStatusItemIconAnimationIfNeeded()
-    }
-
-    private func installStatusPopoverOutsideClickMonitor() {
-        removeStatusPopoverOutsideClickMonitor()
-        statusPopoverOutsideClickMonitor = NSEvent.addGlobalMonitorForEvents(
-            matching: [.leftMouseDown, .rightMouseDown, .otherMouseDown],
-            handler: { [weak self] _ in
-                Task { @MainActor [weak self] in
-                    guard let self, self.statusPopover.isShown else { return }
-                    self.statusPopover.performClose(nil)
-                }
-            }
-        )
-    }
-
-    private func removeStatusPopoverOutsideClickMonitor() {
-        guard let statusPopoverOutsideClickMonitor else { return }
-        NSEvent.removeMonitor(statusPopoverOutsideClickMonitor)
-        self.statusPopoverOutsideClickMonitor = nil
-    }
-
     private func runTrayCommand(_ command: TrayPanelCommand) {
-        statusPopover.performClose(nil)
+        statusPanel.close()
         switch command {
         case .showCaptureTools: captureToolsController.show()
         case .startBrowserCapture: startBrowserCapture()
@@ -596,9 +597,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             // Reserve synchronously, including the delay, so later requests cannot queue or change this result.
             guard !shortRecordingController.isBusy, capturePipeline.beginCapture(pinWhenReady: pinResult) else { return }
             captureToolsController.suspendForCapture()
+            magneticDesktop.suspendForCapture()
             captureResultOverlay.dismiss()
             Task {
-                defer { captureToolsController.resumeAfterCapture() }
+                defer {
+                    captureToolsController.resumeAfterCapture()
+                    magneticDesktop.resumeAfterCapture()
+                }
                 switch action {
                 case .region: await captureRegion(pin: false)
                 case .delayedRegion:
@@ -956,8 +961,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     }
 
     private func editCapture(_ image: NSImage, draft: AnnotationDraft? = nil, ruler: Bool = false,
-                             privacyContext: CapturePrivacyContext = .unknown) {
+                             privacyContext: CapturePrivacyContext = .unknown, hideMagneticDesktop: Bool = false) {
         Task {
+            if hideMagneticDesktop { magneticDesktop.suspendForCapture() }
+            defer { if hideMagneticDesktop { magneticDesktop.resumeAfterCapture() } }
             guard let result = await annotationEditorController.edit(image: image, draft: draft,
                 initialTool: ruler ? .ruler : .mosaic) else { return }
             completeCapture(result.image, pin: result.disposition == .pin, applyWatermark: draft != nil,
@@ -971,8 +978,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
               shortRecordingController.prepareNewRecording(), capturePipeline.beginCapture() else { return }
         captureResultOverlay.dismiss()
         captureToolsController.suspendForCapture()
+        magneticDesktop.suspendForCapture()
         Task {
-            defer { capturePipeline.cancelCapture() }
+            // Recording filters out this app; only its initial selection snapshot needs suspension.
+            defer {
+                capturePipeline.cancelCapture()
+                magneticDesktop.resumeAfterCapture()
+            }
             do {
                 let prepared = try await captureService.prepareRegionCapture()
                 guard let selection = await overlayController.selectRegion(snapshot: prepared.snapshot,
@@ -1072,9 +1084,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             return
         }
         browserLaunchInProgress = true
-        statusPopover.performClose(nil)
-        guard confirmBrowserExtensionInstallation() else {
+        statusPanel.close()
+        do {
+            // Register before triggering Chrome; the native capture handshake proves availability.
+            _ = try BrowserExtensionSetup.prepare()
+        } catch {
             browserLaunchInProgress = false
+            present(error: error)
             return
         }
         Task { @MainActor [weak self] in
@@ -1082,8 +1098,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
             defer { self.browserLaunchInProgress = false }
             do {
                 self.browserCaptureControlController.onUnavailable = { [weak self] in
-                    // A previous confirmation cannot prove the extension is still enabled.
-                    UserDefaults.standard.set(false, forKey: Self.browserExtensionInstalledDefaultsKey)
                     self?.present(error: NSError(domain: "PinboardShot.BrowserCapture", code: 1,
                         userInfo: [NSLocalizedDescriptionKey: L10n.text("browserExtension.controlUnavailable")]))
                 }
@@ -1096,39 +1110,32 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         }
     }
 
-    private func confirmBrowserExtensionInstallation() -> Bool {
-        // Chrome's profile is private. Record the user's explicit confirmation
-        // instead of treating an exported folder as an installed extension.
-        if UserDefaults.standard.bool(forKey: Self.browserExtensionInstalledDefaultsKey) { return true }
-        NSApp.activate(ignoringOtherApps: true)
-        let alert = NSAlert()
-        alert.messageText = L10n.text("browserExtension.setupTitle")
-        alert.informativeText = L10n.text("browserExtension.setupHelp")
-        alert.addButton(withTitle: L10n.text("browserExtension.connect"))
-        alert.addButton(withTitle: L10n.text("browserExtension.installedStart"))
-        alert.addButton(withTitle: L10n.text("common.cancel"))
-        switch alert.runModal() {
-        case .alertFirstButtonReturn:
-            prepareBrowserExtension()
-            return false
-        case .alertSecondButtonReturn:
-            UserDefaults.standard.set(true, forKey: Self.browserExtensionInstalledDefaultsKey)
-            return true
-        default:
-            return false
-        }
-    }
-
-    private func prepareBrowserExtension() {
-        statusPopover.performClose(nil)
+    private func prepareBrowserExtension(openStore: Bool = false) {
+        statusPanel.close()
         NSApp.activate(ignoringOtherApps: true)
         do {
-            let directory = try BrowserExtensionSetup.prepare()
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(directory.path, forType: .string)
+            _ = try BrowserExtensionSetup.prepare()
+            if openStore {
+                NSWorkspace.shared.open(BrowserExtensionSetup.storeURL)
+                return
+            }
             let done = NSAlert()
             done.messageText = L10n.text("browserExtension.readyTitle")
-            done.informativeText = L10n.text("browserExtension.readyHelp", directory.path)
+            done.informativeText = L10n.text("browserExtension.readyHelp")
+            done.addButton(withTitle: L10n.text("common.done"))
+            done.runModal()
+        } catch { present(error: error) }
+    }
+
+    private func downloadBrowserExtension() {
+        statusPanel.close()
+        NSApp.activate(ignoringOtherApps: true)
+        do {
+            let directory = try BrowserExtensionSetup.download()
+            NSWorkspace.shared.activateFileViewerSelecting([directory])
+            let done = NSAlert()
+            done.messageText = L10n.text("browserExtension.localReadyTitle")
+            done.informativeText = L10n.text("browserExtension.localReadyHelp")
             done.addButton(withTitle: L10n.text("common.done"))
             done.runModal()
         } catch { present(error: error) }
@@ -1230,6 +1237,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
                     self.captureToolsController.show(image: image)
                 },
                 onPrepareBrowserExtension: { [weak self] in self?.prepareBrowserExtension() },
+                onDownloadBrowserExtension: { [weak self] in self?.downloadBrowserExtension() },
                 onStartBrowserCapture: { [weak self] in self?.startBrowserCapture() }
             )
             let controller = NSWindowController(window: NSWindow(contentViewController: NSHostingController(rootView: view)))
@@ -1419,7 +1427,7 @@ private struct LegalNoticesPanelView: View {
                     ForEach(LegalNoticesSection.allCases) { section in
                         Text(section.title).tag(section)
                     }
-                }
+                }.clickCursor()
                 .pickerStyle(.segmented)
                 .labelsHidden()
                 .frame(width: 260)
@@ -1479,10 +1487,10 @@ private struct LegalNoticesPanelView: View {
                 NSPasteboard.general.setString(selectedText, forType: .string)
             } label: {
                 Label(L10n.text("common.copy"), systemImage: "doc.on.doc")
-            }
+            }.clickCursor()
             Button(L10n.text("common.done")) {
                 closeAction()
-            }
+            }.clickCursor()
             .keyboardShortcut(.defaultAction)
         }
         .padding(.horizontal, 20)
