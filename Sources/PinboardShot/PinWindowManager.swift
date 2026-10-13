@@ -465,6 +465,7 @@ final class PinPanel: NSPanel {
     var onNudge: ((CGPoint) -> Void)?
     var onContextMenuRequested: ((NSEvent) -> Void)?
     private(set) var isSpaceMoveActive = false
+    private var isPresentingContextMenu = false
 
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
@@ -483,11 +484,7 @@ final class PinPanel: NSPanel {
                 imageView.mouseUp(with: event)
                 return
             case .rightMouseDown:
-                if let onContextMenuRequested {
-                    onContextMenuRequested(event)
-                } else {
-                    imageView.presentContextMenu(with: event)
-                }
+                requestContextMenu(with: event)
                 return
             default:
                 break
@@ -496,7 +493,8 @@ final class PinPanel: NSPanel {
         if event.type == .leftMouseDown {
             makeKey()
         }
-        if Int(event.keyCode) == kVK_Space {
+        // AppKit throws if keyCode is read from mouse/tracking events delivered during a menu.
+        if (event.type == .keyDown || event.type == .keyUp), Int(event.keyCode) == kVK_Space {
             switch event.type {
             case .keyDown:
                 setSpaceMoveActive(true)
@@ -509,6 +507,24 @@ final class PinPanel: NSPanel {
             }
         }
         super.sendEvent(event)
+    }
+
+    private func requestContextMenu(with event: NSEvent) {
+        guard !isPresentingContextMenu else { return }
+        isPresentingContextMenu = true
+        // Menu tracking owns a nested event loop; start it after the pin's mouse-down dispatch finishes.
+        DispatchQueue.main.async { [weak self] in
+            guard let self else { return }
+            defer { self.isPresentingContextMenu = false }
+            guard self.isVisible, let imageView = self.contentView as? PinImageView else { return }
+            self.makeKey()
+            self.makeFirstResponder(imageView)
+            if let onContextMenuRequested = self.onContextMenuRequested {
+                onContextMenuRequested(event)
+            } else {
+                imageView.presentContextMenu(with: event)
+            }
+        }
     }
 
     override func resignKey() {
@@ -576,6 +592,12 @@ final class PinWindowManager: NSObject {
     var onSessionChanged: (() -> Void)?
 
     var count: Int { controllers.count }
+    func visibleFrames(excluding ids: Set<UUID>) -> [CGRect] {
+        controllers.values.compactMap {
+            guard !ids.contains($0.id), let window = $0.window, window.isVisible else { return nil }
+            return window.frame
+        }
+    }
     var shadowsEnabled: Bool {
         if UserDefaults.standard.object(forKey: Self.shadowDefaultsKey) == nil { return true }
         return UserDefaults.standard.bool(forKey: Self.shadowDefaultsKey)
@@ -599,12 +621,33 @@ final class PinWindowManager: NSObject {
         onSessionChanged?()
     }
 
+    func pinFromMagneticDesktop(image: NSImage, frame: CGRect) -> PinWindowController {
+        let controller = makeController(image: image)
+        if !pinsAreVisible {
+            controllers.values.forEach { $0.showWithoutActivating() }
+        }
+        controllers[controller.id] = controller
+        startTrackpadMagnificationMonitoringIfNeeded()
+        // Source-linked pins reuse pin tools but retain the desktop plane instead of forcing topmost.
+        controller.window?.level = .normal
+        controller.window?.setFrame(frame, display: false)
+        controller.captureInitialState()
+        controller.showWithoutActivating()
+        pinsAreVisible = true
+        onSessionChanged?()
+        return controller
+    }
+
     func workspaceCaptures() -> [PinWorkspaceCapture] {
         orderedControllersBackToFront().map(\.workspaceCapture)
     }
 
     func sessionCaptures() -> [PinSessionCapture] {
         orderedControllersBackToFront().map(\.sessionCapture)
+    }
+
+    var magneticPins: [PinWindowController] {
+        orderedControllersBackToFront().filter { $0.magneticSource != nil }
     }
 
     func updateMetadata(for id: UUID, metadata: PinMetadata) {
@@ -636,6 +679,7 @@ final class PinWindowManager: NSObject {
         var clearedApplicationBindings = 0
         for entry in entries {
             let controller = makeController(image: entry.image, metadata: entry.metadata)
+            controller.magneticSource = entry.magneticSource
             controllers[controller.id] = controller
             if controller.show(restoring: entry.state) {
                 clearedApplicationBindings += 1
@@ -824,6 +868,23 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
     private(set) var isComparisonReference = false
     private var visibilityBundleIdentifier: String?
     private var workspaceObserver: NSObjectProtocol?
+    var magneticSource: MagneticPinSource? {
+        didSet {
+            if oldValue != magneticSource { onStateChanged() }
+        }
+    }
+    var onReturnToSource: (() -> Void)?
+    var onReturnAllToSource: (() -> Void)?
+    var onCenterSourceGroup: (() -> Void)?
+    var canCenterSourceGroup: (() -> Bool)?
+    var onSourceGeometryWillChange: (() -> Void)?
+    var onSourceGeometryChanged: (() -> Void)?
+    var onEditSourceImage: (() -> Void)?
+    var onSourceDragEnded: ((CGRect, CGPoint) -> Void)?
+    var onSourceClosed: (() -> Void)?
+    var returnToSourceTitle: String?
+
+    func captureInitialState() { initialState = currentState }
 
     init(
         id: UUID,
@@ -936,6 +997,7 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
 
     func scale(by factor: CGFloat, around anchor: CGPoint? = nil) {
         guard let window else { return }
+        onSourceGeometryWillChange?()
         let frame = PinWindowScaleGeometry.scaledFrame(
             window.frame,
             by: factor,
@@ -945,12 +1007,15 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
         window.setFrame(frame, display: true)
         (window.contentView as? PinImageView)?.refreshPointerChromeForCurrentPointer()
         onStateChanged()
+        onSourceGeometryChanged?()
     }
 
     func nudge(by offset: CGPoint) {
         guard !isPositionLocked, let window else { return }
+        onSourceGeometryWillChange?()
         window.setFrameOrigin(CGPoint(x: window.frame.minX + offset.x, y: window.frame.minY + offset.y))
         onStateChanged()
+        onSourceGeometryChanged?()
     }
 
     func adjustOpacity(by delta: CGFloat) {
@@ -960,6 +1025,7 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
     }
 
     func togglePositionLock() {
+        onSourceGeometryWillChange?()
         isPositionLocked.toggle()
         window?.isMovableByWindowBackground = !isPositionLocked
         window?.invalidateCursorRects(for: window?.contentView ?? NSView())
@@ -1007,8 +1073,10 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
 
     func restoreInitialState() {
         guard let initialState else { return }
+        onSourceGeometryWillChange?()
         _ = apply(initialState)
         onStateChanged()
+        onSourceGeometryChanged?()
     }
 
     func toggleMousePassthrough() {
@@ -1024,7 +1092,8 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
     }
 
     var sessionCapture: PinSessionCapture {
-        PinSessionCapture(id: id, image: image, state: currentState, metadata: metadata)
+        PinSessionCapture(id: id, image: image, state: currentState, metadata: metadata,
+                          magneticSource: magneticSource)
     }
 
     var comparisonSource: NSImage { image }
@@ -1059,6 +1128,7 @@ final class PinWindowController: NSWindowController, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         removeWorkspaceObserver()
         onClose(id)
+        onSourceClosed?()
     }
 
     private static func initialSize(for imageSize: CGSize) -> CGSize {
@@ -1161,6 +1231,7 @@ final class PinImageView: NSImageView, ImageAnalysisOverlayViewDelegate {
     private weak var pinController: PinWindowController?
     private var dragStart: (mouseLocation: CGPoint, windowOrigin: CGPoint, hasActivated: Bool)?
     private var resizeStart: (handle: PinWindowResizeHandle, mouseLocation: CGPoint, frame: CGRect)?
+    private var sourceDragVelocity = MagneticDragVelocity()
     private var pointerTrackingArea: NSTrackingArea?
     private var hoveredResizeHandle: PinWindowResizeHandle?
     private var showsResizeChrome = false
@@ -1314,6 +1385,11 @@ final class PinImageView: NSImageView, ImageAnalysisOverlayViewDelegate {
 
     override func resetCursorRects() {
         super.resetCursorRects()
+        // Locked pins ignore both movement and resize gestures.
+        if pinController?.isPositionLocked == true {
+            addCursorRect(bounds, cursor: .arrow)
+            return
+        }
         let interior = bounds.insetBy(dx: PinWindowResizeGeometry.hitSlop, dy: PinWindowResizeGeometry.hitSlop)
         if !interior.isEmpty {
             addCursorRect(interior, cursor: .openHand)
@@ -1332,11 +1408,21 @@ final class PinImageView: NSImageView, ImageAnalysisOverlayViewDelegate {
 
     override func mouseDown(with event: NSEvent) {
         guard let window else { return }
+        if event.clickCount == 2, let returnToSource = pinController?.onReturnToSource {
+            dragStart = nil
+            resizeStart = nil
+            returnToSource()
+            return
+        }
         window.makeKey()
         window.makeFirstResponder(self)
         guard pinController?.isPositionLocked != true else { return }
+        // Stop group movement before taking gesture coordinates so dragging cannot jump to an old origin.
+        pinController?.onSourceGeometryWillChange?()
         let point = convert(event.locationInWindow, from: nil)
         let mouseLocation = window.convertPoint(toScreen: event.locationInWindow)
+        sourceDragVelocity = MagneticDragVelocity()
+        sourceDragVelocity.record(mouseLocation, at: event.timestamp)
         if let handle = PinWindowResizeGeometry.handle(at: point, in: bounds) {
             resizeStart = (handle, mouseLocation, window.frame)
             dragStart = nil
@@ -1353,6 +1439,7 @@ final class PinImageView: NSImageView, ImageAnalysisOverlayViewDelegate {
     override func mouseDragged(with event: NSEvent) {
         guard let window else { return }
         let mouseLocation = window.convertPoint(toScreen: event.locationInWindow)
+        sourceDragVelocity.record(mouseLocation, at: event.timestamp)
         if let resizeStart {
             let frame = PinWindowResizeGeometry.resizedFrame(
                 resizeStart.frame,
@@ -1385,12 +1472,20 @@ final class PinImageView: NSImageView, ImageAnalysisOverlayViewDelegate {
 
     override func mouseUp(with event: NSEvent) {
         let didChangeGeometry = resizeStart != nil || dragStart?.hasActivated == true
+        let didMove = resizeStart == nil && dragStart?.hasActivated == true
+        if let window {
+            sourceDragVelocity.record(window.convertPoint(toScreen: event.locationInWindow), at: event.timestamp)
+        }
         dragStart = nil
         resizeStart = nil
         updatePointerChrome(at: convert(event.locationInWindow, from: nil))
         window?.invalidateCursorRects(for: self)
         if didChangeGeometry {
             pinController?.didFinishGeometryChange()
+            if !didMove { pinController?.onSourceGeometryChanged?() }
+        }
+        if didMove, let frame = window?.frame {
+            pinController?.onSourceDragEnded?(frame, sourceDragVelocity.velocity)
         }
     }
 
@@ -1574,6 +1669,16 @@ final class PinImageView: NSImageView, ImageAnalysisOverlayViewDelegate {
 
     private func buildMenu() -> NSMenu {
         let menu = NSMenu()
+        if let title = pinController?.returnToSourceTitle, pinController?.onReturnToSource != nil {
+            menu.addItem(withTitle: title, action: #selector(returnToSource), keyEquivalent: "")
+            menu.addItem(withTitle: L10n.text("magnetic.returnAll"), action: #selector(returnAllToSource), keyEquivalent: "")
+            if pinController?.onCenterSourceGroup != nil {
+                let center = menu.addItem(withTitle: L10n.text("magnetic.centerGroup"), action: #selector(centerSourceGroup), keyEquivalent: "")
+                center.isEnabled = pinController?.canCenterSourceGroup?() == true
+            }
+            menu.addItem(withTitle: L10n.text("magnetic.edit"), action: #selector(editSourceImage), keyEquivalent: "")
+            menu.addItem(.separator())
+        }
         menu.addItem(withTitle: L10n.text("pin.copy"), action: #selector(copyImage), keyEquivalent: "c")
         menu.addItem(withTitle: L10n.text("pin.save"), action: #selector(saveImage), keyEquivalent: "s")
         menu.addItem(withTitle: L10n.text("pin.metadata.edit"), action: #selector(editMetadata), keyEquivalent: "")
@@ -1603,6 +1708,17 @@ final class PinImageView: NSImageView, ImageAnalysisOverlayViewDelegate {
     }
 
     @objc private func copyImage() { pinController?.copyImage() }
+    @objc private func returnToSource() { pinController?.onReturnToSource?() }
+    @objc private func returnAllToSource() { pinController?.onReturnAllToSource?() }
+    @objc private func centerSourceGroup() { pinController?.onCenterSourceGroup?() }
+
+    override func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(centerSourceGroup) {
+            return pinController?.onCenterSourceGroup != nil && pinController?.canCenterSourceGroup?() == true
+        }
+        return super.validateMenuItem(menuItem)
+    }
+    @objc private func editSourceImage() { pinController?.onEditSourceImage?() }
     @objc private func saveImage() { pinController?.saveImage() }
     @objc private func editMetadata() { pinController?.requestMetadataEdit() }
     @objc private func zoomIn() { pinController?.scale(by: 1.1) }

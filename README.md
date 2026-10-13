@@ -57,6 +57,8 @@ Official releases are Developer ID signed and Apple notarized. Existing users ca
 
 To pin an image already on the clipboard, choose Paste Clipboard Image. Restore interaction for click-through pins from Pin Management in the menu bar.
 
+Enable **Magnetic Desktop** under Settings → Pin Workspaces to keep recent screenshots along the main screen's right edge. The fan holds 10 screenshots by default (configurable from 1 to 100), with up to 10 per group. The switcher appears only when the eligible fan count exceeds 10; screenshots in the photo box are excluded from fan groups and counts. The rail uses a shallow inward fan with image-first cards and corner timestamps. Hover to expand a preview, then click or drag a card out onto the desktop. Extracted images become regular pins with resizing, zoom, copy, save and workspace support. Automatic placement keeps multiple images apart, shrinking and rearranging them when space runs out. They use normal window levels and flip with light trails when pulled out or returned. Double-click a pin to return it to its original rail or photo box, throw it right to return with inertia, or choose **Return all desktop cards** to gather them together. Right-click to edit. The photo tray shares the app’s panel styling. Drag its header or photo surface to move it, and click to browse and retrieve screenshots; the photos give a small bounce when images arrive. The fold button on the box tucks the rail and box into an irregular slim edge handle; click the handle to unfold. After one minute without interaction with the rail or tray, both fold automatically while desktop pins stay in place. Scrolling the open photo box remains inside it, including at the document edges. The folded state is remembered across launches. This optional mode uses existing screenshot history, including its retention and app exclusion rules.
+
 Chrome webpage capture is optional. Choose store installation or a local download in the app's settings; see the [usage guide](docs/chrome-extension.md) for installation steps and limits.
 
 ### Privacy and local data
@@ -123,6 +125,8 @@ PinboardShot 是一款免费、开源的原生 macOS 截图与贴图工具。截
 4. 经常使用的动作可在「设置 → 快捷键」中绑定按键。**默认不启用全局快捷键**，由你选择需要的组合。
 
 剪贴板中已有图片时，选择「粘贴剪贴板图片」即可贴屏。鼠标穿透开启后，可从菜单栏「贴图管理」恢复交互。
+
+在「设置 → 贴图工作区」开启**磁力桌面**，可将最近截图吸附在主屏幕右侧。扇面默认容纳 10 张，可设置为 1–100 张，每组最多展示 10 张。扇面可浏览的图片超过 10 张时才出现切换器；截图盒中的图片不参与扇面分组和计数。磁吸区采用向左微弯的浅扇形，图片为主体，时间缩至角落。悬停可展开预览，点击或拖动卡片到桌面后，图片直接成为贴图，支持调整大小、缩放、复制、保存与工作区。多张图片会自动错开，空间不足时缩小重排，避免重叠。桌面贴图使用普通窗口层级，抽出与回吸带翻转流光。双击回到原来的磁吸区或截图盒，向右甩动也可回收，或点「收起全部桌面卡片」一键收回；右键可进入编辑。截图托盘沿用应用面板的样式，拖动标题区或图片区域可移动位置，点击可浏览和取图，图片进入时会轻弹抖动。盒上的折叠按钮可将卡片与盒子收成右侧错落的细线，点击细线展开；磁吸区／托盘闲置一分钟后会自动折叠，桌面贴图保持原位；展开截图盒后，底部和滚动边界的滚轮事件也留在盒内。折叠状态在重启后保留。此可选模式复用已有截图历史，仍遵循历史保留与应用排除规则。
 
 Chrome 网页长截图是可选功能，可在应用设置中选择商店安装或下载到本地；安装方法与限制见[使用说明](docs/chrome-extension.md)。
 

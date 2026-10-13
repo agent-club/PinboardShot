@@ -7,8 +7,8 @@ final class BrowserCaptureControlController: NSObject {
     private let panel = NSPanel(contentRect: CGRect(x: 0, y: 0, width: 400, height: 100),
                                 styleMask: [.titled, .nonactivatingPanel], backing: .buffered, defer: false)
     private let statusLabel = NSTextField(wrappingLabelWithString: "")
-    private let pauseButton = NSButton(title: "", target: nil, action: nil)
-    private let stopButton = NSButton(title: "", target: nil, action: nil)
+    private let pauseButton = ActionButton(title: "", target: nil, action: nil)
+    private let stopButton = ActionButton(title: "", target: nil, action: nil)
     private var timer: Timer?
     private var captureID: UUID?
     private var startedAt = Date.distantPast

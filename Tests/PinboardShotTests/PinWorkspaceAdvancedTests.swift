@@ -232,6 +232,26 @@ func advancedWorkspaceRecoveryLifecycle() throws {
     #expect(store.recoveryStorageBytes() == 0)
 }
 
+@Test("恢复快照保留磁吸来源并兼容没有来源字段的旧文件")
+@MainActor
+func advancedWorkspaceRecoveryMagneticCompatibility() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent("PinWorkspaceMagnetic-\(UUID())", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let store = PinWorkspaceStore(rootDirectory: root)
+    let source = MagneticPinSource(historyItemID: UUID(), home: .box)
+    try store.saveRecoverySession(captures: [PinSessionCapture(id: UUID(), image: advancedWorkspaceImage(),
+        state: advancedWorkspaceState, magneticSource: source)], pinsAreVisible: true)
+    #expect(store.loadRecoverySession()?.entries.first?.magneticSource == source)
+    let manifest = root.appendingPathComponent(".session-recovery/current.json")
+    var json = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: manifest)) as? [String: Any])
+    var records = try #require(json["pins"] as? [[String: Any]])
+    records[0].removeValue(forKey: "magneticSource")
+    json["pins"] = records
+    try JSONSerialization.data(withJSONObject: json).write(to: manifest)
+    let legacy = try #require(store.loadRecoverySession())
+    #expect(legacy.entries.count == 1 && legacy.entries[0].magneticSource == nil)
+}
+
 @Test("工作区和恢复读取拒绝符号链接")
 @MainActor
 func advancedWorkspaceRejectsSymbolicLinks() throws {

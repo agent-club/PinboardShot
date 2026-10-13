@@ -177,6 +177,42 @@ struct ScrollCapturePrecisionTests {
         #expect(try pixels(stitched) == pixels(expected))
     }
 
+    @Test("Throttled previews flush the final appended frame when scrolling becomes idle")
+    func previewFlushesAtIdle() async throws {
+        let source = try document(width: 240, height: 1_200)
+        let progress = PreviewProgress()
+        let pipeline = ScrollCaptureFramePipeline(onProgress: { progress.append($0) })
+        defer { pipeline.cancel() }
+        for offset in [0, 40, 80] {
+            let frame = try #require(source.cropping(to: CGRect(x: 0, y: offset, width: 240, height: 600)))
+            #expect(pipeline.submit(frame))
+        }
+        let context = try #require(CGContext(data: nil, width: 240, height: 600,
+            bitsPerComponent: 8, bytesPerRow: 960, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.setFillColor(gray: 1, alpha: 1)
+        context.fill(CGRect(x: 0, y: 0, width: 240, height: 600))
+        // One transient mismatch must not bypass the existing five-frame warning threshold.
+        #expect(pipeline.submit(try #require(context.makeImage())))
+        // Idle/duplicate frames must not be required to deliver the last preview.
+        let final = try #require(pipeline.finalImage())
+        #expect(final.height == 680)
+        try await Task.sleep(for: .milliseconds(250))
+        let last = try #require(progress.last)
+        #expect(last.result != .unmatched)
+        #expect(last.pixelHeight == final.height)
+        let preview = try #require(last.previewImage)
+        #expect(preview.height == final.height)
+        #expect(try pixels(preview) == pixels(final))
+    }
+
+    private final class PreviewProgress: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value: ScrollCaptureProgress?
+        func append(_ progress: ScrollCaptureProgress) { lock.withLock { value = progress } }
+        var last: ScrollCaptureProgress? { lock.withLock { value } }
+    }
+
     @Test("Animation in one content band does not invent scrolling")
     func stationaryAnimation() throws {
         let source = try document(width: 600, height: 1_200)

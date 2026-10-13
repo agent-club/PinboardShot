@@ -70,10 +70,13 @@ final class CaptureResultOverlayController {
 
         let screen = NSScreen.screens.first(where: { $0.frame.contains(NSEvent.mouseLocation) }) ?? NSScreen.main
         if let visibleFrame = screen?.visibleFrame {
+            let magneticSettings = MagneticDesktopSettings()
+            let magneticBoxInset: CGFloat = magneticSettings.isEnabled && !magneticSettings.isCollapsed && HistorySettings.isEnabled()
+                && screen === NSScreen.screens.first ? MagneticDesktopGeometry.boxSize.height + 20 : 0
             panel.setFrameOrigin(
                 CGPoint(
                     x: visibleFrame.maxX - panel.frame.width - 20,
-                    y: visibleFrame.minY + 20
+                    y: min(visibleFrame.maxY - panel.frame.height, visibleFrame.minY + 20 + magneticBoxInset)
                 )
             )
         }
@@ -118,14 +121,14 @@ private struct QuickCaptureOverlayView: View {
                         .font(.headline)
                     Spacer()
                     if let tools = actions.tools {
-                        Button(action: tools) { Image(systemName: "ellipsis.circle") }
+                        Button(action: tools) { Image(systemName: "ellipsis.circle") }.clickCursor()
                             .buttonStyle(.plain)
                             .help(L10n.text("feature.tools.title"))
                             .accessibilityLabel(L10n.text("feature.tools.title"))
                     }
                     Button(action: actions.dismiss) {
                         Image(systemName: "xmark")
-                    }
+                    }.clickCursor()
                     .buttonStyle(.plain)
                     .help(L10n.text("common.close"))
                 }
@@ -154,7 +157,7 @@ private struct QuickCaptureOverlayView: View {
         Button(action: action) {
             Image(systemName: symbol)
                 .frame(width: 30, height: 26)
-        }
+        }.clickCursor()
         .buttonStyle(.bordered)
         .help(L10n.text(titleKey))
         .accessibilityLabel(L10n.text(titleKey))

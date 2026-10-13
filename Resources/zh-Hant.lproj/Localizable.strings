@@ -37,7 +37,7 @@
 "tray.manageAndTools" = "管理與工具";
 "quality.native" = "原生 Retina";
 "menu.capture" = "截圖";
-"menu.quickSettings" = "常用設定";
+"menu.quickSettings" = "快捷設定";
 "menu.manageSettings" = "管理快速鍵、記錄與浮水印…";
 "menu.management" = "管理";
 "menu.more" = "更多";
@@ -116,6 +116,12 @@
 "legalNotices.missingTitle" = "找不到授權與聲明檔案";
 "legalNotices.missingMessage" = "請重新安裝最新版本的 PinboardShot，或前往 GitHub 倉庫查看 LICENSE 和 NOTICE。";
 "annotation.title" = "圖片標註";
+"annotation.zoom.in" = "放大（⌘+）";
+"annotation.zoom.out" = "縮小（⌘−）";
+"annotation.zoom.fit" = "適應視窗";
+"annotation.zoom.fitHelp" = "適應視窗（⌘0）";
+"annotation.zoom.actualHelp" = "100% 顯示（⌘1）";
+"annotation.zoom.navigationHelp" = "捏合縮放；⌘+滾輪縮放；捲動或按住空白鍵拖曳平移";
 "annotation.tool.mosaic" = "馬賽克";
 "annotation.tool.pen" = "畫筆";
 "annotation.tool.rectangle" = "矩形";
@@ -241,6 +247,8 @@
 "preferences.outputQuality" = "輸出清晰度";
 "preferences.includeCursor" = "全螢幕與區域截圖包含滑鼠游標";
 "preferences.captureAnimation" = "截圖開始時顯示輕量動畫";
+"preferences.captureSelectionAlwaysOnTop" = "截圖選區置頂";
+"preferences.captureSelectionAlwaysOnTopHelp" = "讓截圖選區顯示在其他應用程式的彈出視窗和選單上方；關閉後使用一般浮動層級。";
 "preferences.quickCaptureOverlay" = "顯示截圖後快速操作";
 "preferences.quickCaptureOverlayHelp" = "截圖完成後短暫顯示預覽，可複製、儲存、標註、貼到螢幕或拖到其他 App。";
 "common.close" = "關閉";
@@ -660,13 +668,13 @@
 "scrollCapture.auto.permission" = "自動捲動需要輔助使用權限。請在系統設定 → 隱私權與安全性 → 輔助使用中授權 PinboardShot，再重新開始長截圖。";
 
 "browserExtension.title" = "Chrome 網頁長截圖";
-"browserExtension.help" = "網頁由 Chrome 插件按實際捲動座標截取，並在本機回傳編輯。插件需在 Chrome 中由你啟用。";
-"browserExtension.prepare" = "一鍵下載 Chrome 插件";
+"browserExtension.help" = "可下載內建插件到本機，也可從 Chrome 商店安裝。安裝並啟用後，PinboardShot 會自動連線。";
+"browserExtension.prepare" = "連接本機應用程式";
 "browserExtension.setupTitle" = "請先安裝 Chrome 長截圖插件";
-"browserExtension.setupHelp" = "Chrome 網頁長截圖需要插件。點擊「一鍵下載插件」，檔案會儲存到「下載」目錄。請在 Chrome 安裝並啟用插件，安裝完成後重新開始長截圖。若你已經安裝並啟用了插件，可確認後開始截圖。";
-"browserExtension.connect" = "一鍵下載插件";
-"browserExtension.readyTitle" = "插件已放入下載資料夾";
-"browserExtension.readyHelp" = "插件已下載，路徑已複製：\n%@\n\n在 Chrome 開啟 chrome://extensions，開啟開發者模式，點擊「載入未封裝項目」。從「下載」選擇此 PinboardShot-Chrome 資料夾；也可以按 ⌘⇧G 貼上已複製的路徑。請保留這個資料夾，Chrome 會從中執行插件。\n\n安裝並啟用插件後，請回到目標網頁，再次開始長截圖，並確認「已安裝，開始截圖」。";
+"browserExtension.setupHelp" = "請從 Chrome 線上應用程式商店安裝並啟用 PinboardShot Browser Capture。點擊「安裝 Chrome 插件」會連接本機應用程式並開啟商店。安裝完成後，回到目標網頁重新開始長截圖。若已安裝商店版插件，可點擊「已安裝，開始截圖」。舊開發版使用者請先在 Chrome 中移除開發版，再安裝商店版。";
+"browserExtension.connect" = "連接本機應用程式";
+"browserExtension.readyTitle" = "本機連接已就緒";
+"browserExtension.readyHelp" = "本機通道已允許商店安裝與本機安裝的插件連線。請開啟 Chrome 插件面板自動偵測連線，再透過插件按鈕或 ⌘⇧Y 開始截圖。";
 "browserExtension.importFailed" = "無法匯入網頁長截圖。頁面尺寸發生變化、圖片不完整或超出尺寸上限，請重新截圖。";
 
 "browserExtension.start" = "啟動 Chrome 網頁長截圖";
@@ -682,6 +690,63 @@
 "scrollCapture.paused" = "截圖已暫停";
 "scrollCapture.stopping" = "正在停止並儲存截圖…";
 "browserExtension.controlWaiting" = "正在等待 Chrome 截圖擴充功能…";
-"browserExtension.controlUnavailable" = "無法連接 Chrome 截圖插件。請確認插件已安裝並啟用；更新插件後需重新載入。完成後請重新開始長截圖。";
+"browserExtension.controlUnavailable" = "無法連接 Chrome 截圖插件。請開啟插件面板檢查本機連線，確認插件已啟用且快捷鍵為 ⌘⇧Y，再重試。";
 
 "browserExtension.installedStart" = "已安裝，開始截圖";
+"browserExtension.install" = "安裝 Chrome 插件";
+
+"browserExtension.connected" = "已偵測到 Chrome 插件連線";
+
+"browserExtension.notDetected" = "尚未偵測到近期連線。請開啟 Chrome 插件面板，系統會自動重試偵測。";
+
+
+"browserExtension.downloadLocal" = "下載到本機";
+
+"browserExtension.installFromStore" = "從 Chrome 商店安裝";
+
+"browserExtension.localHelp" = "無法存取商店時可使用本機方式：在 Chrome 擴充功能管理頁開啟開發人員模式，載入下載的資料夾。本機插件隨 App 更新，請保留載入的資料夾。";
+
+"browserExtension.localReadyTitle" = "本機插件已下載";
+
+"browserExtension.localReadyHelp" = "插件資料夾已儲存至「下載」並在 Finder 中選取。請在 Chrome 開啟 chrome://extensions，開啟「開發人員模式」，點擊「載入未封裝項目」，選擇該資料夾。載入後即可自動連線；無需存取商店。請保留該資料夾，App 更新後可再次下載並重新載入新版插件。";
+
+/* Magnetic Desktop */
+"magnetic.enabled" = "啟用磁力桌面";
+"magnetic.maximum" = "扇面容量 %d 張";
+"magnetic.maximumLabel" = "扇面容量";
+"magnetic.maximumCount" = "%d 張";
+"magnetic.help" = "最近截圖吸在主螢幕邊緣。扇面容量超過 10 張時分組切換，超出容量的圖片留在截圖盒；點擊截圖盒可分頁瀏覽全部截圖。截圖歷史的保留與排除規則仍然適用，關閉此模式不會刪除圖片。";
+"magnetic.needsHistory" = "請在「截圖歷史」中開啟儲存歷史，磁力桌面才會顯示截圖。";
+"magnetic.card" = "截圖：%d × %d，點擊抽出或拖曳";
+"magnetic.cardHelp" = "懸停預覽，拖到桌面成為貼圖。雙擊或向右甩動回到來源位置，也可一鍵收起全部貼圖。";
+"magnetic.extract" = "抽出截圖";
+"magnetic.return" = "吸回桌邊";
+"magnetic.openPin" = "開啟為一般貼圖";
+"magnetic.box" = "截圖盒";
+"magnetic.boxCount" = "截圖盒 · %d 張";
+"magnetic.boxHelp" = "拖動托盤移動位置，點擊瀏覽全部截圖。選中後在扇面定位，再點擊或拖到桌面成為貼圖。";
+"magnetic.browseBox" = "瀏覽";
+"magnetic.emptyBox" = "盒子還是空的";
+"magnetic.edit" = "編輯";
+"magnetic.collapse" = "摺疊磁力桌面與截圖盒";
+"magnetic.expandCount" = "展開磁力桌面 · %d 張截圖";
+
+"magnetic.centerGroup" = "整組置中";
+"magnetic.returnAll" = "收起全部桌面卡片";
+"magnetic.returnBox" = "放回截圖盒";
+"magnetic.returnHelp" = "雙擊貼圖回到來源位置；右鍵可編輯或收起全部。";
+
+"preferences.menuDisplay" = "選單顯示";
+
+"preferences.menuDisplayHelp" = "選擇在選單列下拉面板中直接顯示的設定。隱藏設定不會變更其功能設定。";
+
+"tray.section.magneticDesktop" = "磁力桌面";
+
+"magnetic.previousGroup" = "上一組";
+"magnetic.nextGroup" = "下一組";
+"magnetic.pageRange" = "%d–%d / %d";
+"magnetic.collectionTitle" = "全部截圖 · %d 張";
+"magnetic.previousPage" = "上一頁";
+"magnetic.nextPage" = "下一頁";
+"magnetic.collectionPage" = "%d / %d";
+"magnetic.locate" = "在扇面中定位";

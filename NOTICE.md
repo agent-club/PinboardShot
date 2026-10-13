@@ -19,6 +19,7 @@ This statement covers the current public website imagery, including `website/pub
 PinboardShot uses third-party open-source software and platform SDKs. Important public dependencies include:
 
 - Sparkle, used for macOS software update delivery, licensed under the MIT License by the Sparkle project contributors.
+- Phosphor Icons 2.1.1, used for Chrome capture controls, licensed under the MIT License. The bundled license is at `browser-extension/icons/Phosphor-LICENSE.txt`; source: https://github.com/phosphor-icons/core.
 - Next.js, React, Vite, Cloudflare tooling, Tailwind CSS, and related website build dependencies, each governed by its own package license.
 - Apple platform SDKs and macOS system frameworks, governed by Apple's applicable developer terms.
 

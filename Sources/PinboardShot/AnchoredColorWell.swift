@@ -3,6 +3,15 @@ import AppKit
 final class AnchoredColorWell: NSColorWell {
     private static let fallbackPanelSize = CGSize(width: 260, height: 320)
 
+    override var isEnabled: Bool {
+        didSet { window?.invalidateCursorRects(for: self) }
+    }
+
+    override func resetCursorRects() {
+        super.resetCursorRects()
+        addCursorRect(bounds, cursor: isEnabled ? .pointingHand : .arrow)
+    }
+
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
     }
