@@ -175,6 +175,15 @@ struct PinWorkspaceRestoreEntry {
     let image: NSImage
     let state: PinWorkspaceWindowState
     let metadata: PinMetadata
+    let magneticSource: MagneticPinSource?
+
+    init(image: NSImage, state: PinWorkspaceWindowState, metadata: PinMetadata,
+         magneticSource: MagneticPinSource? = nil) {
+        self.image = image
+        self.state = state
+        self.metadata = metadata
+        self.magneticSource = magneticSource
+    }
 }
 
 struct PinWorkspaceLoadResult {
@@ -217,12 +226,15 @@ struct PinSessionCapture {
     let image: NSImage
     let state: PinWorkspaceWindowState
     let metadata: PinMetadata
+    let magneticSource: MagneticPinSource?
 
-    init(id: UUID, image: NSImage, state: PinWorkspaceWindowState, metadata: PinMetadata = .empty) {
+    init(id: UUID, image: NSImage, state: PinWorkspaceWindowState, metadata: PinMetadata = .empty,
+         magneticSource: MagneticPinSource? = nil) {
         self.id = id
         self.image = image
         self.state = state
         self.metadata = metadata
+        self.magneticSource = magneticSource
     }
 }
 
@@ -380,14 +392,17 @@ private struct PinSessionRecoveryRecord: Codable {
     let imageFilename: String
     let state: PinWorkspaceWindowState
     let metadata: PinMetadata
+    let magneticSource: MagneticPinSource?
 
-    private enum CodingKeys: String, CodingKey { case id, imageFilename, state, metadata }
+    private enum CodingKeys: String, CodingKey { case id, imageFilename, state, metadata, magneticSource }
 
-    init(id: UUID, imageFilename: String, state: PinWorkspaceWindowState, metadata: PinMetadata) {
+    init(id: UUID, imageFilename: String, state: PinWorkspaceWindowState, metadata: PinMetadata,
+         magneticSource: MagneticPinSource?) {
         self.id = id
         self.imageFilename = imageFilename
         self.state = state
         self.metadata = metadata
+        self.magneticSource = magneticSource
     }
 
     init(from decoder: Decoder) throws {
@@ -396,6 +411,8 @@ private struct PinSessionRecoveryRecord: Codable {
         imageFilename = try container.decode(String.self, forKey: .imageFilename)
         state = try container.decode(PinWorkspaceWindowState.self, forKey: .state)
         metadata = (try? container.decode(PinMetadata.self, forKey: .metadata)) ?? .empty
+        // Older recovery snapshots contain only ordinary pins and have no source association.
+        magneticSource = try container.decodeIfPresent(MagneticPinSource.self, forKey: .magneticSource)
     }
 }
 
@@ -729,7 +746,8 @@ final class PinWorkspaceStore: ObservableObject {
                 id: capture.id,
                 imageFilename: filename,
                 state: capture.state,
-                metadata: capture.metadata
+                metadata: capture.metadata,
+                magneticSource: capture.magneticSource
             )
             records.append(record)
             preparedAssets.append((data, imageURL, needsWrite))
@@ -811,7 +829,8 @@ final class PinWorkspaceStore: ObservableObject {
             entries.append(PinWorkspaceRestoreEntry(
                 image: image,
                 state: record.state,
-                metadata: record.metadata
+                metadata: record.metadata,
+                magneticSource: record.magneticSource
             ))
         }
         guard !entries.isEmpty else {

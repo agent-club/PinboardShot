@@ -160,6 +160,7 @@ test("server-renders the PinboardShot download page", async () => {
   assert.ok(html.includes(currentRelease.version));
   assert.match(html, /Remote OCR is your choice|远程 OCR 由你决定/);
   assert.match(html, /href="\/privacy"/i);
+  assert.match(html, /href="\/chrome-extension"/i);
   assert.match(html, /自有照片与界面示意素材|owned photos and interface mockups/i);
   assert.match(html, /Apple Inc\./i);
   assert.match(html, /application\/ld\+json/i);
@@ -186,7 +187,7 @@ test("server-renders the PinboardShot download page", async () => {
 });
 
 test("restores an analytics opt-out before loading Google tag on every page", async () => {
-  for (const path of ["/", "/zh", "/en", "/privacy", ...contentPages.map((page) => page.path)]) {
+  for (const path of ["/", "/zh", "/en", "/privacy", "/chrome-extension", ...contentPages.map((page) => page.path)]) {
     const response = await render(path);
     assert.equal(response.status, 200);
     const html = await response.text();
@@ -334,8 +335,15 @@ test("server-renders the privacy policy", async () => {
   assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/privacy"/i);
   assert.match(html, /property="og:url" content="https:\/\/pinboardshot\.agentclub\.dev\/privacy"/i);
   assert.match(html, /property="og:locale" content="en_US"/i);
-  assert.match(html, /Last updated:<\/strong>\s*(?:<!-- -->)?August 23, 2026/i);
-  assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 8 月 23 日/i);
+  assert.match(html, /Last updated:<\/strong>\s*(?:<!-- -->)?October 1, 2026/i);
+  assert.match(html, /最后更新：<\/strong>\s*(?:<!-- -->)?2026 年 10 月 1 日/i);
+  assert.match(html, /every minute/i);
+  assert.match(html, /every five seconds/i);
+  assert.match(html, /不会读取网页或截图/);
+  assert.match(html, /Chrome Native Messaging/i);
+  assert.match(html, /Limited Use requirements/i);
+  assert.match(html, /Chrome 扩展说明/i);
+  assert.match(html, /href="\/chrome-extension"/i);
   assert.match(html, /does not include analytics or advertising SDKs/i);
   assert.match(html, /remote OCR plugin/i);
   assert.match(html, /API Keys are stored in macOS Keychain/i);
@@ -343,6 +351,30 @@ test("server-renders the privacy policy", async () => {
   assert.match(html, /Analytics storage is enabled by default/i);
   assert.match(html, /do not\s+(?:<!-- -->)?enable ad personalization/i);
   assert.match(html, /owned photos and interface mockups/i);
+});
+
+test("serves a bilingual Chrome extension guide with a privacy policy link", async () => {
+  const response = await render("/chrome-extension");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /<title>PinboardShot Browser Capture — Chrome Extension for Long Web Pages<\/title>/i);
+  assert.match(html, /rel="canonical" href="https:\/\/pinboardshot\.agentclub\.dev\/chrome-extension"/i);
+  assert.match(html, /PinboardShot Browser Capture/);
+  assert.match(html, /Choose an installation method/);
+  assert.match(html, /选择安装方式/);
+  assert.match(html, /Download locally/);
+  assert.match(html, /下载到本地/);
+  assert.match(html, /Load unpacked/);
+  assert.match(html, /加载已解压的扩展程序/);
+  assert.match(html, /version 0\.2\.2 is available now/i);
+  assert.match(html, /update is awaiting review/i);
+  assert.match(html, /本地内置的 0\.2\.2 版本现在即可使用/);
+  assert.match(html, /仍在等待审核/);
+  assert.match(html, /href="https:\/\/chromewebstore\.google\.com\/detail\/pinboardshot-browser-capt\/kjpleeeibdicdoljjhoahhnkggncglac"/);
+  assert.match(html, /Connect local app/);
+  assert.match(html, /连接本机应用/);
+  assert.match(html, /Native Messaging/);
+  assert.match(html, /href="\/privacy"/i);
 });
 
 test("serves robots and sitemap for search crawlers", async () => {
@@ -365,6 +397,9 @@ test("serves robots and sitemap for search crawlers", async () => {
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/zh<\/loc>/i);
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/en<\/loc>/i);
   assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/privacy<\/loc>/i);
+  assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/chrome-extension<\/loc>/i);
+  assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/privacy<\/loc>\s*<lastmod>2026-10-01<\/lastmod>/i);
+  assert.match(sitemapXml, /<loc>https:\/\/pinboardshot\.agentclub\.dev\/chrome-extension<\/loc>\s*<lastmod>2026-10-01<\/lastmod>/i);
   for (const page of contentPages) {
     const matches = sitemapXml.match(new RegExp(`<loc>https:\/\/pinboardshot\\.agentclub\\.dev${page.path}<\\/loc>`, "gi")) ?? [];
     assert.equal(matches.length, 1, `${page.path} should appear in the sitemap exactly once`);

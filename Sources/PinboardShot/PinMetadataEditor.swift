@@ -143,10 +143,10 @@ private struct PinMetadataEditorView: View {
 
             HStack {
                 Spacer()
-                Button(L10n.text("common.cancel"), action: cancel)
+                Button(L10n.text("common.cancel"), action: cancel).clickCursor()
                     .keyboardShortcut(.cancelAction)
                     .accessibilityLabel(L10n.text("common.cancel"))
-                Button(L10n.text("common.save"), action: saveChanges)
+                Button(L10n.text("common.save"), action: saveChanges).clickCursor()
                     .keyboardShortcut(.defaultAction)
                     .accessibilityLabel(L10n.text("common.save"))
             }

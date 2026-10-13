@@ -6,13 +6,19 @@ const settle = () => new Promise(resolve => setTimeout(resolve, 0));
 function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false, finishOpenFailed = false,
   windowFocused = true, supportsCaptureControl = true, pauseAfterFirstTile = false,
   pauseBeforeSecondTile = false, documentHeight = 1500, viewportHeight = 500,
-  hideTabURL = false, hangVisibleCapture = false, hangMetrics = false } = {}) {
+  hideTabURL = false, hangVisibleCapture = false, hangMetrics = false, nativeAvailable = true,
+  innerPane = false, moveCropAfterFirstImage = false, downloadsMode = "complete", disconnectAt = null } = {}) {
   const runtimeMessages = [];
   const nativeRequests = [];
   const contentRequests = [];
   const openedPanels = [];
-  const listeners = { runtime: [], commands: [], action: [] };
+  const listeners = { runtime: [], commands: [], action: [], alarms: [], startup: [], installed: [] };
   const native = { message: [], disconnect: [] };
+  const downloadListeners = new Set();
+  const downloadRequests = [];
+  const downloadSearches = [];
+  const cancelledDownloads = [];
+  const downloadEvents = [];
   let scrollY = 0;
   let active = true;
   let imageCount = 0;
@@ -23,7 +29,11 @@ function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false
   let pauseRequested = false;
   let tabId = 40;
   let windowId = 7;
-  const page = { viewportWidth: 800, viewportHeight, documentHeight, devicePixelRatio: 1 };
+  let nextDownloadId = 91;
+  let nativeDisconnected = false;
+  const page = { viewportWidth: 800, viewportHeight, documentHeight, devicePixelRatio: 1,
+    ...(innerPane ? { browserViewportWidth: 1200, browserViewportHeight: 800,
+      captureRect: { x: 40, y: 60, width: 800, height: viewportHeight } } : {}) };
   const chrome = {
     runtime: {
       id: "extension-id",
@@ -31,7 +41,10 @@ function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false
       id: "extension-id",
       getURL: path => `chrome-extension://extension-id/${path}`,
       onMessage: { addListener: fn => listeners.runtime.push(fn) },
+      onStartup: { addListener: fn => listeners.startup.push(fn) },
+      onInstalled: { addListener: fn => listeners.installed.push(fn) },
       sendMessage: async message => { runtimeMessages.push(message); return {}; },
+      getPlatformInfo: async () => ({ os: "mac", arch: "arm" }),
       connectNative: host => {
         assert.equal(host, "com.ryanwang.pinboardshot.browser_capture");
         const port = {
@@ -39,6 +52,26 @@ function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false
           onDisconnect: { addListener: fn => native.disconnect.push(fn) },
           postMessage: message => {
             nativeRequests.push(message);
+            if (!nativeAvailable) return;
+            if (nativeDisconnected) return;
+            const disconnect = () => {
+              if (nativeDisconnected) return;
+              nativeDisconnected = true;
+              chrome.runtime.lastError = { message: "native_disconnected" };
+              for (const callback of native.disconnect) callback();
+              chrome.runtime.lastError = null;
+            };
+            if (disconnectAt === "afterBegin" && message.command === "begin") {
+              queueMicrotask(() => {
+                for (const callback of native.message) callback({ requestId: message.requestId, ok: true, captureId: "capture-test" });
+                disconnect();
+              });
+              return;
+            }
+            if (disconnectAt === "tileChunk" && message.command === "tileChunk") {
+              queueMicrotask(disconnect);
+              return;
+            }
             queueMicrotask(() => {
               if (message.command === "tileEnd" && message.index === 0 && pauseAfterFirstTile) controlPaused = true;
               if (message.command === "setControl") {
@@ -55,10 +88,20 @@ function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false
           },
           disconnect: () => {}
         };
+        if (!nativeAvailable) queueMicrotask(() => {
+          chrome.runtime.lastError = { message: "Specified native messaging host not found." };
+          for (const callback of native.disconnect) callback();
+          chrome.runtime.lastError = null;
+        });
         return port;
       }
     },
     action: { onClicked: { addListener: fn => listeners.action.push(fn) } },
+    alarms: {
+      get: async () => null,
+      create: async (name, options) => { assert.equal(name, "pinboardshot.connection"); assert.equal(options.periodInMinutes, 1); },
+      onAlarm: { addListener: fn => listeners.alarms.push(fn) }
+    },
     sidePanel: { open: async options => { openedPanels.push(options); } },
     commands: { onCommand: { addListener: fn => listeners.commands.push(fn) } },
     windows: { getLastFocused: async () => ({ id: windowId, focused: active && windowFocused, tabs: [{ id: tabId, windowId, active }] }) },
@@ -72,6 +115,7 @@ function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false
         const image = `data:image/png;base64,${"A".repeat(100)}`;
         if (switchAfterFirstImage && imageCount === 1) active = false;
         if (moveAfterFirstImage && imageCount === 1) scrollY += 17;
+        if (moveCropAfterFirstImage && imageCount === 1) page.captureRect = { ...page.captureRect, x: 57 };
         return image;
       },
       sendMessage: async (id, message) => {
@@ -94,9 +138,35 @@ function makeChrome({ switchAfterFirstImage = false, moveAfterFirstImage = false
         throw new Error(`Unexpected content message: ${message.type}`);
       }
     },
-    scripting: { executeScript: async () => { injected = true; return []; } }
+    scripting: { executeScript: async () => { injected = true; return []; } },
+    downloads: {
+      onChanged: {
+        addListener: listener => downloadListeners.add(listener),
+        removeListener: listener => downloadListeners.delete(listener)
+      },
+      download: async ({ filename, saveAs, conflictAction }) => {
+        const id = nextDownloadId++;
+        downloadRequests.push({ id, filename, saveAs, conflictAction, restoredAtStart: restored });
+        downloadEvents.push("download");
+        setTimeout(() => {
+          const delta = downloadsMode === "error"
+            ? { id, state: { current: "interrupted" }, error: { current: "FILE_FAILED" } }
+            : { id, state: { current: "complete" } };
+          for (const listener of downloadListeners) listener(delta);
+          downloadEvents.push(delta.state.current);
+        }, 40);
+        return id;
+      },
+      search: async query => {
+        downloadSearches.push({ ...query });
+        return [{ id: query.id, state: "in_progress" }];
+      },
+      cancel: async id => { cancelledDownloads.push(id); }
+    }
   };
   return { chrome, listeners, runtimeMessages, nativeRequests, openedPanels,
+    downloadRequests, downloadSearches, cancelledDownloads, downloadEvents,
+    setNativeAvailable(value) { nativeAvailable = value; },
     setPaused(value) { controlPaused = value; }, setStopped(value) { controlStopped = value; },
     setPageScroll(value) { scrollY = value; },
     inspect: () => ({ scrollY, active, imageCount, restored, injected, contentRequests: [...contentRequests] }) };
@@ -110,14 +180,119 @@ const waitUntil = async (predicate, limit = 12000) => {
   }
   return false;
 };
-const startCapture = mock => new Promise(resolve => mock.listeners.runtime[0](
-  { channel: "pinboardshot.capture", type: "start" }, popupSender, resolve));
+const startCapture = (mock, options = {}) => new Promise(resolve => mock.listeners.runtime[0](
+  { channel: "pinboardshot.capture", type: "start", ...options }, popupSender, resolve));
+
+async function withBrowserImageMocks(innerPane, callback) {
+  const original = new Map(["createImageBitmap", "OffscreenCanvas"].map(key => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
+  const draws = [];
+  globalThis.createImageBitmap = async blob => ({
+    width: blob.size === 3 || !innerPane ? 800 : 1200,
+    height: blob.size === 3 || !innerPane ? 500 : 800,
+    close() {}
+  });
+  globalThis.OffscreenCanvas = class {
+    constructor(width, height) { this.width = width; this.height = height; }
+    getContext() { return { drawImage: (...args) => draws.push(args.slice(1)) }; }
+    async convertToBlob() { return new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }); }
+  };
+  try { return await callback(draws); }
+  finally {
+    for (const [key, descriptor] of original) {
+      if (descriptor) Object.defineProperty(globalThis, key, descriptor);
+      else delete globalThis[key];
+    }
+  }
+}
 
 async function loadBackground(mock) {
   globalThis.chrome = mock.chrome;
   const url = new URL(`../background.js?test=${Math.random()}`, import.meta.url);
   await import(url.href);
 }
+
+test("connection detection handshakes without requesting tabs or starting a capture", async () => {
+  const mock = makeChrome();
+  await loadBackground(mock);
+  const reply = await new Promise(resolve => mock.listeners.runtime[0](
+    { channel: "pinboardshot.capture", type: "connectionRequest" }, popupSender, resolve));
+  assert.equal(reply.connection.status, "connected");
+  assert.deepEqual(mock.nativeRequests.map(request => request.command), ["hello"]);
+  assert.equal(mock.inspect().imageCount, 0);
+  assert.equal(mock.inspect().injected, false);
+});
+
+test("inner-pane images are cropped before Native Messaging receives their tiles", async () => {
+  const original = { createImageBitmap: globalThis.createImageBitmap, OffscreenCanvas: globalThis.OffscreenCanvas };
+  const drawn = [];
+  let closed = 0;
+  globalThis.createImageBitmap = async () => ({ width: 1200, height: 800, close() { closed++; } });
+  globalThis.OffscreenCanvas = class {
+    constructor(width, height) { assert.equal(width, 800); assert.equal(height, 500); }
+    getContext() { return { drawImage: (...args) => drawn.push(args.slice(1)) }; }
+    async convertToBlob() { return new Blob([new Uint8Array([1, 2, 3])], { type: "image/png" }); }
+  };
+  try {
+    const mock = makeChrome({ innerPane: true });
+    await loadBackground(mock);
+    await startCapture(mock);
+    assert.ok(await waitUntil(() => mock.runtimeMessages.some(m => m.state?.status === "complete")));
+    const tiles = mock.nativeRequests.filter(r => r.command === "tileBegin");
+    assert.equal(tiles.length, 4);
+    assert.ok(tiles.every(t => t.viewportWidth === 800 && t.viewportHeight === 500));
+    assert.ok(drawn.every(rect => JSON.stringify(rect) === JSON.stringify([40, 60, 800, 500, 0, 0, 800, 500])));
+    assert.equal(closed, 4);
+    assert.ok(mock.nativeRequests.filter(r => r.command === "tileChunk").every(r => r.data === "AQID"));
+  } finally { Object.assign(globalThis, original); }
+});
+
+test("movement of an inner pane during screenshot capture cancels the session", async () => {
+  const original = { createImageBitmap: globalThis.createImageBitmap, OffscreenCanvas: globalThis.OffscreenCanvas };
+  globalThis.createImageBitmap = async () => ({ width: 1200, height: 800, close() {} });
+  globalThis.OffscreenCanvas = class {
+    getContext() { return { drawImage() {} }; }
+    async convertToBlob() { return new Blob([new Uint8Array([1, 2, 3])]); }
+  };
+  try {
+    const mock = makeChrome({ innerPane: true, moveCropAfterFirstImage: true });
+    await loadBackground(mock);
+    await startCapture(mock);
+    assert.ok(await waitUntil(() => mock.runtimeMessages.some(m => m.state?.error === "capture_position_changed")));
+    assert.ok(mock.nativeRequests.some(r => r.command === "cancel"));
+    assert.equal(mock.nativeRequests.filter(r => r.command === "tileBegin").length, 0);
+    assert.equal(mock.inspect().restored, true);
+  } finally { Object.assign(globalThis, original); }
+});
+
+test("background alarm and installation automatically check the local app", async () => {
+  const mock = makeChrome();
+  await loadBackground(mock);
+  mock.listeners.installed[0]();
+  assert.ok(await waitUntil(() => mock.runtimeMessages.some(message => message.type === "connection")));
+  mock.listeners.alarms[0]({ name: "pinboardshot.connection" });
+  assert.ok(await waitUntil(() => mock.nativeRequests.length === 2));
+  assert.ok(mock.nativeRequests.every(request => request.command === "hello"));
+});
+
+test("connection detection reports incompatible native protocols", async () => {
+  const mock = makeChrome({ supportsCaptureControl: false });
+  await loadBackground(mock);
+  const reply = await new Promise(resolve => mock.listeners.runtime[0](
+    { channel: "pinboardshot.capture", type: "connectionRequest" }, popupSender, resolve));
+  assert.equal(reply.connection.status, "unsupported");
+  assert.equal(mock.inspect().injected, false);
+});
+
+test("a missing native host is detected and the next check recovers after registration", async () => {
+  const mock = makeChrome({ nativeAvailable: false });
+  await loadBackground(mock);
+  const check = () => new Promise(resolve => mock.listeners.runtime[0](
+    { channel: "pinboardshot.capture", type: "connectionRequest" }, popupSender, resolve));
+  assert.equal((await check()).connection.status, "disconnected");
+  mock.setNativeAvailable(true);
+  assert.equal((await check()).connection.status, "connected");
+  assert.equal(mock.inspect().imageCount, 0);
+});
 
 test("only a manual toolbar click opens the persistent control panel", async () => {
   const mock = makeChrome();
@@ -246,13 +421,127 @@ test("saved captures remain intact when the host cannot open the App", async () 
   assert.equal(mock.inspect().restored, true);
 });
 
-test("native hosts without capture-control support fail with a clear protocol error", async () => {
-  const mock = makeChrome({ supportsCaptureControl: false });
-  await loadBackground(mock);
-  await startCapture(mock);
-  assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "error")), true);
-  assert.ok(mock.runtimeMessages.some(item => item.state?.error === "native_protocol_unsupported"));
-  assert.equal(mock.inspect().imageCount, 0);
+test("an incompatible native host falls back to independent capture and download", async () => {
+  await withBrowserImageMocks(false, async () => {
+    const mock = makeChrome({ supportsCaptureControl: false, documentHeight: 900 });
+    await loadBackground(mock);
+    assert.equal((await startCapture(mock)).ok, true);
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "complete")), true);
+    assert.ok(mock.nativeRequests.some(item => item.command === "hello"));
+    assert.ok(!mock.nativeRequests.some(item => ["begin", "finish"].includes(item.command)));
+    assert.equal(mock.downloadRequests.length, 1);
+    assert.equal(mock.inspect().restored, true);
+  });
+});
+
+test("a missing host saves an independent inner-pane PNG, forwards saveAs, and waits for completion", async () => {
+  await withBrowserImageMocks(true, async draws => {
+    const mock = makeChrome({ nativeAvailable: false, innerPane: true, documentHeight: 900 });
+    await loadBackground(mock);
+    assert.equal((await startCapture(mock, { saveAs: true })).ok, true);
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "complete")), true);
+
+    assert.equal(mock.downloadRequests.length, 1);
+    assert.equal(mock.downloadRequests[0].saveAs, true);
+    assert.equal(mock.downloadRequests[0].restoredAtStart, true);
+    assert.equal(mock.downloadRequests[0].conflictAction, "uniquify");
+    assert.deepEqual(draws[0], [40, 60, 800, 500, 0, 0, 800, 500]);
+    assert.deepEqual(mock.downloadSearches, [{ id: mock.downloadRequests[0].id }]);
+    assert.deepEqual(mock.downloadEvents, ["download", "complete"]);
+    assert.ok(mock.runtimeMessages.some(item => item.state?.status === "saving"));
+    assert.ok(mock.nativeRequests.some(item => item.command === "hello"));
+    assert.ok(!mock.nativeRequests.some(item => ["begin", "finish"].includes(item.command)));
+  });
+});
+
+test("independent capture pause holds image count steady and resume completes", async () => {
+  await withBrowserImageMocks(false, async () => {
+    const mock = makeChrome({ nativeAvailable: false, documentHeight: 900 });
+    await loadBackground(mock);
+    await startCapture(mock);
+    assert.equal(await waitUntil(() => mock.inspect().imageCount >= 1), true);
+    const paused = await new Promise(resolve => mock.listeners.runtime[0](
+      { channel: "pinboardshot.capture", type: "togglePause" }, popupSender, resolve));
+    assert.equal(paused.ok, true);
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "paused")), true);
+    const pausedCount = mock.inspect().imageCount;
+    await new Promise(resolve => setTimeout(resolve, 700));
+    assert.equal(mock.inspect().imageCount, pausedCount);
+    const resumed = await new Promise(resolve => mock.listeners.runtime[0](
+      { channel: "pinboardshot.capture", type: "togglePause" }, popupSender, resolve));
+    assert.equal(resumed.ok, true);
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "complete")), true);
+    assert.equal(mock.downloadRequests.length, 1);
+  });
+});
+
+test("stopping an independent paused capture saves only committed tiles", async () => {
+  await withBrowserImageMocks(false, async () => {
+    const mock = makeChrome({ nativeAvailable: false, documentHeight: 1500 });
+    await loadBackground(mock);
+    await startCapture(mock);
+    assert.equal(await waitUntil(() => mock.inspect().imageCount >= 1), true);
+    await new Promise(resolve => mock.listeners.runtime[0](
+      { channel: "pinboardshot.capture", type: "togglePause" }, popupSender, resolve));
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "paused")), true);
+    const committedCount = mock.inspect().imageCount;
+    const stopped = await new Promise(resolve => mock.listeners.runtime[0](
+      { channel: "pinboardshot.capture", type: "stop" }, popupSender, resolve));
+    assert.equal(stopped.ok, true);
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "stopped")), true);
+    assert.equal(mock.inspect().imageCount, committedCount);
+    assert.equal(mock.downloadRequests.length, 1);
+    assert.ok(!mock.nativeRequests.some(item => ["begin", "finish"].includes(item.command)));
+  });
+});
+
+test("cancelling an independent paused capture discards it without downloading", async () => {
+  await withBrowserImageMocks(false, async () => {
+    const mock = makeChrome({ nativeAvailable: false, documentHeight: 900 });
+    await loadBackground(mock);
+    await startCapture(mock);
+    assert.equal(await waitUntil(() => mock.inspect().imageCount >= 1), true);
+    await new Promise(resolve => mock.listeners.runtime[0](
+      { channel: "pinboardshot.capture", type: "togglePause" }, popupSender, resolve));
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "paused")), true);
+    await new Promise(resolve => mock.listeners.runtime[0](
+      { channel: "pinboardshot.capture", type: "cancel" }, popupSender, resolve));
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "cancelled")), true);
+    assert.equal(mock.downloadRequests.length, 0);
+    assert.equal(mock.inspect().restored, true);
+  });
+});
+
+test("independent download failure reports error and restores the page", async () => {
+  await withBrowserImageMocks(false, async () => {
+    const mock = makeChrome({ nativeAvailable: false, downloadsMode: "error", documentHeight: 900 });
+    await loadBackground(mock);
+    await startCapture(mock);
+    assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "error")), true);
+    assert.ok(mock.runtimeMessages.some(item => item.state?.error === "browser_download_failed"));
+    assert.equal(mock.downloadRequests.length, 1);
+    assert.deepEqual(mock.cancelledDownloads, [mock.downloadRequests[0].id]);
+    assert.equal(mock.inspect().restored, true);
+  });
+});
+
+test("native disconnect after begin or during tile transfer never falls back to downloads", async t => {
+  for (const disconnectAt of ["afterBegin", "tileChunk"]) {
+    await t.test(disconnectAt, async () => {
+      await withBrowserImageMocks(false, async () => {
+        const mock = makeChrome({ disconnectAt, documentHeight: 900 });
+        await loadBackground(mock);
+        await startCapture(mock);
+        assert.equal(await waitUntil(() => mock.runtimeMessages.some(item => item.state?.status === "error")), true);
+        assert.ok(mock.nativeRequests.some(item => item.command === "begin"));
+        if (disconnectAt === "tileChunk") assert.ok(mock.nativeRequests.some(item => item.command === "tileChunk"));
+        assert.ok(mock.runtimeMessages.some(item => item.state?.error === "native_disconnected"));
+        assert.equal(mock.downloadRequests.length, 0);
+        assert.ok(!mock.nativeRequests.some(item => item.command === "finish"));
+        assert.equal(mock.inspect().restored, true);
+      });
+    });
+  }
 });
 
 test("pause blocks further scrolling and tiles; resume restores the next tile coordinate", async () => {

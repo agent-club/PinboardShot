@@ -154,7 +154,7 @@ private struct CompositionStudioView: View {
                             Text(item.createdAt, style: .time)
                             Text("\(item.pixelWidth) × \(item.pixelHeight)").font(.caption).foregroundStyle(.secondary)
                         }
-                    }
+                    }.clickCursor()
                 }
             }
             .padding(14)
@@ -182,13 +182,13 @@ private struct CompositionStudioView: View {
                     ForEach(CompositionLayout.allCases) { layout in
                         Text(L10n.text("composition.layout.\(layout.rawValue)")).tag(layout)
                     }
-                }
+                }.clickCursor()
                 Picker(L10n.text("composition.background"), selection: $options.background) {
                     ForEach(CompositionBackground.allCases) { background in
                         Text(L10n.text("composition.background.\(background.rawValue)")).tag(background)
                     }
-                }
-                Toggle(L10n.text("composition.shadow"), isOn: $options.showsShadow)
+                }.clickCursor()
+                Toggle(L10n.text("composition.shadow"), isOn: $options.showsShadow).clickCursor()
             }
             HStack {
                 Text(L10n.text("composition.padding"))
@@ -219,12 +219,12 @@ private struct CompositionStudioView: View {
             Button(L10n.text("annotation.pin")) {
                 guard let image = renderedImage else { return }
                 onPin(image)
-            }
+            }.clickCursor()
             Button(L10n.text("pin.save")) {
                 guard let image = renderedImage else { return }
                 do { _ = try ImageFileExporter.save(image) }
                 catch { errorMessage = error.localizedDescription }
-            }
+            }.clickCursor()
             .keyboardShortcut(.defaultAction)
         }
     }
