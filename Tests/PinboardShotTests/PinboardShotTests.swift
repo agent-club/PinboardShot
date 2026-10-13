@@ -677,12 +677,12 @@ func captureMemoryBoundaries() {
     #expect(!ClipboardImagePolicy.shouldProvideTIFF(width: 7680, height: 4320))
 }
 
-@Test("滚动截图预览保持正向并渲染超长图的可见区域")
+@Test("滚动截图预览等比展示完整长图并保持正向")
 @MainActor
 func scrollCapturePreviewRendersLongImageUpright() throws {
     _ = NSApplication.shared
-    let previewWidth = 5
-    let previewHeight = 4_096
+    let previewWidth = 260
+    let previewHeight = 2_400
     let context = try #require(CGContext(
         data: nil,
         width: previewWidth,
@@ -717,11 +717,12 @@ func scrollCapturePreviewRendersLongImageUpright() throws {
     imageView.image = image
     imageView.updateDocumentSize()
 
-    #expect(imageView.frame.height > 200_000)
+    #expect(imageView.frame.size == scrollView.contentSize)
     #expect(scrollView.documentVisibleRect.minY == 0)
     let drawingRects = try #require(imageView.drawingRects(for: imageView.bounds))
     #expect(drawingRects.destination.height <= scrollView.documentVisibleRect.height)
-    #expect(drawingRects.source.height < image.size.height)
+    #expect(drawingRects.source == CGRect(origin: .zero, size: image.size))
+    #expect(abs(drawingRects.destination.width / drawingRects.destination.height - image.size.width / image.size.height) < 0.0001)
 
     let rendered = try #require(
         scrollView.bitmapImageRepForCachingDisplay(in: scrollView.bounds)
@@ -729,10 +730,37 @@ func scrollCapturePreviewRendersLongImageUpright() throws {
     scrollView.cacheDisplay(in: scrollView.bounds, to: rendered)
     let visibleColor = try #require(rendered.colorAt(
         x: rendered.pixelsWide / 2,
-        y: rendered.pixelsHigh / 2
+        y: rendered.pixelsHigh * 3 / 4
+    ))
+    let topColor = try #require(rendered.colorAt(
+        x: rendered.pixelsWide / 2, y: rendered.pixelsHigh / 4
     ))
 
     #expect(visibleColor.blueComponent > visibleColor.redComponent)
+    #expect(topColor.redComponent > topColor.blueComponent)
+}
+
+@Test("滚动截图增长时预览逐步缩小且不裁掉首尾")
+@MainActor
+func scrollCapturePreviewFitsGrowingImage() throws {
+    let scrollView = NSScrollView(frame: CGRect(x: 0, y: 0, width: 260, height: 420))
+    let imageView = ScrollCapturePreviewImageView()
+    scrollView.documentView = imageView
+    imageView.scrollView = scrollView
+    var previousWidth = CGFloat.greatestFiniteMagnitude
+    for height in [200, 600, 1_200, 4_096, 200_000] {
+        imageView.image = NSImage(size: CGSize(width: 600, height: height))
+        imageView.updateDocumentSize()
+        let rects = try #require(imageView.drawingRects(for: imageView.bounds))
+        #expect(abs(rects.source.minX) < 0.0001 && abs(rects.source.minY) < 0.0001)
+        #expect(abs(rects.source.width - 600) < 0.0001)
+        #expect(abs(rects.source.height - CGFloat(height)) < 0.0001)
+        #expect(imageView.bounds.contains(rects.destination))
+        #expect(rects.destination.width <= previousWidth)
+        #expect(abs(rects.destination.width / rects.destination.height - 600 / CGFloat(height)) < 0.0001)
+        #expect(rects.destination.maxY == imageView.bounds.maxY)
+        previousWidth = rects.destination.width
+    }
 }
 
 @Test("区域坐标转换")

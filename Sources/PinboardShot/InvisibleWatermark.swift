@@ -287,22 +287,34 @@ enum InvisibleWatermarkCodec {
         // 160 位载荷在画面中重复四次，并用低强度棋盘亮度扰动编码，兼顾不可见性与缩放/压缩恢复。
         let gridColumns = tileColumns * horizontalRepeats
         let gridRows = tileRows * verticalRepeats
-        for y in 0..<source.height {
-            let gridY = min(gridRows - 1, y * gridRows / source.height)
-            let cellY = gridY % tileRows
-            let localY = (y * gridRows * patternDivisions / source.height) % patternDivisions
-            for x in 0..<source.width {
-                let gridX = min(gridColumns - 1, x * gridColumns / source.width)
+        // Horizontal coordinates and payload bits repeat on every row. Preserve the
+        // integer grid mapping while building one delta row for each payload row.
+        var horizontalDeltas = [Int8](repeating: 0, count: source.width * tileRows)
+        for x in 0..<source.width {
+            let gridX = min(gridColumns - 1, x * gridColumns / source.width)
+            let localX = (x * gridColumns * patternDivisions / source.width) % patternDivisions
+            let checkerSign = localX.isMultiple(of: 2) ? 1 : -1
+            for cellY in 0..<tileRows {
                 let bitIndex = cellY * tileColumns + (gridX % tileColumns)
-                let byte = payload[bitIndex / 8]
-                let isOne = byte & (1 << (7 - bitIndex % 8)) != 0
-                let localX = (x * gridColumns * patternDivisions / source.width) % patternDivisions
-                let checkerSign = (localX + localY).isMultiple(of: 2) ? 1 : -1
-                let delta = checkerSign * (isOne ? strength : -strength)
-                let offset = (y * source.width + x) * 4
-                bytes[offset] = adjusted(bytes[offset], by: delta)
-                bytes[offset + 1] = adjusted(bytes[offset + 1], by: delta)
-                bytes[offset + 2] = adjusted(bytes[offset + 2], by: delta)
+                let isOne = payload[bitIndex / 8] & (1 << (7 - bitIndex % 8)) != 0
+                horizontalDeltas[cellY * source.width + x] = Int8(checkerSign * (isOne ? strength : -strength))
+            }
+        }
+        horizontalDeltas.withUnsafeBufferPointer { deltas in
+            for y in 0..<source.height {
+                let gridY = min(gridRows - 1, y * gridRows / source.height)
+                let cellY = gridY % tileRows
+                let localY = (y * gridRows * patternDivisions / source.height) % patternDivisions
+                let rowSign = localY.isMultiple(of: 2) ? 1 : -1
+                let deltaOffset = cellY * source.width
+                let rowOffset = y * source.width * 4
+                for x in 0..<source.width {
+                    let delta = Int(deltas[deltaOffset + x]) * rowSign
+                    let offset = rowOffset + x * 4
+                    bytes[offset] = adjusted(bytes[offset], by: delta)
+                    bytes[offset + 1] = adjusted(bytes[offset + 1], by: delta)
+                    bytes[offset + 2] = adjusted(bytes[offset + 2], by: delta)
+                }
             }
         }
 

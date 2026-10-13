@@ -1,12 +1,42 @@
-import { captureBudget, MAX_CAPTURE_MS, MAX_TILES, MIN_CAPTURE_INTERVAL_MS, nextTarget, progressPercent, validateMetrics } from "./lib/planner.mjs";
+import { captureBudget, MAX_CAPTURE_MS, MAX_TILES, MIN_CAPTURE_INTERVAL_MS, nextTarget, progressPercent, tileCropRect, validateMetrics } from "./lib/planner.mjs";
 import { splitBase64 } from "./lib/native-protocol.mjs";
 import { NativeCaptureClient } from "./lib/native-client.mjs";
+import { BrowserCaptureImage } from "./lib/browser-image.mjs";
+import { saveBrowserCapture } from "./lib/browser-download.mjs";
 
 const CHANNEL = "pinboardshot.capture";
 const captureState = { status: "idle", progress: 0, error: null, tabId: null };
 let activeCapture = null;
 const CONTROL_POLL_INTERVAL_MS = 250;
 const CHROME_CAPTURE_TIMEOUT_MS = 30000;
+const CONNECTION_ALARM = "pinboardshot.connection";
+let connectionState = { status: "checking", error: null };
+let connectionProbe = null;
+
+function publishConnection() {
+  chrome.runtime.sendMessage({ channel: CHANNEL, type: "connection", connection: { ...connectionState } }).catch(() => {});
+}
+
+function checkConnection() {
+  // Never probe through the capture port or create an image session in the background.
+  if (activeCapture) return Promise.resolve({ ...connectionState });
+  if (connectionProbe) return connectionProbe;
+  connectionProbe = (async () => {
+    const client = new NativeCaptureClient(chrome, 5000);
+    try {
+      await client.connect();
+      connectionState = { status: "connected", error: null };
+    } catch (error) {
+      const code = errorCode(error);
+      connectionState = { status: code === "native_protocol_unsupported" ? "unsupported" : "disconnected", error: code };
+    } finally {
+      client.disconnect();
+      publishConnection();
+    }
+    return { ...connectionState };
+  })().finally(() => { connectionProbe = null; });
+  return connectionProbe;
+}
 
 function publish() {
   chrome.runtime.sendMessage({ channel: CHANNEL, type: "state", state: { ...captureState } }).catch(() => {});
@@ -68,7 +98,7 @@ async function waitForTab(tabId, windowId) {
   if (!await activeTabMatches(tabId, windowId)) throw new Error("active_tab_changed");
 }
 
-async function captureVisible(tabId, windowId) {
+async function captureVisible(tabId, windowId, metrics) {
   await waitForTab(tabId, windowId);
   // A pending Chrome API must not trap Cancel or hold the page and native session indefinitely.
   const dataUrl = await boundedChromeCall(
@@ -76,7 +106,27 @@ async function captureVisible(tabId, windowId) {
   await waitForTab(tabId, windowId);
   const comma = dataUrl.indexOf(",");
   if (comma < 0 || !dataUrl.startsWith("data:image/png;base64,")) throw new Error("invalid_screenshot");
-  return dataUrl.slice(comma + 1);
+  const png = dataUrl.slice(comma + 1);
+  if (!metrics.captureRect) return png;
+  return boundedChromeCall(async () => {
+    const bytes = Uint8Array.from(atob(png), character => character.charCodeAt(0));
+    const image = await createImageBitmap(new Blob([bytes], { type: "image/png" }));
+    try {
+      const rect = tileCropRect(metrics, image.width, image.height);
+      const canvas = new OffscreenCanvas(rect.width, rect.height);
+      const context = canvas.getContext("2d");
+      if (!context) throw new Error("invalid_crop_geometry");
+      context.drawImage(image, rect.x, rect.y, rect.width, rect.height, 0, 0, rect.width, rect.height);
+      const blob = await canvas.convertToBlob({ type: "image/png" });
+      const output = new Uint8Array(await blob.arrayBuffer());
+      // Avoid spreading a full screenshot into a call stack-sized argument list.
+      let binary = "";
+      for (let offset = 0; offset < output.length; offset += 32768) {
+        binary += String.fromCharCode(...output.subarray(offset, offset + 32768));
+      }
+      return btoa(binary);
+    } finally { image.close(); }
+  }, "screenshot_timeout");
 }
 
 function sameCaptureGeometry(first, second) {
@@ -84,7 +134,10 @@ function sameCaptureGeometry(first, second) {
     first.devicePixelRatio === second.devicePixelRatio;
   const sameVerticalPixel = Math.round(first.scrollY * first.devicePixelRatio) === Math.round(second.scrollY * second.devicePixelRatio);
   const sameHorizontalPixel = Math.round(first.scrollX * first.devicePixelRatio) === Math.round(second.scrollX * second.devicePixelRatio);
-  return sameViewport && sameVerticalPixel && sameHorizontalPixel;
+  const sameCrop = Boolean(first.captureRect) === Boolean(second.captureRect) &&
+    (!first.captureRect || (["x", "y", "width", "height"].every(key => Math.abs(first.captureRect[key] - second.captureRect[key]) < 0.5) &&
+      first.browserViewportWidth === second.browserViewportWidth && first.browserViewportHeight === second.browserViewportHeight));
+  return sameViewport && sameVerticalPixel && sameHorizontalPixel && sameCrop;
 }
 
 async function waitCaptureRate() {
@@ -108,6 +161,7 @@ async function waitForResume(run) {
 }
 
 function waitForControlRevision(run, revision) {
+  if (run.mode === "browser") return Promise.resolve();
   if (run.controlRevision > revision || run.controlError || run.controlPollingStopped) return Promise.resolve();
   return new Promise(resolve => run.controlWaiters.push({ revision, resolve }));
 }
@@ -180,7 +234,12 @@ function setPaused(run, paused) {
 
 async function togglePause() {
   const run = activeCapture;
-  if (!run || run.cancelled || run.stopRequested || !run.client || !run.captureId) return false;
+  if (!run || run.cancelled || run.stopRequested || captureState.status === "saving") return false;
+  if (run.mode === "browser") {
+    setPaused(run, !run.paused);
+    return true;
+  }
+  if (!run.client || !run.captureId) return false;
   const paused = !(run.desiredPaused ?? run.remotePaused ?? run.paused);
   run.desiredPaused = paused;
   try {
@@ -194,7 +253,9 @@ async function togglePause() {
 
 async function requestStop() {
   const run = activeCapture;
-  if (!run || run.cancelled || run.stopRequested || !run.client || !run.captureId) return false;
+  if (!run || run.cancelled || run.stopRequested || captureState.status === "saving") return false;
+  if (run.mode === "browser") return observeStopRequest(run);
+  if (!run.client || !run.captureId) return false;
   try {
     await run.client.request("setControl", {
       captureId: run.captureId, paused: run.remotePaused === true, stopped: true
@@ -217,11 +278,8 @@ function observeStopRequest(run) {
 async function finishAtStopBoundary(client, captureId, run, tileCount, coveredHeight) {
   await stopNativeControlPolling(run);
   if (tileCount > 0) {
-    await client.request("finish", {
-      captureId,
-      capturedHeight: Math.min(coveredHeight, run.lastTileDocumentHeight)
-    });
-  } else {
+    await finishOutput(client, captureId, run, Math.min(coveredHeight, run.lastTileDocumentHeight));
+  } else if (run.mode === "app") {
     await client.request("cancel", { captureId });
   }
   run.completed = true;
@@ -230,8 +288,9 @@ async function finishAtStopBoundary(client, captureId, run, tileCount, coveredHe
 
 function cancelCapture() {
   const run = activeCapture;
-  if (!run || run.cancelled || run.stopRequested) return false;
+  if (!run || run.cancelled || (run.stopRequested && !(run.mode === "browser" && captureState.status === "saving"))) return false;
   run.cancelled = true;
+  run.abortController.abort();
   for (const wake of run.cancelWaiters) wake();
   run.resume?.();
   setState("cancelling", captureState.progress);
@@ -267,7 +326,22 @@ async function transmitTile(client, captureId, index, metrics, pngBase64) {
   await client.request("tileEnd", { captureId, index });
 }
 
-async function runCapture(tab) {
+async function restoreCapturePage(run) {
+  if (!run.prepared) return;
+  try { await sendToContent(run.tabId, { type: "restore" }); } catch {}
+  run.prepared = false;
+}
+
+async function finishOutput(client, captureId, run, capturedHeight) {
+  if (run.mode === "app") return client.request("finish", { captureId, capturedHeight });
+  await restoreCapturePage(run);
+  setState("saving");
+  const blob = await boundedChromeCall(() => run.browserImage.finish(capturedHeight), "browser_image_failed");
+  if (run.cancelled) throw new Error("cancelled");
+  captureState.downloadId = await saveBrowserCapture(chrome, blob, { saveAs: run.saveAs, signal: run.abortController.signal });
+}
+
+async function runCapture(tab, { saveAs = false } = {}) {
   if (activeCapture) throw new Error("capture_already_active");
   if (!tab?.id || !Number.isInteger(tab.windowId) || !/^https?:/i.test(tab.url || "")) throw new Error("unsupported_page");
   const run = {
@@ -276,15 +350,15 @@ async function runCapture(tab) {
     controlRevision: 0, controlWaiters: [], controlPollingStopped: false,
     remotePaused: null, desiredPaused: null, remoteStopped: null,
     controlTask: null, controlError: null, client: null, captureId: null,
-    lastTileDocumentHeight: 0, cancelWaiters: new Set()
+    lastTileDocumentHeight: 0, cancelWaiters: new Set(), mode: null, browserImage: null,
+    prepared: false, abortController: new AbortController(), saveAs, keepAlive: null
   };
   activeCapture = run;
-  Object.assign(captureState, { status: "preparing", progress: 0, error: null, tabId: tab.id });
+  Object.assign(captureState, { status: "preparing", progress: 0, error: null, tabId: tab.id, mode: null, downloadId: null });
   publish();
 
   const client = new NativeCaptureClient(chrome);
   let captureId = null;
-  let prepared = false;
   let completed = false;
   let coveredHeight = 0;
   let previousTileBottomPixels = 0;
@@ -293,16 +367,38 @@ async function runCapture(tab) {
   let previousViewportHeight = null;
   let expectedTarget = 0;
   try {
-    await client.connect();
-    const begun = await client.request("begin");
-    if (typeof begun.captureId !== "string" || !begun.captureId) throw new Error("native_protocol_error");
-    captureId = begun.captureId;
-    run.client = client;
-    run.captureId = captureId;
-    run.controlTask = pollNativeControl(run, client, captureId);
+    // Choose the output once, before any tiles. A mid-capture App failure never
+    // redirects an already-started native session into a second browser save.
+    const requestTimeout = client.timeoutMs;
+    client.timeoutMs = 5000;
+    try {
+      await boundedChromeCall(() => client.connect(), "native_timeout");
+      run.mode = "app";
+      connectionState = { status: "connected", error: null };
+    } catch (error) {
+      if (run.cancelled) throw new Error("cancelled");
+      client.disconnect();
+      run.mode = "browser";
+      run.browserImage = new BrowserCaptureImage();
+      const code = errorCode(error);
+      connectionState = { status: code === "native_protocol_unsupported" ? "unsupported" : "disconnected", error: code };
+      // Native ports keep workers alive; independent pauses need an API heartbeat.
+      run.keepAlive = setInterval(() => { chrome.runtime.getPlatformInfo().catch(() => {}); }, 20000);
+    } finally { client.timeoutMs = requestTimeout; }
+    captureState.mode = run.mode;
+    publishConnection();
+    publish();
+    if (run.mode === "app") {
+      const begun = await client.request("begin");
+      if (typeof begun.captureId !== "string" || !begun.captureId) throw new Error("native_protocol_error");
+      captureId = begun.captureId;
+      run.client = client;
+      run.captureId = captureId;
+      run.controlTask = pollNativeControl(run, client, captureId);
+    }
     await waitForTab(tab.id, tab.windowId);
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ["capture.js"] });
-    prepared = true;
+    run.prepared = true;
     const initial = (await sendToContent(tab.id, { type: "prepare" })).metrics;
     validateMetrics(initial);
     previousViewportWidth = initial.viewportWidth;
@@ -367,7 +463,7 @@ async function runCapture(tab) {
       if (beforeCapture.viewportWidth !== previousViewportWidth || beforeCapture.viewportHeight !== previousViewportHeight ||
           beforeCapture.devicePixelRatio !== metrics.devicePixelRatio) throw new Error("viewport_changed");
       captureBudget(beforeCapture, tileCount + 1);
-      const png = await captureVisible(tab.id, tab.windowId);
+      const png = await captureVisible(tab.id, tab.windowId, beforeCapture);
       const afterCapture = await sendToContent(tab.id, { type: "metrics" }).then(reply => reply.metrics);
       validateMetrics(afterCapture);
       if (!sameCaptureGeometry(beforeCapture, afterCapture)) throw new Error("capture_position_changed");
@@ -376,7 +472,9 @@ async function runCapture(tab) {
       captureBudget(afterCapture, tileCount + 1);
       run.lastCaptureAt = Date.now();
       metrics = { ...beforeCapture, documentHeight: afterCapture.documentHeight };
-      await transmitTile(client, captureId, tileCount, metrics, png);
+      if (run.mode === "browser") {
+        await boundedChromeCall(() => run.browserImage.addTile(metrics, png), "browser_image_failed");
+      } else await transmitTile(client, captureId, tileCount, metrics, png);
       run.lastTileDocumentHeight = metrics.documentHeight;
       tileCount++;
       previousTileBottomPixels = Math.max(previousTileBottomPixels,
@@ -399,7 +497,7 @@ async function runCapture(tab) {
       validateMetrics(live);
       if (live.viewportWidth !== previousViewportWidth || live.viewportHeight !== previousViewportHeight) throw new Error("viewport_changed");
       captureBudget(live, tileCount);
-      const target = nextTarget(metrics.scrollY, live.documentHeight, live.viewportHeight);
+      const target = nextTarget(metrics.scrollY, live.documentHeight, live.viewportHeight, live.requiredOverlap);
       if (target === null) {
         const latest = await waitForQuietBottom(tab.id, tab.windowId, live);
         if (await waitForResume(run) === "stopped") {
@@ -408,7 +506,7 @@ async function runCapture(tab) {
           break;
         }
         if (latest.documentHeight > live.documentHeight + 0.5 && metrics.scrollY < latest.documentHeight - latest.viewportHeight - 0.5) {
-          expectedTarget = nextTarget(metrics.scrollY, latest.documentHeight, latest.viewportHeight);
+          expectedTarget = nextTarget(metrics.scrollY, latest.documentHeight, latest.viewportHeight, latest.requiredOverlap);
           await waitForTab(tab.id, tab.windowId);
           metrics = await sendToContent(tab.id, { type: "goTo", targetY: expectedTarget, hideFixed: true }).then(reply => reply.metrics);
           continue;
@@ -416,7 +514,7 @@ async function runCapture(tab) {
         const actualCovered = Math.min(latest.documentHeight, coveredHeight);
         if (actualCovered + 0.5 < latest.documentHeight) throw new Error("incomplete_coverage");
         await stopNativeControlPolling(run);
-        await client.request("finish", { captureId, capturedHeight: actualCovered });
+        await finishOutput(client, captureId, run, actualCovered);
         completed = true;
         setState("complete", 100);
         break;
@@ -440,12 +538,12 @@ async function runCapture(tab) {
     }
     setState(code === "cancelled" ? "cancelled" : "error", captureState.progress, code);
   } finally {
+    clearInterval(run.keepAlive);
+    run.browserImage?.dispose();
     await stopNativeControlPolling(run);
     client.disconnect();
     await run.controlTask?.catch(() => {});
-    if (prepared) {
-      try { await sendToContent(tab.id, { type: "restore" }); } catch {}
-    }
+    await restoreCapturePage(run);
     if (activeCapture === run) activeCapture = null;
   }
 }
@@ -464,6 +562,11 @@ chrome.commands.onCommand.addListener(async command => {
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (sender.id !== chrome.runtime.id || message?.channel !== CHANNEL) return false;
   const popupSender = !sender.tab && sender.url === chrome.runtime.getURL("popup.html");
+  if (message.type === "connectionRequest") {
+    if (!popupSender) return false;
+    checkConnection().then(connection => sendResponse({ ok: true, connection }));
+    return true;
+  }
   if (message.type === "stateRequest") {
     if (!popupSender) return false;
     sendResponse({ ok: true, state: { ...captureState } });
@@ -481,7 +584,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ ok: false, error: "invoke_on_current_tab" });
         return;
       }
-      void runCapture(tab).catch(error => setState("error", captureState.progress, errorCode(error)));
+      void runCapture(tab, { saveAs: message.saveAs === true }).catch(error => setState("error", captureState.progress, errorCode(error)));
       sendResponse({ ok: true });
     }).catch(error => sendResponse({ ok: false, error: errorCode(error) }));
     return true;
@@ -508,3 +611,13 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   }
   return false;
 });
+
+chrome.alarms.onAlarm.addListener(alarm => {
+  if (alarm.name === CONNECTION_ALARM) void checkConnection();
+});
+// Recreate a lost alarm whenever Chrome starts this service worker.
+chrome.alarms.get(CONNECTION_ALARM).then(alarm => {
+  if (!alarm) return chrome.alarms.create(CONNECTION_ALARM, { periodInMinutes: 1 });
+}).catch(() => {});
+chrome.runtime.onStartup.addListener(() => { void checkConnection(); });
+chrome.runtime.onInstalled.addListener(() => { void checkConnection(); });

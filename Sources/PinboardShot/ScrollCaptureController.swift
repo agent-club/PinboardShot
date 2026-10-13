@@ -61,6 +61,9 @@ final class ScrollCaptureFramePipeline: @unchecked Sendable {
     private var storageFailed = false
     private var consecutiveUnmatchedFrames = 0
     private var lastPreviewDate = Date.distantPast
+    private var previewUpdateScheduled = false
+    private var previewUpdateGeneration = 0
+    private var pendingPreviewResult: ScrollCaptureAppendResult?
     private var previousAutomaticFrame: CGImage?
 
     init(
@@ -185,7 +188,30 @@ final class ScrollCaptureFramePipeline: @unchecked Sendable {
         let shouldReport = result == .initial || result == .unmatched ||
             result == .limitReached || wasUnmatched ||
             Date().timeIntervalSince(lastPreviewDate) >= 0.12
-        guard shouldReport else { return }
+        guard shouldReport else {
+            pendingPreviewResult = result
+            guard !previewUpdateScheduled else { return }
+            previewUpdateScheduled = true
+            let generation = previewUpdateGeneration
+            let delay = max(0, 0.12 - Date().timeIntervalSince(lastPreviewDate))
+            // Flush the newest stitched image even if scrolling stops before the
+            // next frame. Otherwise throttling can leave the preview one step behind.
+            processingQueue.asyncAfter(deadline: .now() + delay) { [self] in
+                guard generation == previewUpdateGeneration else { return }
+                previewUpdateScheduled = false
+                guard !stateLock.withLock({ isCancelled || didReachLimit }),
+                      let pendingPreviewResult else { return }
+                reportProgress(pendingPreviewResult)
+            }
+            return
+        }
+        reportProgress(result)
+    }
+
+    private func reportProgress(_ result: ScrollCaptureAppendResult) {
+        previewUpdateGeneration += 1
+        previewUpdateScheduled = false
+        pendingPreviewResult = nil
         // A fast scroll can produce many matched frames per second. Limit preview
         // reads and main-thread updates so they do not delay the stitcher.
         let preview = accumulator.makePreviewImage()
@@ -642,9 +668,9 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
     private let titleLabel = NSTextField(labelWithString: "")
     private let statusLabel = NSTextField(wrappingLabelWithString: L10n.text("scrollCapture.status.ready"))
     private let sizeLabel = NSTextField(labelWithString: "—")
-    private let finishButton = NSButton(title: "", target: nil, action: nil)
-    private let cancelButton = NSButton(title: "", target: nil, action: nil)
-    private let autoScrollButton = NSButton(title: "", target: nil, action: nil)
+    private let finishButton = ActionButton(title: "", target: nil, action: nil)
+    private let cancelButton = ActionButton(title: "", target: nil, action: nil)
+    private let autoScrollButton = ActionButton(title: "", target: nil, action: nil)
     private var autoPausedStatusKey: String?
     private var hasStartedAutoCapture = false
     private var isClosingProgrammatically = false
@@ -688,9 +714,11 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
     func update(_ progress: ScrollCaptureProgress) {
         statusLabel.textColor = .secondaryLabelColor
         if let preview = progress.previewImage {
+            // Thumbnail dimensions are rounded; retain the capture's aspect ratio
+            // even when a very long preview is only a few pixels wide.
             imageView.image = NSImage(
                 cgImage: preview,
-                size: CGSize(width: preview.width, height: preview.height)
+                size: CGSize(width: progress.pixelWidth, height: progress.pixelHeight)
             )
             imageView.updateDocumentSize()
         }
@@ -763,7 +791,7 @@ private final class ScrollCapturePreviewController: NSObject, NSWindowDelegate {
 
         let scrollView = NSScrollView()
         scrollView.borderType = .bezelBorder
-        scrollView.hasVerticalScroller = true
+        scrollView.hasVerticalScroller = false
         scrollView.drawsBackground = true
         scrollView.backgroundColor = .windowBackgroundColor
         scrollView.documentView = imageView
@@ -825,10 +853,10 @@ final class ScrollCapturePreviewImageView: NSView {
     }
 
     func updateDocumentSize() {
-        guard let scrollView, let image, image.size.width > 0 else { return }
-        let width = max(1, scrollView.contentSize.width)
-        let height = max(scrollView.contentSize.height, width * image.size.height / image.size.width)
-        frame = CGRect(x: 0, y: 0, width: width, height: height)
+        guard let scrollView else { return }
+        // Keep the whole capture visible; extending the document frame hides the
+        // growing tail instead of showing capture progress.
+        frame = CGRect(origin: .zero, size: scrollView.contentSize)
         needsDisplay = true
         scrollView.contentView.scroll(to: .zero)
         scrollView.reflectScrolledClipView(scrollView.contentView)
@@ -851,12 +879,15 @@ final class ScrollCapturePreviewImageView: NSView {
     }
 
     func drawingRects(for dirtyRect: NSRect) -> (destination: NSRect, source: NSRect)? {
-        guard let image else { return nil }
+        guard let image, image.size.width > 0, image.size.height > 0,
+              bounds.width > 0, bounds.height > 0 else { return nil }
+        let scale = min(bounds.width / image.size.width, bounds.height / image.size.height)
+        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
         let imageRect = CGRect(
-            x: 0,
-            y: 0,
-            width: bounds.width,
-            height: bounds.width * image.size.height / max(1, image.size.width)
+            x: bounds.midX - size.width / 2,
+            y: bounds.maxY - size.height,
+            width: size.width,
+            height: size.height
         )
         let documentVisibleRect = scrollView?.documentVisibleRect ?? dirtyRect
         let destinationRect = dirtyRect
@@ -867,8 +898,8 @@ final class ScrollCapturePreviewImageView: NSView {
         let scaleX = image.size.width / imageRect.width
         let scaleY = image.size.height / imageRect.height
         let sourceRect = CGRect(
-            x: destinationRect.minX * scaleX,
-            y: destinationRect.minY * scaleY,
+            x: (destinationRect.minX - imageRect.minX) * scaleX,
+            y: (destinationRect.minY - imageRect.minY) * scaleY,
             width: destinationRect.width * scaleX,
             height: destinationRect.height * scaleY
         )

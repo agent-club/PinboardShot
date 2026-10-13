@@ -17,6 +17,7 @@ archive="$feed_dir/PinboardShot-${version}-${build}.zip"
 dmg="$feed_dir/PinboardShot-${version}-${build}.dmg"
 appcast="$feed_dir/appcast.xml"
 
+./scripts/check-notary-profile.sh "$notary_profile"
 echo "==> Building, signing, notarizing app, and generating Sparkle update feed"
 ./scripts/prepare-update.sh "$version" "$build"
 
@@ -53,12 +54,13 @@ if ! rg -q "releases/download/v${version}/PinboardShot-${version}-${build}\\.zip
   echo "appcast.xml does not point at the expected release ZIP." >&2
   exit 1
 fi
-if ! unzip -Z1 "$archive" | rg -q '^PinboardShot\.app/' || \
-   unzip -Z1 "$archive" | rg -q -v '^PinboardShot\.app/'; then
+# Drain unzip's output: early rg exits can trigger SIGPIPE under pipefail.
+if ! unzip -Z1 "$archive" | rg '^PinboardShot\.app/' >/dev/null || \
+   unzip -Z1 "$archive" | rg -v '^PinboardShot\.app/' >/dev/null; then
   echo "Release ZIP must contain only PinboardShot.app at the top level." >&2
   exit 1
 fi
-if unzip -l "$archive" | rg -q '(^|/)(Sources|Tests|website|Package\.swift|\.env|AGENTS\.md)(/|$)'; then
+if unzip -l "$archive" | rg '(^|/)(Sources|Tests|website|Package\.swift|\.env|AGENTS\.md)(/|$)' >/dev/null; then
   echo "Release ZIP contains source, website, project metadata, or sensitive-looking files." >&2
   exit 1
 fi

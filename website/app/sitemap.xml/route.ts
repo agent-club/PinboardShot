@@ -13,7 +13,8 @@ const crawlablePages: readonly CrawlablePage[] = [
   { path: "/", alternates: true, lastModified: releaseIsoDate() },
   { path: localeSeo.zh.path, alternates: true, lastModified: releaseIsoDate() },
   { path: localeSeo.en.path, alternates: true, lastModified: releaseIsoDate() },
-  { path: "/privacy", alternates: false, lastModified: "2026-08-23" },
+  { path: "/privacy", alternates: false, lastModified: "2026-10-01" },
+  { path: "/chrome-extension", alternates: false, lastModified: "2026-10-01" },
   ...CONTENT_PAGES.map((page) => ({
     path: page.path,
     alternates: false,

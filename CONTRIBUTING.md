@@ -24,9 +24,11 @@ Report vulnerabilities according to [SECURITY.md](SECURITY.md). Do not expose vu
 From the repository root, run:
 
 ```bash
-swift test --no-parallel
+./scripts/test-app.sh
 ./scripts/build-app.sh
 ```
+
+`test-app.sh` runs tests serially, isolates the WebKit integration test in its own process, and requires completion summaries to catch an early test-host exit. Use `./scripts/test-app.sh release` for Release verification.
 
 `build-app.sh` builds the app, then removes the old bundle and recreates `.build/app/PinboardShot.app`. It includes both `arm64` and `x86_64` by default. To build only for Apple Silicon:
 
@@ -108,9 +110,11 @@ Review the diff and staging area before committing. Never commit authentication 
 在仓库根目录执行：
 
 ```bash
-swift test --no-parallel
+./scripts/test-app.sh
 ./scripts/build-app.sh
 ```
+
+`test-app.sh` 串行运行测试，并将 WebKit 集成用例放在独立进程中；它会检查完成汇总，避免测试宿主提前退出却被判定成功。Release 验证使用 `./scripts/test-app.sh release`。
 
 `build-app.sh` 先构建，再清理并重新生成 `.build/app/PinboardShot.app`，默认包含 `arm64` 与 `x86_64`。仅构建 Apple Silicon 架构时可执行：
 

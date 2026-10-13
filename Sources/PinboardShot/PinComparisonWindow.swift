@@ -228,7 +228,7 @@ private struct PinComparisonView: View {
                 ForEach(PinComparisonMode.allCases, id: \.self) { candidate in
                     Text(L10n.text(candidate.titleKey)).tag(candidate)
                 }
-            }
+            }.clickCursor()
             .pickerStyle(.segmented)
             .frame(maxWidth: 420)
             .accessibilityLabel(L10n.text("comparison.mode"))
@@ -237,7 +237,7 @@ private struct PinComparisonView: View {
                 isSwapped.toggle()
             } label: {
                 Label(L10n.text("comparison.swap"), systemImage: "arrow.left.arrow.right")
-            }
+            }.clickCursor()
             .accessibilityLabel(L10n.text("comparison.swap"))
 
             Spacer(minLength: 8)
@@ -256,7 +256,7 @@ private struct PinComparisonView: View {
 
             Button(action: exportComparison) {
                 Label(L10n.text("comparison.export"), systemImage: "square.and.arrow.down")
-            }
+            }.clickCursor()
             .help(L10n.text("comparison.exportHelp"))
         }
     }

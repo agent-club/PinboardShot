@@ -26,13 +26,26 @@ This process publishes public release assets only. Do not upload credentials, lo
    plutil -replace CFBundleVersion -string <build> Resources/Info.plist
    ```
 
-3. Run the app test suite:
+3. Verify notarization profile access in the approved host environment before building:
+
+   ```bash
+   ./scripts/check-notary-profile.sh
+   python3 scripts/tests/test_notary_profile.py
+   ```
+
+   The default profile is `PinboardShot-notary`; an existing alternative may be
+   selected with `PINBOARDSHOT_NOTARY_PROFILE`. A failed Keychain lookup does not
+   establish that the profile is missing or expired. Diagnose execution-context
+   access first; do not recreate credentials based on that error alone. Never
+   print credential values. Both release entry points run this check automatically.
+
+4. Run the app test suite:
 
    ```bash
    swift test
    ```
 
-4. Check Git state and keep unrelated changes out of the release commit:
+5. Check Git state and keep unrelated changes out of the release commit:
 
    ```bash
    git status --short --untracked-files=all

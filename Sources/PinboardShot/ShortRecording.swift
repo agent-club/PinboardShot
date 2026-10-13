@@ -354,8 +354,8 @@ private struct RecordingControls: View {
         VStack(spacing: 12) {
             Text(L10n.text("feature.record.status", model.elapsed)).monospacedDigit()
             HStack {
-                Button(L10n.text("common.cancel")) { Task { await model.cancel() } }
-                Button(L10n.text("feature.record.stop"), systemImage: "stop.fill") { Task { await model.stop() } }
+                Button(L10n.text("common.cancel")) { Task { await model.cancel() } }.clickCursor()
+                Button(L10n.text("feature.record.stop"), systemImage: "stop.fill") { Task { await model.stop() } }.clickCursor()
                     .keyboardShortcut(.defaultAction)
             }.disabled(model.isFinishing)
         }.padding(12)
@@ -401,10 +401,10 @@ private struct RecordingPreview: View {
                     player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                     player.currentItem?.forwardPlaybackEndTime = CMTime(seconds: end, preferredTimescale: 600)
                     player.play()
-                }.disabled(!validRange)
+                }.clickCursor().disabled(!validRange)
                 Spacer()
                 if saving { ProgressView().controlSize(.small) }
-                Button(L10n.text("feature.record.save")) { save() }.disabled(saving || !validRange)
+                Button(L10n.text("feature.record.save")) { save() }.clickCursor().disabled(saving || !validRange)
             }
             if let message { Text(message).foregroundStyle(.secondary) }
         }
