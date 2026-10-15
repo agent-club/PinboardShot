@@ -5,6 +5,9 @@ struct MagneticDesktopPreferences: View {
     @AppStorage(MagneticDesktopSettings.enabledKey) private var enabled = false
     @AppStorage(MagneticDesktopSettings.maximumVisibleKey) private var maximumVisible = MagneticDesktopSettings.defaultMaximumVisible
     @AppStorage(HistorySettings.enabledDefaultsKey) private var historyEnabled = true
+    @AppStorage(MagneticDesktopSettings.animationStyleKey) private var animationStyle = MagneticAnimationStyle.full
+    @AppStorage(MagneticDesktopSettings.reduceMotionKey) private var motionReduced = false
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -14,9 +17,24 @@ struct MagneticDesktopPreferences: View {
                     Text(L10n.text("magnetic.maximum", maximumVisible))
                 }
                 .disabled(!enabled)
-                Text("1–10").font(.caption).foregroundStyle(.secondary)
+                Text(verbatim: "\(MagneticDesktopSettings.supportedLimits.lowerBound)–\(MagneticDesktopSettings.supportedLimits.upperBound)")
+                    .font(.caption).foregroundStyle(.secondary)
             }
             Text(L10n.text("magnetic.help"))
+                .font(.callout).foregroundStyle(.secondary)
+            Divider()
+            Picker(L10n.text("magnetic.animationStyle"), selection: $animationStyle) {
+                ForEach(MagneticAnimationStyle.allCases, id: \.self) { style in
+                    Text(L10n.text("magnetic.animationStyle.\(style.rawValue)")).tag(style)
+                }
+            }
+            .pickerStyle(.segmented)
+            .disabled(!enabled)
+            Text(L10n.text("magnetic.animationStyle.\(animationStyle.rawValue).help"))
+                .font(.callout).foregroundStyle(.secondary)
+            Toggle(L10n.text("magnetic.reduceMotion"), isOn: $motionReduced)
+                .clickCursor().disabled(!enabled)
+            Text(L10n.text(systemReduceMotion ? "magnetic.reduceMotion.system" : "magnetic.reduceMotion.help"))
                 .font(.callout).foregroundStyle(.secondary)
             if !historyEnabled {
                 Text(L10n.text("magnetic.needsHistory"))
@@ -54,11 +72,20 @@ struct MagneticFanMotionView: View {
     @ObservedObject var motion: MagneticFanMotion
     let screenFrame: CGRect
     let pivot: CGPoint
+    var simple = false
 
     var body: some View {
         Canvas { context, _ in
             let hinge = CGPoint(x: pivot.x - screenFrame.minX, y: screenFrame.maxY - pivot.y)
             for (index, leaf) in motion.leaves.enumerated().reversed() {
+                if simple {
+                    var drawing = context
+                    drawing.opacity = Double(motion.progress)
+                    drawing.draw(drawing.resolve(Image(nsImage: leaf.image)), in:
+                        CGRect(x: leaf.frame.minX - screenFrame.minX, y: screenFrame.maxY - leaf.frame.maxY,
+                               width: leaf.frame.width, height: leaf.frame.height))
+                    continue
+                }
                 let delay = 0.14 * CGFloat(index) / CGFloat(max(1, motion.leaves.count - 1))
                 let progress = min(1, max(0, (motion.progress - delay) / (1 - delay)))
                 let eased = progress * progress * (3 - 2 * progress)
@@ -323,6 +350,8 @@ struct MagneticBoxView: View {
     let onReturnAll: () -> Void
     let onOpen: () -> Void
     let onCollapse: () -> Void
+    var motionReduced = false
+    var decorativeEffects = true
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var isHovering = false
@@ -379,7 +408,7 @@ struct MagneticBoxView: View {
         .background(TrayPanelBackdrop())
         // Hover only fans the photos; the tray and its drag target keep fixed bounds.
         .onHover { isHovering = $0 }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.18), value: isHovering)
+        .animation(reduceMotion || motionReduced ? nil : .easeOut(duration: 0.18), value: isHovering)
     }
 
     private var previewStack: some View {
@@ -400,7 +429,7 @@ struct MagneticBoxView: View {
                     .background(Color.white, in: RoundedRectangle(cornerRadius: 5))
                     .clipShape(RoundedRectangle(cornerRadius: 5))
                     .shadow(color: .black.opacity(0.12), radius: 2, y: 1)
-                    .rotationEffect(.degrees([-8, 6, -3, 9, 1][index] * (isHovering ? 1.08 : 1)))
+                    .rotationEffect(.degrees([-8, 6, -3, 9, 1][index] * (isHovering && decorativeEffects && !reduceMotion && !motionReduced ? 1.08 : 1)))
                     .offset(x: [-28, 21, -10, 29, 2][index], y: [0, -1, -3, 2, -2][index])
             }
         }

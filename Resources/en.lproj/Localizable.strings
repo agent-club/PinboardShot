@@ -716,6 +716,14 @@
 "magnetic.maximumLabel" = "Fan capacity";
 "magnetic.maximumCount" = "%d screenshots";
 "magnetic.help" = "Recent screenshots snap to the main screen edge. Fan capacities above 10 use browsable groups; screenshots beyond the capacity stay in the box. Click the box to browse all screenshots by page. History retention and app exclusions still apply. Turning this mode off does not delete images.";
+"magnetic.animationStyle" = "Animation style";
+"magnetic.animationStyle.full" = "Full";
+"magnetic.animationStyle.simple" = "Simple";
+"magnetic.animationStyle.full.help" = "Keep fan unfolding, card flips, flight trails, and arrival bounces.";
+"magnetic.animationStyle.simple.help" = "Keep smooth movement and fades without flips, trails, shakes, or bounces.";
+"magnetic.reduceMotion" = "Reduce motion";
+"magnetic.reduceMotion.help" = "Disable animated movement, rotation, and bouncing for instant transitions. Also follows the system Reduce Motion setting.";
+"magnetic.reduceMotion.system" = "System Reduce Motion is on, so magnetic animations are reduced. Your selected style is preserved.";
 "magnetic.needsHistory" = "Enable screenshot history to display captures on the Magnetic Desktop.";
 "magnetic.card" = "Screenshot: %d × %d. Click to pull out or drag.";
 "magnetic.cardHelp" = "Hover to preview. Drag onto the desktop to create a pin. Double-click or throw right to return to its source, or use Return all to gather every pin.";

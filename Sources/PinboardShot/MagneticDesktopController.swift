@@ -105,6 +105,8 @@ final class MagneticDesktopController {
     var boxArrivalProgress: CGFloat { boxMotion.progress }
     private var settings: MagneticDesktopSettings { MagneticDesktopSettings(defaults: defaults) }
     private var visibleFrame: CGRect? { screenFrames().first }
+    private var motionReduced: Bool { reduceMotion() || settings.reduceMotion }
+    private var decorativeEffects: Bool { !motionReduced && settings.animationStyle == .full }
 
     init(historyStore: HistoryStore, defaults: UserDefaults = .standard,
          reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
@@ -156,6 +158,10 @@ final class MagneticDesktopController {
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification).sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.refresh(force: true) }
         }.store(in: &subscriptions)
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refresh(force: true) }
+            }.store(in: &subscriptions)
         refresh(force: true)
         recordInteraction()
     }
@@ -251,6 +257,10 @@ final class MagneticDesktopController {
         let ids = historyStore.items.map(\.id)
         guard force || current != lastSettings || ids != lastIDs || historyEnabled != lastHistoryEnabled else { return }
         guard !suspended else { return }
+        if force || current.animationStyle != lastSettings?.animationStyle || current.reduceMotion != lastSettings?.reduceMotion {
+            clearEffects()
+            stopBoxMotion()
+        }
         lastSettings = current
         lastHistoryEnabled = historyEnabled
         lastIDs = ids
@@ -463,7 +473,8 @@ final class MagneticDesktopController {
     }
 
     private func animateFan(_ panels: [NSPanel], opening: Bool, in screen: CGRect, generation: Int) async {
-        guard !panels.isEmpty, !reduceMotion() else { clearFanAnimation(); return }
+        guard !panels.isEmpty, !motionReduced else { clearFanAnimation(); return }
+        let simple = settings.animationStyle == .simple
         let continuing = fanAnimationPanel?.isVisible == true
         let start = continuing ? fanMotion.progress : (opening ? CGFloat(0) : CGFloat(1))
         let end: CGFloat = opening ? 1 : 0
@@ -488,7 +499,7 @@ final class MagneticDesktopController {
         // Only the visual leaves move. They must never take clicks or activate another app's keyboard focus.
         overlay.ignoresMouseEvents = true
         overlay.contentView = MagneticPassiveHostingView(rootView:
-            MagneticFanMotionView(motion: fanMotion, screenFrame: screen, pivot: pivot))
+            MagneticFanMotionView(motion: fanMotion, screenFrame: screen, pivot: pivot, simple: simple))
         overlay.setFrame(screen, display: true)
         overlay.orderFrontRegardless()
         panels.forEach { $0.orderOut(nil) }
@@ -496,7 +507,7 @@ final class MagneticDesktopController {
             // A cancelled transition must not hide the newer animation created by a rapid reversal.
             if generation == refreshGeneration { clearFanAnimation() }
         }
-        let duration = max(0.16, 0.46 * Double(abs(end - start)))
+        let duration = simple ? 0.16 : max(0.16, 0.46 * Double(abs(end - start)))
         let steps = max(1, Int(duration * 60))
         for step in 0...steps {
             guard !Task.isCancelled, generation == refreshGeneration, !suspended else { return }
@@ -526,12 +537,12 @@ final class MagneticDesktopController {
                              flights: [UUID: MagneticFlightDirection] = [:]) async {
         let changing = targets.filter { $0.0.frame != $0.1 }
         guard !changing.isEmpty else { return }
-        guard !reduceMotion() else {
+        guard !motionReduced else {
             changing.forEach { $0.0.setFrame($0.1, display: true) }
             return
         }
         let starts = changing.map { $0.0.frame }
-        let flying = flights.filter { id, _ in changing.contains { $0.0 === cardPanels[id] } }
+        let flying = decorativeEffects ? flights.filter { id, _ in changing.contains { $0.0 === cardPanels[id] } } : [:]
         var generation: Int?
         if !flying.isEmpty, let screen = visibleFrame {
             clearEffects()
@@ -636,7 +647,7 @@ final class MagneticDesktopController {
             // Return flights stay on the desktop plane until they actually reach the rail.
             panel.level = isDesktop || flightDirections[id] == .inward ? .normal : .floating
             panel.alphaValue = 1
-            if isNew && hasPresented && !reduceMotion() && !unfolding && !changingPage {
+            if isNew && hasPresented && decorativeEffects && !unfolding && !changingPage {
                 panel.setFrame(PinWindowVisibleGeometry.constrainedFrame(
                     CGRect(origin: newCapture ? pointerLocation() : boxFrame.origin,
                            size: MagneticDesktopGeometry.cardSize), visibleFrames: [frame]), display: false)
@@ -648,7 +659,7 @@ final class MagneticDesktopController {
         }
         if unfolding || changingPage {
             moving.forEach { $0.0.setFrame($0.1, display: true) }
-            if changingPage && !unfolding && !reduceMotion() {
+            if changingPage && !unfolding && !motionReduced {
                 let cards = moving.map(\.0).filter { panel in !desktopPins.values.contains { $0.window === panel } }
                 defer { if isCurrent() { cards.forEach { $0.alphaValue = 1 } } }
                 for step in 0...8 {
@@ -681,7 +692,8 @@ final class MagneticDesktopController {
             desktopCount: desktopFrames.count, motion: boxMotion,
             onReturnAll: { [weak self] in self?.returnAllToEdge() },
             onOpen: { [weak self] in self?.toggleBox() },
-            onCollapse: { [weak self] in self?.setCollapsed(true) })
+            onCollapse: { [weak self] in self?.setCollapsed(true) },
+            motionReduced: motionReduced, decorativeEffects: decorativeEffects)
         if let hosting = box.contentView as? MagneticBoxHostingView {
             // A history refresh during a drag must retain its original press coordinates.
             hosting.rootView = content
@@ -1138,7 +1150,7 @@ final class MagneticDesktopController {
 
     private func shakeBox() {
         stopBoxMotion()
-        guard !reduceMotion(), !suspended else { return }
+        guard decorativeEffects, !suspended else { return }
         let generation = boxGeneration
         boxMotion.progress = 0
         boxTask = Task { @MainActor [weak self] in

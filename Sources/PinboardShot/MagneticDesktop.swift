@@ -1,10 +1,16 @@
 import AppKit
 import Foundation
 
+enum MagneticAnimationStyle: String, CaseIterable {
+    case full, simple
+}
+
 struct MagneticDesktopSettings: Equatable {
     static let enabledKey = "magneticDesktopEnabled"
     static let maximumVisibleKey = "magneticDesktopMaximumVisible"
     static let collapsedKey = "magneticDesktopCollapsed"
+    static let animationStyleKey = "magneticDesktopAnimationStyle"
+    static let reduceMotionKey = "magneticDesktopReduceMotion"
     static let defaultMaximumVisible = 10
     static let supportedLimits = 1...100
     static let maximumCardsPerGroup = 10
@@ -12,10 +18,14 @@ struct MagneticDesktopSettings: Equatable {
     let isEnabled: Bool
     let maximumVisible: Int
     let isCollapsed: Bool
+    let animationStyle: MagneticAnimationStyle
+    let reduceMotion: Bool
 
     init(defaults: UserDefaults = .standard) {
         isEnabled = defaults.bool(forKey: Self.enabledKey)
         isCollapsed = defaults.bool(forKey: Self.collapsedKey)
+        animationStyle = MagneticAnimationStyle(rawValue: defaults.string(forKey: Self.animationStyleKey) ?? "") ?? .full
+        reduceMotion = defaults.bool(forKey: Self.reduceMotionKey)
         let stored = defaults.object(forKey: Self.maximumVisibleKey) as? Int
         maximumVisible = stored.map { min(max($0, Self.supportedLimits.lowerBound), Self.supportedLimits.upperBound) }
             ?? Self.defaultMaximumVisible

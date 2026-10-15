@@ -716,6 +716,14 @@
 "magnetic.maximumLabel" = "扇面容量";
 "magnetic.maximumCount" = "%d 张";
 "magnetic.help" = "最近截图吸在主屏幕边缘。扇面容量超过 10 张时分组切换，超出容量的图片留在截图盒；点击截图盒可分页浏览全部截图。截图历史的保留与排除规则仍然适用，关闭此模式不会删除图片。";
+"magnetic.animationStyle" = "动效风格";
+"magnetic.animationStyle.full" = "完整";
+"magnetic.animationStyle.simple" = "简洁";
+"magnetic.animationStyle.full.help" = "保留折扇展开、卡片翻转、飞行光轨和回收弹跳。";
+"magnetic.animationStyle.simple.help" = "保留平滑移动与淡入淡出，去掉翻转、光轨、抖动和弹跳。";
+"magnetic.reduceMotion" = "弱化动效";
+"magnetic.reduceMotion.help" = "关闭位移、旋转和弹跳动效，操作即时完成。系统开启“减少动态效果”时也会自动生效。";
+"magnetic.reduceMotion.system" = "系统已开启“减少动态效果”，磁吸动效已弱化。所选风格会保留。";
 "magnetic.needsHistory" = "请在“截图历史”中开启保存历史，磁力桌面才会展示截图。";
 "magnetic.card" = "截图：%d × %d，点击抽出或拖动";
 "magnetic.cardHelp" = "悬停预览，拖到桌面成为贴图。双击或向右甩动回到来源位置，也可一键收起全部贴图。";

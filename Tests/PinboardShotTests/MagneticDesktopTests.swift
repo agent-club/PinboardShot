@@ -66,6 +66,85 @@ private final class MagneticContextMenuProbe: NSObject {
 @Suite("Magnetic Desktop", .serialized)
 @MainActor
 struct MagneticDesktopTests {
+    @Test("Animation preferences persist without changing the default style")
+    func animationSettingsPersist() throws {
+        let suite = "MagneticAnimationSettings.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(MagneticDesktopSettings(defaults: defaults).animationStyle == .full)
+        #expect(!MagneticDesktopSettings(defaults: defaults).reduceMotion)
+        defaults.set(MagneticAnimationStyle.simple.rawValue, forKey: MagneticDesktopSettings.animationStyleKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.reduceMotionKey)
+        let reloaded = try #require(UserDefaults(suiteName: suite))
+        #expect(MagneticDesktopSettings(defaults: reloaded).animationStyle == .simple)
+        #expect(MagneticDesktopSettings(defaults: reloaded).reduceMotion)
+    }
+
+    @Test("Custom motion modes preserve extraction and returns without decorative effects",
+          arguments: ["simple", "reduced", "system"])
+    func customMotionModes(mode: String) async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticAnimation-\(UUID())")
+        let suite = "MagneticAnimation.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        defaults.set(1, forKey: MagneticDesktopSettings.maximumVisibleKey)
+        defaults.set(mode == "simple" ? "simple" : "full", forKey: MagneticDesktopSettings.animationStyleKey)
+        defaults.set(mode == "reduced", forKey: MagneticDesktopSettings.reduceMotionKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        _ = try store.add(syntheticImage(1))
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { mode == "system" }, pointerLocation: { CGPoint(x: -10000, y: -10000) })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        controller.setCollapsed(false)
+        if mode == "simple" {
+            try await waitUntil { controller.fanAnimationPanel?.isVisible == true }
+            let fan = try #require(controller.fanAnimationPanel?.contentView as? MagneticPassiveHostingView<MagneticFanMotionView>)
+            #expect(fan.rootView.simple)
+        }
+        try await waitUntil { controller.boxPanel?.isVisible == true && controller.cardPanels.count == 1 }
+        #expect(controller.fanAnimationPanel?.isVisible != true)
+        let id = try #require(store.items.first?.id)
+        let railFrame = try #require(controller.cardPanels[id]?.frame)
+        controller.extract(id)
+        try await Task.sleep(for: .milliseconds(40))
+        #expect(controller.activeFlightCount == 0 && controller.trailPanel?.isVisible != true)
+        if mode == "simple" {
+            let card = try #require(controller.cardPanels[id]?.contentView as? MagneticCardHostingView)
+            #expect(card.rootView.motion.progress == 1)
+            #expect(controller.cardPanels[id]?.frame != railFrame)
+            #expect(controller.desktopPins[id] == nil)
+        } else {
+            #expect(controller.desktopPins[id] != nil)
+        }
+        try await waitUntil { controller.desktopPins[id] != nil }
+        controller.returnToEdge(id)
+        try await waitUntil { controller.desktopPins[id] == nil && controller.cardPanels[id]?.frame == railFrame }
+        _ = try store.add(syntheticImage(2))
+        try await waitUntil { controller.overflowCount == 2 && controller.cardPanels[id] == nil }
+        #expect(controller.boxArrivalProgress == 1)
+        let box = try #require(controller.boxPanel?.contentView as? MagneticBoxHostingView)
+        #expect(!box.rootView.decorativeEffects)
+        #expect(box.rootView.motionReduced == (mode != "simple"))
+
+        // Changing a preference while running must replace the current view policy immediately.
+        defaults.set("simple", forKey: MagneticDesktopSettings.animationStyleKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.reduceMotionKey)
+        controller.refresh()
+        try await waitUntil { box.rootView.motionReduced }
+        controller.setCollapsed(true)
+        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible == false }
+        #expect(controller.fanAnimationPanel?.isVisible != true)
+    }
+
     @Test("Default display cap and opt-in setting persist independently of history retention")
     func settingsPersist() throws {
         let suite = "MagneticSettingsTests.\(UUID())"
