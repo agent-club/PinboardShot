@@ -18,6 +18,7 @@ private final class MagneticDesktopPanel: NSPanel {
         }
         if let hosting = contentView as? MagneticCardHostingView, hosting.handleMouseEvent(event) { return }
         if let hosting = contentView as? MagneticBoxHostingView, hosting.handleMouseEvent(event) { return }
+        if let hosting = contentView as? MagneticFoldedHostingView, hosting.handleMouseEvent(event) { return }
         super.sendEvent(event)
     }
 }
@@ -35,6 +36,17 @@ final class MagneticDesktopController {
     private var homes: [UUID: MagneticCardHome] = [:]
     private let boxMotion = MagneticBoxMotion()
     private var boxPreferredOrigin: CGPoint?
+    private var foldedPreferredOrigin: CGPoint?
+    private var magneticScreenFrame: CGRect?
+    private let foldedMotion = MagneticFoldedMotion()
+    private(set) var foldedDockEdge: MagneticDockEdge = .right
+    private(set) var foldedIsDetached = false
+    private(set) var foldedIsCompact = false
+    private var foldedIsHovered = false
+    private let foldedIdleTimeout: TimeInterval
+    private var lastFoldedInteraction: TimeInterval?
+    private var foldedIdleTask: Task<Void, Never>?
+    private var foldedDragStart: (point: CGPoint, anchor: CGPoint, detached: Bool)?
     private var boxTask: Task<Void, Never>?
     private var boxGeneration = 0
     private var subscriptions: [AnyCancellable] = []
@@ -81,6 +93,7 @@ final class MagneticDesktopController {
     private(set) var contentsPanel: NSPanel?
     private(set) var hoverPanel: NSPanel?
     private(set) var foldedPanel: NSPanel?
+    private(set) var foldedBubblePanel: NSPanel?
     private(set) var pagerPanel: NSPanel?
     private var collectionPage = 0
     private var focusedRailID: UUID?
@@ -104,16 +117,36 @@ final class MagneticDesktopController {
     var activeFlightCount: Int { trailState.flights.count }
     var boxArrivalProgress: CGFloat { boxMotion.progress }
     private var settings: MagneticDesktopSettings { MagneticDesktopSettings(defaults: defaults) }
-    private var visibleFrame: CGRect? { screenFrames().first }
+    private var visibleFrame: CGRect? {
+        let frames = screenFrames()
+        guard let preferred = magneticScreenFrame else { return frames.first }
+        if frames.contains(preferred) { return preferred }
+        // A disconnected or rearranged display must leave the entry point on an available screen.
+        return MagneticDesktopGeometry.screenFrame(for: foldedPanel?.frame ?? preferred, in: frames)
+    }
+    private var motionReduced: Bool { reduceMotion() || settings.reduceMotion }
+    private var decorativeEffects: Bool { !motionReduced && settings.animationStyle != .simple }
+
+    private func foldedAnimation(response: Double, damping: Double) -> Animation? {
+        guard !motionReduced else { return nil }
+        switch settings.animationStyle {
+        case .full: return .spring(response: response, dampingFraction: damping)
+        case .elastic: return .spring(response: response * 1.2, dampingFraction: 0.58)
+        case .arc: return .easeInOut(duration: response)
+        case .simple: return .easeOut(duration: 0.18)
+        }
+    }
 
     init(historyStore: HistoryStore, defaults: UserDefaults = .standard,
          reduceMotion: @escaping () -> Bool = { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion },
          pointerLocation: @escaping () -> CGPoint = { NSEvent.mouseLocation },
          pinManager: PinWindowManager? = nil,
          idleTimeout: TimeInterval = 60,
+         foldedIdleTimeout: TimeInterval = 8,
          idleClock: @escaping () -> TimeInterval = { ProcessInfo.processInfo.systemUptime },
          screenFrames: @escaping () -> [CGRect] = { NSScreen.screens.map(\.visibleFrame) }) {
         self.idleTimeout = idleTimeout
+        self.foldedIdleTimeout = foldedIdleTimeout
         self.idleClock = idleClock
         self.historyStore = historyStore
         self.defaults = defaults
@@ -156,6 +189,10 @@ final class MagneticDesktopController {
         NotificationCenter.default.publisher(for: NSApplication.didChangeScreenParametersNotification).sink { [weak self] _ in
             Task { @MainActor [weak self] in self?.refresh(force: true) }
         }.store(in: &subscriptions)
+        NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification)
+            .sink { [weak self] _ in
+                Task { @MainActor [weak self] in self?.refresh(force: true) }
+            }.store(in: &subscriptions)
         refresh(force: true)
         recordInteraction()
     }
@@ -186,6 +223,10 @@ final class MagneticDesktopController {
     func stop(closeDesktopPins: Bool = true) {
         idleTask?.cancel()
         idleTask = nil
+        foldedIdleTask?.cancel()
+        foldedIdleTask = nil
+        lastFoldedInteraction = nil
+        foldedIsHovered = false
         // Shutdown detaches live callbacks but retains the source metadata saved for recovery.
         for id in Array(desktopPins.keys) { releasePin(id, close: closeDesktopPins, keepSource: !closeDesktopPins) }
         if ownsPinManager { pinManager.closeAll() }
@@ -217,6 +258,16 @@ final class MagneticDesktopController {
         boxPreviewPanel = nil
         hoverPanel = nil
         foldedPanel = nil
+        foldedBubblePanel = nil
+        foldedPreferredOrigin = nil
+        magneticScreenFrame = nil
+        foldedIsDetached = false
+        foldedDockEdge = .right
+        foldedMotion.dockEdge = .right
+        foldedIsCompact = false
+        foldedMotion.compactProgress = 0
+        foldedMotion.progress = 0
+        foldedMotion.pull = 0
         pagerPanel = nil
         thumbnails.removeAll()
     }
@@ -224,6 +275,9 @@ final class MagneticDesktopController {
     func suspendForCapture() {
         interruptDesktopCentering()
         desktopCenterRequest = nil
+        foldedIdleTask?.cancel()
+        foldedIdleTask = nil
+        foldedIsHovered = false
         idleTask?.cancel()
         idleTask = nil
         hoverTask?.cancel()
@@ -243,6 +297,7 @@ final class MagneticDesktopController {
         suspended = false
         refresh(force: true)
         recordInteraction()
+        recordFoldedInteraction()
     }
 
     func refresh(force: Bool = false) {
@@ -251,6 +306,11 @@ final class MagneticDesktopController {
         let ids = historyStore.items.map(\.id)
         guard force || current != lastSettings || ids != lastIDs || historyEnabled != lastHistoryEnabled else { return }
         guard !suspended else { return }
+        if force || current.animationStyle != lastSettings?.animationStyle || current.reduceMotion != lastSettings?.reduceMotion {
+            clearEffects()
+            stopBoxMotion()
+            hideFoldedBubbles()
+        }
         lastSettings = current
         lastHistoryEnabled = historyEnabled
         lastIDs = ids
@@ -275,6 +335,11 @@ final class MagneticDesktopController {
         hoverPanel?.orderOut(nil)
         refreshGeneration += 1
         guard current.isEnabled, historyEnabled, let frame = visibleFrame else {
+            foldedIdleTask?.cancel()
+            foldedIdleTask = nil
+            lastFoldedInteraction = nil
+            foldedIsHovered = false
+            setFoldedCompact(false)
             idleTask?.cancel()
             idleTask = nil
             for id in Array(desktopPins.keys) { releasePin(id, close: false) }
@@ -297,6 +362,7 @@ final class MagneticDesktopController {
             shouldRestoreContents = false
             return
         }
+        if magneticScreenFrame != nil { magneticScreenFrame = frame }
         if current.isCollapsed {
             idleTask?.cancel()
             idleTask = nil
@@ -334,7 +400,9 @@ final class MagneticDesktopController {
 
     private func hidePanels() {
         clearFanAnimation()
+        hideFoldedBubbles()
         (boxPanel?.contentView as? MagneticBoxHostingView)?.cancelDrag()
+        (foldedPanel?.contentView as? MagneticFoldedHostingView)?.cancelDrag()
         cardPanels.values.forEach { $0.orderOut(nil) }
         boxPanel?.orderOut(nil)
         closeBox()
@@ -346,8 +414,18 @@ final class MagneticDesktopController {
 
     func setCollapsed(_ collapsed: Bool) {
         guard settings.isCollapsed != collapsed else { return }
+        if !collapsed {
+            setFoldedCompact(false)
+            foldedIdleTask?.cancel()
+            foldedIdleTask = nil
+            lastFoldedInteraction = nil
+            foldedIsHovered = false
+        } else {
+            lastFoldedInteraction = idleClock()
+        }
         defaults.set(collapsed, forKey: MagneticDesktopSettings.collapsedKey)
         (boxPanel?.contentView as? MagneticBoxHostingView)?.cancelDrag()
+        (foldedPanel?.contentView as? MagneticFoldedHostingView)?.cancelDrag()
         if collapsed {
             for id in Array(desktopFrames.keys) {
                 restoreFlightProxy(id)
@@ -402,9 +480,103 @@ final class MagneticDesktopController {
         refresh(force: true)
     }
 
+    private func recordFoldedInteraction() {
+        guard !subscriptions.isEmpty, settings.isEnabled, settings.isCollapsed, !suspended,
+              HistorySettings.isEnabled(defaults: defaults) else { return }
+        lastFoldedInteraction = idleClock()
+        armFoldedIdleTimer()
+    }
+
+    private func armFoldedIdleTimer() {
+        guard !subscriptions.isEmpty, settings.isEnabled, settings.isCollapsed, !foldedIsDetached, !foldedIsCompact,
+              !foldedIsHovered, !suspended, foldedIdleTask == nil else { return }
+        if lastFoldedInteraction == nil { lastFoldedInteraction = idleClock() }
+        foldedIdleTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                guard let self, let last = self.lastFoldedInteraction else { return }
+                let remaining = max(0.1, self.foldedIdleTimeout - (self.idleClock() - last))
+                do { try await Task.sleep(for: .seconds(remaining)) } catch { return }
+                guard !Task.isCancelled else { return }
+                self.checkForFoldedIdleCollapse()
+                if self.foldedIsCompact || self.foldedIsDetached || self.foldedIsHovered { return }
+            }
+        }
+    }
+
+    func checkForFoldedIdleCollapse() {
+        guard settings.isEnabled, settings.isCollapsed, !suspended, !isReconciling,
+              HistorySettings.isEnabled(defaults: defaults), !foldedIsDetached, !foldedIsCompact,
+              !foldedIsHovered, foldedDragStart == nil,
+              let panel = foldedPanel, panel.isVisible, let last = lastFoldedInteraction,
+              idleClock() - last >= foldedIdleTimeout else { return }
+        // A stationary pointer still protects the first fold, even if no new mouse-moved event arrives.
+        if panel.frame.contains(pointerLocation()) { setFoldedHovered(true); return }
+        setFoldedCompact(true)
+        foldedIdleTask?.cancel()
+        foldedIdleTask = nil
+    }
+
+    private func setFoldedHovered(_ hovered: Bool) {
+        guard !subscriptions.isEmpty, settings.isEnabled, settings.isCollapsed, !suspended,
+              foldedPanel?.isVisible == true, foldedIsHovered != hovered else { return }
+        foldedIsHovered = hovered
+        if hovered {
+            foldedIdleTask?.cancel()
+            foldedIdleTask = nil
+            setFoldedCompact(false)
+        }
+        recordFoldedInteraction()
+    }
+
+    private func setFoldedCompact(_ compact: Bool) {
+        guard foldedIsCompact != compact, !foldedIsDetached else { return }
+        let center = foldedPanel?.frame.midpoint
+        foldedIsCompact = compact
+        withAnimation(foldedAnimation(response: 0.3, damping: 0.85)) {
+            foldedMotion.compactProgress = compact ? 1 : 0
+        }
+        guard let frame = visibleFrame, let panel = foldedPanel, let center else { return }
+        let size = resolvedFoldedFrame(in: frame).size
+        foldedPreferredOrigin = CGPoint(x: center.x - size.width / 2, y: center.y - size.height / 2)
+        let pose = resolvedFoldedFrame(in: frame)
+        foldedPreferredOrigin = pose.origin
+        panel.setFrame(pose, display: true)
+        updateFoldedBubbles()
+    }
+
+    private func hideFoldedBubbles() {
+        foldedBubblePanel?.orderOut(nil)
+        // Remove the TimelineView so a hidden effect does not keep scheduling frames.
+        foldedBubblePanel?.contentView = nil
+    }
+
+    private func updateFoldedBubbles() {
+        guard foldedIsCompact, !foldedIsHovered, !foldedIsDetached, foldedDragStart == nil,
+              !suspended, settings.isEnabled, settings.isCollapsed, decorativeEffects,
+              let capsule = foldedPanel, capsule.isVisible, let screen = visibleFrame,
+              !capsule.frame.insetBy(dx: -36, dy: -36).contains(pointerLocation()) else {
+            hideFoldedBubbles()
+            return
+        }
+        let viewport = capsule.frame.insetBy(dx: -28, dy: -28).intersection(screen)
+        guard !viewport.isEmpty else { hideFoldedBubbles(); return }
+        let panel = foldedBubblePanel ?? makePanel(frame: viewport)
+        foldedBubblePanel = panel
+        if panel.isVisible, panel.frame == viewport,
+           let hosting = panel.contentView as? MagneticPassiveHostingView<MagneticCapsuleBubbles>,
+           hosting.rootView.capsuleFrame == capsule.frame, hosting.rootView.edge == foldedDockEdge { return }
+        panel.level = capsule.level
+        panel.hasShadow = false
+        panel.ignoresMouseEvents = true
+        panel.contentView = MagneticPassiveHostingView(rootView:
+            MagneticCapsuleBubbles(capsuleFrame: capsule.frame, viewport: viewport, edge: foldedDockEdge))
+        panel.setFrame(viewport, display: true)
+        panel.order(.below, relativeTo: capsule.windowNumber)
+    }
+
     private func reconcileFolded(frame: CGRect, generation: Int) async {
         guard !Task.isCancelled, generation == refreshGeneration, !suspended else { return }
-        // Folding must not retain a preview of a screenshot removed by history retention or deletion.
+        // Release cached rail content removed by history retention or deletion even while folded.
         let retained = Set(queue.recentIDs)
         for id in cardPanels.keys.filter({ !retained.contains($0) }) {
             cardPanels.removeValue(forKey: id)?.orderOut(nil)
@@ -416,14 +588,29 @@ final class MagneticDesktopController {
                 pin.showWithoutActivating()
             }
         }
-        let destination = MagneticDesktopGeometry.foldedFrame(in: frame)
+        let destination = resolvedFoldedFrame(in: frame)
         let panel = foldedPanel ?? makePanel(frame: destination)
         foldedPanel = panel
-        panel.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-        panel.contentView = MagneticPassiveHostingView(rootView: MagneticFoldedView(count: queue.recentIDs.count,
-            onExpand: { [weak self] in self?.setCollapsed(false) }))
+        // Keep the collapsed entry point above other apps' floating panels and pop-up windows.
+        panel.level = .screenSaver
+        (panel as? MagneticDesktopPanel)?.onInteraction = { [weak self] in self?.recordFoldedInteraction() }
+        let content = MagneticFoldedView(count: queue.recentIDs.count, motion: foldedMotion,
+            onExpand: { [weak self] in self?.setCollapsed(false) },
+            onHoverChanged: { [weak self] in self?.setFoldedHovered($0) })
+        if let hosting = panel.contentView as? MagneticFoldedHostingView {
+            // Retain the press coordinates when history changes during a drag.
+            hosting.rootView = content
+        } else {
+            let hosting = MagneticFoldedHostingView(rootView: content)
+            hosting.onDragBegan = { [weak self] in self?.beginFoldedDrag(at: $0) }
+            hosting.onDrag = { [weak self] in self?.dragFolded(to: $0, ended: $1) }
+            hosting.onDragCancelled = { [weak self] in self?.cancelFoldedDrag() }
+            panel.contentView = hosting
+        }
         panel.setFrame(destination, display: true)
         panel.orderFrontRegardless()
+        updateFoldedBubbles()
+        armFoldedIdleTimer()
         closeBox()
         pagerPanel?.orderOut(nil)
         let ordered = partition.visible
@@ -463,7 +650,8 @@ final class MagneticDesktopController {
     }
 
     private func animateFan(_ panels: [NSPanel], opening: Bool, in screen: CGRect, generation: Int) async {
-        guard !panels.isEmpty, !reduceMotion() else { clearFanAnimation(); return }
+        guard !panels.isEmpty, !motionReduced else { clearFanAnimation(); return }
+        let simple = settings.animationStyle == .simple
         let continuing = fanAnimationPanel?.isVisible == true
         let start = continuing ? fanMotion.progress : (opening ? CGFloat(0) : CGFloat(1))
         let end: CGFloat = opening ? 1 : 0
@@ -479,8 +667,17 @@ final class MagneticDesktopController {
         fanMotion.leaves = leaves
         fanMotion.progress = start
         fanPanels = panels
-        let folded = MagneticDesktopGeometry.foldedFrame(in: screen)
-        let pivot = CGPoint(x: folded.maxX - 7, y: folded.minY + folded.height * 25 / 144)
+        let folded = resolvedFoldedFrame(in: screen)
+        let pivot: CGPoint
+        if foldedIsDetached { pivot = folded.midpoint }
+        else {
+            switch foldedDockEdge {
+            case .right: pivot = CGPoint(x: folded.maxX - 7, y: folded.minY + folded.height * 25 / 144)
+            case .left: pivot = CGPoint(x: folded.minX + 7, y: folded.minY + folded.height * 25 / 144)
+            case .top: pivot = CGPoint(x: folded.maxX - folded.width * 25 / 144, y: folded.maxY - 7)
+            case .bottom: pivot = CGPoint(x: folded.minX + folded.width * 25 / 144, y: folded.minY + 7)
+            }
+        }
         let overlay = fanAnimationPanel ?? makePanel(frame: screen)
         fanAnimationPanel = overlay
         overlay.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 2)
@@ -488,7 +685,8 @@ final class MagneticDesktopController {
         // Only the visual leaves move. They must never take clicks or activate another app's keyboard focus.
         overlay.ignoresMouseEvents = true
         overlay.contentView = MagneticPassiveHostingView(rootView:
-            MagneticFanMotionView(motion: fanMotion, screenFrame: screen, pivot: pivot))
+            MagneticFanMotionView(motion: fanMotion, screenFrame: screen, pivot: pivot,
+                                  simple: simple, style: settings.animationStyle))
         overlay.setFrame(screen, display: true)
         overlay.orderFrontRegardless()
         panels.forEach { $0.orderOut(nil) }
@@ -496,7 +694,8 @@ final class MagneticDesktopController {
             // A cancelled transition must not hide the newer animation created by a rapid reversal.
             if generation == refreshGeneration { clearFanAnimation() }
         }
-        let duration = max(0.16, 0.46 * Double(abs(end - start)))
+        let baseDuration = settings.animationStyle == .full ? 0.46 : 0.56
+        let duration = simple ? 0.16 : max(0.16, baseDuration * Double(abs(end - start)))
         let steps = max(1, Int(duration * 60))
         for step in 0...steps {
             guard !Task.isCancelled, generation == refreshGeneration, !suspended else { return }
@@ -526,20 +725,25 @@ final class MagneticDesktopController {
                              flights: [UUID: MagneticFlightDirection] = [:]) async {
         let changing = targets.filter { $0.0.frame != $0.1 }
         guard !changing.isEmpty else { return }
-        guard !reduceMotion() else {
+        guard !motionReduced else {
             changing.forEach { $0.0.setFrame($0.1, display: true) }
             return
         }
         let starts = changing.map { $0.0.frame }
-        let flying = flights.filter { id, _ in changing.contains { $0.0 === cardPanels[id] } }
+        let style = settings.animationStyle
+        let flying = decorativeEffects ? flights.filter { id, _ in changing.contains { $0.0 === cardPanels[id] } } : [:]
         var generation: Int?
         if !flying.isEmpty, let screen = visibleFrame {
             clearEffects()
             generation = effectGeneration
-            for (id, direction) in flying { motion(for: id).begin(direction) }
+            for (id, direction) in flying {
+                motion(for: id).style = style
+                motion(for: id).begin(direction)
+            }
             trailState.flights = flying.keys.compactMap { id in
                 guard let index = changing.firstIndex(where: { $0.0 === cardPanels[id] }) else { return nil }
-                return MagneticFlightTrail(id: id, start: starts[index].midpoint, end: changing[index].1.midpoint, progress: 0)
+                return MagneticFlightTrail(id: id, start: starts[index].midpoint, end: changing[index].1.midpoint,
+                                           progress: 0, style: style)
             }
             let trail = trailPanel ?? makePanel(frame: screen)
             trailPanel = trail
@@ -555,18 +759,22 @@ final class MagneticDesktopController {
             if let generation, generation == effectGeneration { clearEffects() }
         }
         // Window frames and visual progress share one clock, including all-card returns.
-        let steps = max(1, Int(duration * 60))
+        let animationDuration = duration * (style == .elastic || style == .arc ? 1.25 : 1)
+        let steps = max(1, Int(animationDuration * 60))
         for step in 1...steps {
             guard !Task.isCancelled else { return }
             let progress = CGFloat(step) / CGFloat(steps)
-            let eased = 1 - pow(1 - progress, 3)
+            let eased = style.progress(progress)
             for (index, target) in changing.enumerated() {
                 let start = starts[index], end = target.1
-                target.0.setFrame(CGRect(
-                    x: start.minX + (end.minX - start.minX) * eased,
-                    y: start.minY + (end.minY - start.minY) * eased,
-                    width: start.width + (end.width - start.width) * eased,
-                    height: start.height + (end.height - start.height) * eased), display: true)
+                let center = style.point(from: start.midpoint, to: end.midpoint, progress: eased)
+                let size = CGSize(width: start.width + (end.width - start.width) * eased,
+                                  height: start.height + (end.height - start.height) * eased)
+                let pose = CGRect(x: center.x - size.width / 2, y: center.y - size.height / 2,
+                                  width: size.width, height: size.height)
+                // Curved travel may bow outside a display; all other styles retain the existing path.
+                target.0.setFrame(style == .arc && step < steps
+                    ? PinWindowVisibleGeometry.constrainedFrame(pose, visibleFrames: screenFrames()) : pose, display: true)
             }
             if generation == effectGeneration {
                 for id in flying.keys { cardMotions[id]?.progress = progress }
@@ -577,7 +785,7 @@ final class MagneticDesktopController {
                 }
             }
             if step < steps {
-                do { try await Task.sleep(for: .seconds(duration / Double(steps))) }
+                do { try await Task.sleep(for: .seconds(animationDuration / Double(steps))) }
                 catch { return }
             }
         }
@@ -636,7 +844,7 @@ final class MagneticDesktopController {
             // Return flights stay on the desktop plane until they actually reach the rail.
             panel.level = isDesktop || flightDirections[id] == .inward ? .normal : .floating
             panel.alphaValue = 1
-            if isNew && hasPresented && !reduceMotion() && !unfolding && !changingPage {
+            if isNew && hasPresented && decorativeEffects && !unfolding && !changingPage {
                 panel.setFrame(PinWindowVisibleGeometry.constrainedFrame(
                     CGRect(origin: newCapture ? pointerLocation() : boxFrame.origin,
                            size: MagneticDesktopGeometry.cardSize), visibleFrames: [frame]), display: false)
@@ -648,7 +856,7 @@ final class MagneticDesktopController {
         }
         if unfolding || changingPage {
             moving.forEach { $0.0.setFrame($0.1, display: true) }
-            if changingPage && !unfolding && !reduceMotion() {
+            if changingPage && !unfolding && !motionReduced {
                 let cards = moving.map(\.0).filter { panel in !desktopPins.values.contains { $0.window === panel } }
                 defer { if isCurrent() { cards.forEach { $0.alphaValue = 1 } } }
                 for step in 0...8 {
@@ -681,7 +889,8 @@ final class MagneticDesktopController {
             desktopCount: desktopFrames.count, motion: boxMotion,
             onReturnAll: { [weak self] in self?.returnAllToEdge() },
             onOpen: { [weak self] in self?.toggleBox() },
-            onCollapse: { [weak self] in self?.setCollapsed(true) })
+            onCollapse: { [weak self] in self?.setCollapsed(true) },
+            motionReduced: motionReduced, decorativeEffects: decorativeEffects, animationStyle: settings.animationStyle)
         if let hosting = box.contentView as? MagneticBoxHostingView {
             // A history refresh during a drag must retain its original press coordinates.
             hosting.rootView = content
@@ -739,6 +948,10 @@ final class MagneticDesktopController {
     }
 
     func updateHover(at point: CGPoint) {
+        if settings.isCollapsed, let panel = foldedPanel, panel.isVisible {
+            setFoldedHovered(panel.frame.contains(point))
+            updateFoldedBubbles()
+        }
         let rail = cardPanels.filter { desktopFrames[$0.key] == nil }.map(\.value)
         if (rail + [boxPanel, contentsPanel, pagerPanel].compactMap { $0 }).contains(where: { $0.isVisible && $0.frame.contains(point) }) {
             recordInteraction()
@@ -1061,7 +1274,7 @@ final class MagneticDesktopController {
 
     private func magneticObstacles(in screen: CGRect) -> [CGRect] {
         guard screen == visibleFrame else { return [] }
-        if settings.isCollapsed { return [MagneticDesktopGeometry.foldedFrame(in: screen)] }
+        if settings.isCollapsed { return [resolvedFoldedFrame(in: screen)] }
         let cards = MagneticDesktopGeometry.cardFrames(count: partition.visible.count, in: screen)
         return [resolvedBoxFrame(in: screen)] + cards
             + (railPageCount > 1 ? [MagneticDesktopGeometry.pagerFrame(beside: cards, in: screen)] : [])
@@ -1138,7 +1351,7 @@ final class MagneticDesktopController {
 
     private func shakeBox() {
         stopBoxMotion()
-        guard !reduceMotion(), !suspended else { return }
+        guard decorativeEffects, !suspended else { return }
         let generation = boxGeneration
         boxMotion.progress = 0
         boxTask = Task { @MainActor [weak self] in
@@ -1149,6 +1362,127 @@ final class MagneticDesktopController {
                 self.boxMotion.progress = CGFloat(step) / 24
                 do { try await Task.sleep(for: .milliseconds(16)) } catch { return }
             }
+        }
+    }
+
+    private func attachedFoldedSize(in frame: CGRect) -> CGSize {
+        let thickness: CGFloat = foldedIsCompact ? 20 : 32
+        let length: CGFloat = foldedIsCompact ? 56 : 144
+        if foldedDockEdge.isHorizontal {
+            return CGSize(width: min(length, frame.width * 0.65), height: min(thickness, frame.height))
+        }
+        return CGSize(width: min(thickness, frame.width), height: min(length, frame.height * 0.65))
+    }
+
+    private func resolvedFoldedFrame(in frame: CGRect) -> CGRect {
+        let initial = MagneticDesktopGeometry.foldedFrame(in: frame)
+        let size = foldedIsDetached
+            ? CGSize(width: min(96, frame.width), height: min(112, frame.height))
+            : attachedFoldedSize(in: frame)
+        var origin = foldedPreferredOrigin ?? initial.origin
+        if !foldedIsDetached {
+            switch foldedDockEdge {
+            case .right: origin.x = frame.maxX - size.width
+            case .left: origin.x = frame.minX
+            case .top: origin.y = frame.maxY - size.height
+            case .bottom: origin.y = frame.minY
+            }
+        }
+        return PinWindowVisibleGeometry.constrainedFrame(
+            CGRect(origin: origin, size: size), visibleFrames: [frame])
+    }
+
+    private func beginFoldedDrag(at point: CGPoint) {
+        hideFoldedBubbles()
+        setFoldedCompact(false)
+        recordFoldedInteraction()
+        guard let panel = foldedPanel else { return }
+        foldedDragStart = (point, CGPoint(x: (point.x - panel.frame.minX) / panel.frame.width,
+            y: (point.y - panel.frame.minY) / panel.frame.height), foldedIsDetached)
+    }
+
+    private func cancelFoldedDrag() {
+        foldedDragStart = nil
+        withAnimation(foldedAnimation(response: 0.3, damping: 0.75)) {
+            foldedMotion.pull = 0
+        }
+        recordFoldedInteraction()
+    }
+
+    private func changeFoldedAttachment(detached: Bool) {
+        guard foldedIsDetached != detached else { return }
+        foldedIsDetached = detached
+        if detached {
+            foldedIdleTask?.cancel()
+            foldedIdleTask = nil
+        } else {
+            recordFoldedInteraction()
+        }
+        withAnimation(foldedAnimation(response: 0.34, damping: 0.78)) {
+            foldedMotion.progress = detached ? 1 : 0
+            foldedMotion.pull = 0
+        }
+    }
+
+    private func dragFolded(to point: CGPoint, ended: Bool) {
+        guard let currentScreen = visibleFrame, let panel = foldedPanel, panel.isVisible,
+              let start = foldedDragStart, settings.isEnabled, settings.isCollapsed, !suspended else { return }
+        // Keep the current screen through gaps and menu/Dock areas, switching once the pointer enters another display.
+        let frame = currentScreen.contains(point) ? currentScreen
+            : screenFrames().first(where: { $0.contains(point) }) ?? currentScreen
+        let changedScreen = frame != currentScreen
+        magneticScreenFrame = frame
+        let delta = CGPoint(x: point.x - start.point.x, y: point.y - start.point.y)
+        let wasDetached = foldedIsDetached
+        let previousEdge = foldedDockEdge
+        if changedScreen { changeFoldedAttachment(detached: true) }
+        if !foldedIsDetached {
+            let inward = foldedDockEdge.inwardTravel(delta)
+            let tangent = foldedDockEdge.isHorizontal ? abs(delta.x) : abs(delta.y)
+            // Pull inward to detach; motion along the active edge remains a slide.
+            if !start.detached && inward >= 64 && inward > tangent * 0.75 {
+                changeFoldedAttachment(detached: true)
+            } else {
+                let size = attachedFoldedSize(in: frame)
+                foldedPreferredOrigin = CGPoint(x: point.x - start.anchor.x * size.width,
+                                                y: point.y - start.anchor.y * size.height)
+                if !ended { foldedMotion.pull = min(1, max(0, inward / 64)) }
+                let pose = resolvedFoldedFrame(in: frame)
+                foldedPreferredOrigin = pose.origin
+                panel.setFrame(pose, display: true)
+                return
+            }
+        }
+        let floating = resolvedFoldedFrame(in: frame)
+        var anchor = start.anchor
+        if !start.detached {
+            // Grow inward from the grip so detaching does not immediately enter the snap zone again.
+            switch foldedDockEdge {
+            case .right: anchor.x = max(0.65, anchor.x)
+            case .left: anchor.x = min(0.35, anchor.x)
+            case .top: anchor.y = max(0.65, anchor.y)
+            case .bottom: anchor.y = min(0.35, anchor.y)
+            }
+        }
+        let origin = CGPoint(x: point.x - anchor.x * floating.width, y: point.y - anchor.y * floating.height)
+        if let edge = MagneticDockEdge.nearest(to: CGRect(origin: origin, size: floating.size),
+                                               in: frame, preferring: foldedDockEdge) {
+            foldedDockEdge = edge
+            foldedMotion.dockEdge = edge
+            changeFoldedAttachment(detached: false)
+            let size = attachedFoldedSize(in: frame)
+            foldedPreferredOrigin = CGPoint(x: point.x - start.anchor.x * size.width,
+                                            y: point.y - start.anchor.y * size.height)
+        } else {
+            foldedPreferredOrigin = origin
+        }
+        let pose = resolvedFoldedFrame(in: frame)
+        foldedPreferredOrigin = pose.origin
+        panel.setFrame(pose, display: true)
+        if changedScreen || wasDetached != foldedIsDetached || previousEdge != foldedDockEdge {
+            // Restart the grip at the new shape, including when snapping to a different edge mid-drag.
+            foldedDragStart = (point, CGPoint(x: min(1, max(0, (point.x - pose.minX) / pose.width)),
+                                              y: min(1, max(0, (point.y - pose.minY) / pose.height))), foldedIsDetached)
         }
     }
 

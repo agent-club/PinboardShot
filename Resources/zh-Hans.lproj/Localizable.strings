@@ -716,6 +716,18 @@
 "magnetic.maximumLabel" = "扇面容量";
 "magnetic.maximumCount" = "%d 张";
 "magnetic.help" = "最近截图吸在主屏幕边缘。扇面容量超过 10 张时分组切换，超出容量的图片留在截图盒；点击截图盒可分页浏览全部截图。截图历史的保留与排除规则仍然适用，关闭此模式不会删除图片。";
+"magnetic.animationStyle" = "动效风格";
+"magnetic.animationStyle.full" = "完整";
+"magnetic.animationStyle.simple" = "简洁";
+"magnetic.animationStyle.elastic" = "弹性";
+"magnetic.animationStyle.arc" = "弧线";
+"magnetic.animationStyle.elastic.help" = "展开、抽出、吸回和居中采用弹性节奏，配合卡片轻弹与截图盒回弹。";
+"magnetic.animationStyle.arc.help" = "展开、抽出、吸回和居中沿弧线移动，配合轻微摆转与弧形光轨。";
+"magnetic.animationStyle.full.help" = "保留折扇展开、卡片翻转、飞行光轨和回收弹跳。";
+"magnetic.animationStyle.simple.help" = "保留平滑移动与淡入淡出，去掉翻转、光轨、抖动和弹跳。";
+"magnetic.reduceMotion" = "弱化动效";
+"magnetic.reduceMotion.help" = "关闭位移、旋转和弹跳动效，操作即时完成。系统开启“减少动态效果”时也会自动生效。";
+"magnetic.reduceMotion.system" = "系统已开启“减少动态效果”，磁吸动效已弱化。所选风格会保留。";
 "magnetic.needsHistory" = "请在“截图历史”中开启保存历史，磁力桌面才会展示截图。";
 "magnetic.card" = "截图：%d × %d，点击抽出或拖动";
 "magnetic.cardHelp" = "悬停预览，拖到桌面成为贴图。双击或向右甩动回到来源位置，也可一键收起全部贴图。";
@@ -750,3 +762,61 @@
 "magnetic.nextPage" = "下一页";
 "magnetic.collectionPage" = "%d / %d";
 "magnetic.locate" = "在扇面中定位";
+
+/* Settings workspace */
+"settings.sidebar.subtitle" = "截图与桌面工具";
+"settings.sidebar.library" = "内容库";
+"settings.sidebar.customize" = "个性化";
+"settings.description.shortcuts" = "为常用动作设置顺手的按键组合";
+"settings.description.history" = "找回截图，让灵感随时可用";
+"settings.description.pins" = "保存桌面布局，随时回到工作现场";
+"settings.description.ocr" = "选择文字识别方式与连接服务";
+"settings.description.watermark" = "管理隐形标记与本机记录";
+"settings.description.toolbar" = "把常用工具放在最顺手的位置";
+"settings.description.general" = "让 PinboardShot 配合你的工作习惯";
+"settings.shortcuts.actions" = "动作与快捷键";
+"settings.history.library" = "截图记录";
+"settings.history.saving" = "保存规则";
+"settings.history.storage" = "本机存储";
+"settings.history.localStorage" = "所有内容均保存在本机";
+"settings.history.results" = "%d 张截图";
+"settings.history.empty" = "还没有截图";
+"settings.history.emptyHelp" = "完成截图后，可以在这里查看、复制或贴到桌面。";
+"settings.search.empty" = "没有匹配的结果";
+"settings.search.emptyHelp" = "试试其他关键词，或清空搜索条件。";
+"settings.search.clear" = "清空搜索";
+"settings.moreActions" = "更多操作";
+"settings.pageNavigation" = "页面分区";
+"settings.general.basic" = "常规";
+"settings.general.connections" = "连接与权限";
+"settings.general.advanced" = "更新与隐私";
+"settings.toolbar.arrange" = "排列与显示";
+"settings.toolbar.preview" = "工具栏预览";
+"settings.history.maintenance" = "存储与清理";
+"settings.shortcuts.empty" = "还没有快捷键";
+
+/* Compact settings navigation and storage */
+"settings.rail.shortcuts" = "快捷键";
+"settings.rail.history" = "历史";
+"settings.rail.pins" = "工作区";
+"settings.rail.ocr" = "文字识别";
+"settings.rail.watermark" = "水印";
+"settings.rail.toolbar" = "工具栏";
+"settings.rail.general" = "偏好";
+"settings.history.starred" = "星标";
+"settings.history.manage" = "管理历史";
+"settings.history.exclusions" = "隐私排除";
+"settings.storage.images" = "截图图片";
+"settings.storage.index" = "文字索引";
+"settings.storage.recovery" = "会话恢复";
+"settings.workspace.export" = "导出";
+"settings.workspace.skipped" = "%d 张图片无法预览";
+"settings.workspace.emptyHelp" = "摆放好贴图后，点击右上角“保存工作区”。";
+
+/* Application appearance */
+"appearance.system" = "跟随系统";
+"appearance.light" = "浅色";
+"appearance.dark" = "深色";
+"preferences.appearance.section" = "外观";
+"preferences.appearance.mode" = "颜色模式";
+"preferences.appearance.help" = "选择浅色或深色，或随 macOS 外观自动切换。";

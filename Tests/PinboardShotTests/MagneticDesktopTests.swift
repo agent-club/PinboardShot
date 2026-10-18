@@ -66,6 +66,171 @@ private final class MagneticContextMenuProbe: NSObject {
 @Suite("Magnetic Desktop", .serialized)
 @MainActor
 struct MagneticDesktopTests {
+    @Test("Animation preferences persist without changing the default style")
+    func animationSettingsPersist() throws {
+        let suite = "MagneticAnimationSettings.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(MagneticDesktopSettings(defaults: defaults).animationStyle == .full)
+        #expect(!MagneticDesktopSettings(defaults: defaults).reduceMotion)
+        defaults.set(MagneticAnimationStyle.simple.rawValue, forKey: MagneticDesktopSettings.animationStyleKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.reduceMotionKey)
+        let reloaded = try #require(UserDefaults(suiteName: suite))
+        #expect(MagneticDesktopSettings(defaults: reloaded).animationStyle == .simple)
+        #expect(MagneticDesktopSettings(defaults: reloaded).reduceMotion)
+        for style in MagneticAnimationStyle.allCases {
+            defaults.set(style.rawValue, forKey: MagneticDesktopSettings.animationStyleKey)
+            #expect(MagneticDesktopSettings(defaults: reloaded).animationStyle == style)
+        }
+    }
+
+    @Test("Every motion suite reaches exact endpoints, with curved travel distinct from straight travel")
+    func animationTrajectories() {
+        let start = CGPoint(x: -700, y: 100), end = CGPoint(x: -200, y: 400)
+        for style in MagneticAnimationStyle.allCases {
+            #expect(style.progress(0) == 0 && style.progress(1) == 1)
+            #expect(style.point(from: start, to: end, progress: 0) == start)
+            #expect(style.point(from: start, to: end, progress: 1) == end)
+            #expect(style.point(from: start, to: start, progress: 0.5) == start)
+            for step in 0...100 {
+                let progress = style.progress(CGFloat(step) / 100)
+                #expect(progress.isFinite && (0...1).contains(progress))
+            }
+        }
+        let straight = MagneticAnimationStyle.full.point(from: start, to: end, progress: 0.5)
+        let curved = MagneticAnimationStyle.arc.point(from: start, to: end, progress: 0.5)
+        #expect(hypot(curved.x - straight.x, curved.y - straight.y) > 40)
+        #expect(MagneticAnimationStyle.elastic.progress(0.3) != MagneticAnimationStyle.full.progress(0.3))
+    }
+
+    @Test("New motion suites preserve fan, extraction, centering, returns and reduced motion",
+          arguments: [MagneticAnimationStyle.elastic, .arc])
+    func animationSuiteLifecycle(style: MagneticAnimationStyle) async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticSuite-\(UUID())")
+        let suite = "MagneticSuite.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        defaults.set(style.rawValue, forKey: MagneticDesktopSettings.animationStyleKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { false }, pointerLocation: { CGPoint(x: -10000, y: -10000) })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        let keyWindow = NSApp.keyWindow
+        controller.setCollapsed(false)
+        try await waitUntil { controller.fanAnimationPanel?.isVisible == true }
+        let fan = try #require(controller.fanAnimationPanel?.contentView as? MagneticPassiveHostingView<MagneticFanMotionView>)
+        #expect(fan.rootView.style == style && !fan.rootView.simple)
+        try await Task.sleep(for: .milliseconds(180))
+        try snapshot(controller.fanAnimationPanel, to: "/private/tmp/PinboardShot-\(style.rawValue)-fan.png")
+        try await waitUntil { controller.boxPanel?.isVisible == true }
+        let id = try #require(store.items.first?.id)
+        let rail = try #require(controller.cardPanels[id]?.frame)
+        controller.extract(id)
+        try await waitUntil { controller.activeFlightCount > 0 }
+        let card = try #require(controller.cardPanels[id]?.contentView as? MagneticCardHostingView)
+        #expect(card.rootView.motion.style == style)
+        try await Task.sleep(for: .milliseconds(180))
+        try snapshot(controller.cardPanels[id], to: "/private/tmp/PinboardShot-\(style.rawValue)-flight.png")
+        try await waitUntil { controller.desktopPins[id] != nil && controller.activeFlightCount == 0 }
+        // A real user arrangement can still be explicitly centered under either motion suite.
+        try await Task.sleep(for: .milliseconds(300))
+        let pin = try #require(controller.desktopPins[id])
+        pin.nudge(by: CGPoint(x: -65, y: 0))
+        let moved = try #require(pin.window?.frame)
+        controller.centerDesktopGroup()
+        try await waitUntil { pin.window?.frame != moved }
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(pin.window?.frame.size == moved.size)
+        #expect(NSApp.keyWindow === keyWindow)
+        controller.returnToEdge(id)
+        try await waitUntil { controller.desktopPins[id] == nil && controller.cardPanels[id]?.frame == rail
+            && controller.activeFlightCount == 0 }
+        controller.setCollapsed(true)
+        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible == false }
+        defaults.set(true, forKey: MagneticDesktopSettings.reduceMotionKey)
+        controller.refresh()
+        controller.setCollapsed(false)
+        try await waitUntil { controller.boxPanel?.isVisible == true }
+        #expect(controller.fanAnimationPanel?.isVisible != true)
+        controller.extract(id)
+        try await waitUntil { controller.desktopPins[id] != nil }
+        #expect(controller.activeFlightCount == 0)
+    }
+
+    @Test("Custom motion modes preserve extraction and returns without decorative effects",
+          arguments: ["simple", "reduced", "system"])
+    func customMotionModes(mode: String) async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticAnimation-\(UUID())")
+        let suite = "MagneticAnimation.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        defaults.set(1, forKey: MagneticDesktopSettings.maximumVisibleKey)
+        defaults.set(mode == "simple" ? "simple" : "full", forKey: MagneticDesktopSettings.animationStyleKey)
+        defaults.set(mode == "reduced", forKey: MagneticDesktopSettings.reduceMotionKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        _ = try store.add(syntheticImage(1))
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { mode == "system" }, pointerLocation: { CGPoint(x: -10000, y: -10000) })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        controller.setCollapsed(false)
+        if mode == "simple" {
+            try await waitUntil { controller.fanAnimationPanel?.isVisible == true }
+            let fan = try #require(controller.fanAnimationPanel?.contentView as? MagneticPassiveHostingView<MagneticFanMotionView>)
+            #expect(fan.rootView.simple)
+        }
+        try await waitUntil { controller.boxPanel?.isVisible == true && controller.cardPanels.count == 1 }
+        #expect(controller.fanAnimationPanel?.isVisible != true)
+        let id = try #require(store.items.first?.id)
+        let railFrame = try #require(controller.cardPanels[id]?.frame)
+        controller.extract(id)
+        try await Task.sleep(for: .milliseconds(40))
+        #expect(controller.activeFlightCount == 0 && controller.trailPanel?.isVisible != true)
+        if mode == "simple" {
+            let card = try #require(controller.cardPanels[id]?.contentView as? MagneticCardHostingView)
+            #expect(card.rootView.motion.progress == 1)
+            #expect(controller.cardPanels[id]?.frame != railFrame)
+            #expect(controller.desktopPins[id] == nil)
+        } else {
+            #expect(controller.desktopPins[id] != nil)
+        }
+        try await waitUntil { controller.desktopPins[id] != nil }
+        controller.returnToEdge(id)
+        try await waitUntil { controller.desktopPins[id] == nil && controller.cardPanels[id]?.frame == railFrame }
+        _ = try store.add(syntheticImage(2))
+        try await waitUntil { controller.overflowCount == 2 && controller.cardPanels[id] == nil }
+        #expect(controller.boxArrivalProgress == 1)
+        let box = try #require(controller.boxPanel?.contentView as? MagneticBoxHostingView)
+        #expect(!box.rootView.decorativeEffects)
+        #expect(box.rootView.motionReduced == (mode != "simple"))
+
+        // Changing a preference while running must replace the current view policy immediately.
+        defaults.set("simple", forKey: MagneticDesktopSettings.animationStyleKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.reduceMotionKey)
+        controller.refresh()
+        try await waitUntil { box.rootView.motionReduced }
+        controller.setCollapsed(true)
+        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible == false }
+        #expect(controller.fanAnimationPanel?.isVisible != true)
+    }
+
     @Test("Default display cap and opt-in setting persist independently of history retention")
     func settingsPersist() throws {
         let suite = "MagneticSettingsTests.\(UUID())"
@@ -678,7 +843,19 @@ struct MagneticDesktopTests {
         #expect(contents.level.rawValue > rail.level.rawValue)
         controller.setCollapsed(true)
         try await waitUntil { controller.foldedPanel?.isVisible == true }
-        #expect(controller.foldedPanel?.canBecomeKey == false)
+        let folded = try #require(controller.foldedPanel)
+        #expect(!folded.canBecomeKey && !folded.canBecomeMain)
+        let competingPanel = NSPanel(contentRect: folded.frame,
+            styleMask: [.borderless, .nonactivatingPanel], backing: .buffered, defer: false)
+        competingPanel.level = .popUpMenu
+        defer { competingPanel.orderOut(nil) }
+        competingPanel.orderFrontRegardless()
+        try await Task.sleep(for: .milliseconds(50))
+        let windows = try #require(CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID)
+            as? [[String: Any]])
+        let foldedIndex = try #require(windows.firstIndex { ($0[kCGWindowNumber as String] as? Int) == folded.windowNumber })
+        let competingIndex = try #require(windows.firstIndex { ($0[kCGWindowNumber as String] as? Int) == competingPanel.windowNumber })
+        #expect(foldedIndex < competingIndex)
     }
 
     @Test("Box hover previews switch safely, stay passive and disappear on outside click, close and capture")
@@ -1200,17 +1377,24 @@ struct MagneticDesktopTests {
         #expect(store.items.map(\.id) == originalIDs)
         try snapshot(folded, to: "/private/tmp/PinboardShot-magnetic-folded-smoke.png")
         if ProcessInfo.processInfo.environment["PINBOARDSHOT_MAGNETIC_VISUAL_CHECK"] == "1" {
+            // SwiftPM test runners do not include the compiled app asset catalog.
+            let resources = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/Assets.xcassets")
+            for name in MagneticFoldedView.artworkNames where NSImage(named: name) == nil {
+                let image = try #require(NSImage(contentsOf: resources.appendingPathComponent("\(name).imageset/artwork.png")))
+                #expect(image.setName(name))
+            }
             let originalView = foldedView.rootView
             for dark in [false, true] {
                 folded.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
                 foldedView.rootView = MagneticFoldedView(count: 17, onExpand: originalView.onExpand)
                 try await Task.sleep(for: .milliseconds(80))
-                try snapshot(folded, to: dark ? "/private/tmp/PinboardShot-folded-fan-dark.png"
-                    : "/private/tmp/PinboardShot-folded-fan-light.png")
+                try snapshot(folded, to: dark ? "/private/tmp/PinboardShot-folded-thumbnails-dark.png"
+                    : "/private/tmp/PinboardShot-folded-thumbnails-light.png")
             }
             foldedView.rootView = MagneticFoldedView(count: 1234, onExpand: originalView.onExpand)
             try await Task.sleep(for: .milliseconds(80))
-            try snapshot(folded, to: "/private/tmp/PinboardShot-folded-fan-long-count.png")
+            try snapshot(folded, to: "/private/tmp/PinboardShot-folded-thumbnails-long-count.png")
             foldedView.rootView = originalView
             folded.appearance = nil
         }
@@ -1237,6 +1421,178 @@ struct MagneticDesktopTests {
         try await waitUntil { controller.foldedPanel?.isVisible == true }
         #expect(controller.cardPanels.isEmpty)
         #expect(store.items.count == 7)
+    }
+
+    @Test("Second fold waits eight seconds, holds the first fold on hover and restarts after leaving or dragging")
+    func secondFoldLifecycle() async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticSecondFold-\(UUID())")
+        let suite = "MagneticSecondFoldTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        var now: TimeInterval = 0
+        let outside = CGPoint(x: -10000, y: -10000)
+        var pointer = outside
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { true }, pointerLocation: { pointer }, idleClock: { now })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        let panel = try #require(controller.foldedPanel)
+        let first = panel.frame
+        let hosting = try #require(panel.contentView as? MagneticFoldedHostingView)
+        now = 7.99
+        controller.checkForFoldedIdleCollapse()
+        #expect(!controller.foldedIsCompact && panel.frame == first)
+        now = 8
+        controller.checkForFoldedIdleCollapse()
+        #expect(controller.foldedIsCompact && panel.frame.size == CGSize(width: 20, height: 56))
+        #expect(panel.frame.midY == first.midY && panel.frame.maxX == first.maxX)
+        if ProcessInfo.processInfo.environment["PINBOARDSHOT_MAGNETIC_VISUAL_CHECK"] == "1" {
+            let assets = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+                .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/Assets.xcassets")
+            for name in MagneticFoldedView.artworkNames where NSImage(named: name) == nil {
+                let image = try #require(NSImage(contentsOf: assets.appendingPathComponent("\(name).imageset/artwork.png")))
+                #expect(image.setName(name))
+            }
+            for dark in [false, true] {
+                panel.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                try await Task.sleep(for: .milliseconds(80))
+                try snapshot(panel, to: dark ? "/private/tmp/PinboardShot-second-fold-dark.png"
+                    : "/private/tmp/PinboardShot-second-fold-light.png")
+            }
+            panel.appearance = nil
+        }
+        now = 40
+        _ = try store.add(syntheticImage(1))
+        try await waitUntil { hosting.rootView.count == 2 }
+        #expect(controller.foldedIsCompact && panel.frame.height == 56)
+        pointer = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        controller.updateHover(at: pointer)
+        #expect(!controller.foldedIsCompact && panel.frame == first)
+        now = 200
+        controller.checkForFoldedIdleCollapse()
+        #expect(!controller.foldedIsCompact && MagneticDesktopSettings(defaults: defaults).isCollapsed)
+        pointer = outside
+        controller.updateHover(at: pointer)
+        now = 207.99
+        controller.checkForFoldedIdleCollapse()
+        #expect(!controller.foldedIsCompact)
+        now = 208
+        controller.checkForFoldedIdleCollapse()
+        #expect(controller.foldedIsCompact)
+
+        func send(_ type: NSEvent.EventType, at point: CGPoint) throws {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: panel.convertPoint(fromScreen: point),
+                modifierFlags: [], timestamp: 10, windowNumber: panel.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 0))
+            panel.sendEvent(event)
+        }
+        var start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: start)
+        #expect(!controller.foldedIsCompact)
+        let moved = CGPoint(x: start.x, y: start.y + 12)
+        try send(.leftMouseDragged, at: moved)
+        now = 300
+        controller.checkForFoldedIdleCollapse()
+        #expect(!controller.foldedIsCompact && hosting.isDragging)
+        try send(.leftMouseUp, at: moved)
+        now = 307.99
+        controller.checkForFoldedIdleCollapse()
+        #expect(!controller.foldedIsCompact)
+        now = 308
+        controller.checkForFoldedIdleCollapse()
+        #expect(controller.foldedIsCompact)
+        start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: start)
+        try send(.leftMouseUp, at: start)
+        try await waitUntil { !panel.isVisible && controller.boxPanel?.isVisible == true }
+        #expect(!MagneticDesktopSettings(defaults: defaults).isCollapsed)
+        controller.setCollapsed(true)
+        try await waitUntil { panel.isVisible }
+        now = 316
+        controller.checkForFoldedIdleCollapse()
+        #expect(controller.foldedIsCompact)
+        let compactCenter = panel.frame.midY
+        defaults.set(false, forKey: MagneticDesktopSettings.enabledKey)
+        controller.refresh(force: true)
+        #expect(!panel.isVisible)
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        controller.refresh(force: true)
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        let restored = try #require(controller.foldedPanel)
+        #expect(restored.frame.midY == compactCenter && !controller.foldedIsCompact)
+    }
+
+    @Test("Second fold timer runs automatically, pauses while hovered or capturing, and leaves floating stacks alone")
+    func automaticSecondFoldTimer() async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticSecondFoldTimer-\(UUID())")
+        let suite = "MagneticSecondFoldTimerTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        let outside = CGPoint(x: -10000, y: -10000)
+        var pointer = outside
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { true }, pointerLocation: { pointer }, foldedIdleTimeout: 0.12)
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedIsCompact }
+        let panel = try #require(controller.foldedPanel)
+        pointer = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        controller.updateHover(at: pointer)
+        try await Task.sleep(for: .milliseconds(220))
+        #expect(!controller.foldedIsCompact && panel.frame.height == 144)
+        pointer = outside
+        controller.updateHover(at: pointer)
+        controller.suspendForCapture()
+        try await Task.sleep(for: .milliseconds(220))
+        #expect(!controller.foldedIsCompact && !panel.isVisible)
+        controller.resumeAfterCapture()
+        try await waitUntil { panel.isVisible }
+        #expect(!controller.foldedIsCompact)
+        try await waitUntil { controller.foldedIsCompact }
+        let start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        for (type, point) in [(NSEvent.EventType.leftMouseDown, start),
+            (.leftMouseDragged, CGPoint(x: start.x - 100, y: start.y)),
+            (.leftMouseUp, CGPoint(x: start.x - 100, y: start.y))] {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: panel.convertPoint(fromScreen: point),
+                modifierFlags: [], timestamp: 10, windowNumber: panel.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 0))
+            panel.sendEvent(event)
+        }
+        #expect(controller.foldedIsDetached && !controller.foldedIsCompact)
+        try await Task.sleep(for: .milliseconds(220))
+        #expect(controller.foldedIsDetached && panel.frame.size == CGSize(width: 96, height: 112))
+    }
+
+    @Test("Folded decorative artwork resolves to valid bundled image assets")
+    func foldedArtworkAssets() throws {
+        let resources = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().appendingPathComponent("Resources/Assets.xcassets")
+        for name in MagneticFoldedView.artworkNames {
+            let directory = resources.appendingPathComponent("\(name).imageset")
+            let manifest = try #require(JSONSerialization.jsonObject(with: Data(contentsOf:
+                directory.appendingPathComponent("Contents.json"))) as? [String: Any])
+            let images = try #require(manifest["images"] as? [[String: Any]])
+            let filename = try #require(images.first?["filename"] as? String)
+            let image = try #require(NSImage(contentsOf: directory.appendingPathComponent(filename)))
+            #expect(image.size.width > 0 && image.size.height > 0)
+        }
     }
 
     @Test("Fan transitions reverse without moving hit windows, cancel for capture and honor reduced motion")
@@ -2016,6 +2372,552 @@ struct MagneticDesktopTests {
         #expect(panel.frame == clamped)
     }
 
+    @Test("Folded handle slides vertically along the right edge, keeps click expansion and survives refresh and capture")
+    func nativeFoldedDragging() async throws {
+        let app = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticFoldedDrag-\(UUID())")
+        let suite = "MagneticFoldedDragTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        var screen = CGRect(x: 100, y: -100, width: 1200, height: 800)
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { true }, screenFrames: { [screen] })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        let panel = try #require(controller.foldedPanel)
+        let hosting = try #require(panel.contentView as? MagneticFoldedHostingView)
+        let keyWindow = app.keyWindow
+        let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
+        #expect(!panel.canBecomeKey && !panel.canBecomeMain)
+        #expect(hosting.acceptsFirstMouse(for: nil))
+        func send(_ type: NSEvent.EventType, at point: CGPoint) throws {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: panel.convertPoint(fromScreen: point),
+                modifierFlags: [], timestamp: 10, windowNumber: panel.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 0))
+            panel.sendEvent(event)
+        }
+        let original = panel.frame
+        var start = CGPoint(x: original.midX, y: original.midY)
+        try send(.leftMouseDown, at: start)
+        try send(.leftMouseDragged, at: CGPoint(x: start.x - 40, y: start.y))
+        try send(.leftMouseUp, at: CGPoint(x: start.x - 40, y: start.y))
+        #expect(panel.frame == original && panel.isVisible && MagneticDesktopSettings(defaults: defaults).isCollapsed)
+        try send(.leftMouseDown, at: start)
+        try send(.leftMouseDragged, at: CGPoint(x: start.x - 2, y: start.y + 1))
+        #expect(!hosting.isDragging && panel.frame == original)
+        try send(.leftMouseDragged, at: CGPoint(x: start.x - 20, y: start.y + 60))
+        #expect(hosting.isDragging && panel.frame.origin == CGPoint(x: original.minX, y: original.minY + 60))
+        _ = try store.add(syntheticImage(1))
+        try await waitUntil { hosting.rootView.count == 2 }
+        #expect(panel.contentView === hosting && hosting.isDragging)
+        try send(.leftMouseDragged, at: CGPoint(x: start.x - 24, y: start.y + 75))
+        try send(.leftMouseUp, at: CGPoint(x: start.x - 25, y: start.y + 80))
+        let moved = panel.frame
+        #expect(moved.origin == CGPoint(x: original.minX, y: original.minY + 80))
+        #expect(!hosting.isDragging && panel.isVisible && MagneticDesktopSettings(defaults: defaults).isCollapsed)
+        #expect(app.keyWindow === keyWindow)
+        #expect(NSWorkspace.shared.frontmostApplication?.processIdentifier == frontmostPID)
+
+        controller.refresh(force: true)
+        try await Task.sleep(for: .milliseconds(40))
+        #expect(panel.frame == moved && panel.contentView === hosting)
+        start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: start)
+        try send(.leftMouseDragged, at: CGPoint(x: start.x - 10, y: start.y + 10000))
+        try send(.leftMouseUp, at: CGPoint(x: start.x - 10, y: start.y + 10000))
+        #expect(panel.frame.maxX == screen.maxX && panel.frame.maxY == screen.maxY)
+        #expect(screen.contains(panel.frame))
+        start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: start)
+        try send(.leftMouseDragged, at: CGPoint(x: start.x + 10000, y: start.y - 10000))
+        try send(.leftMouseUp, at: CGPoint(x: start.x + 10000, y: start.y - 10000))
+        #expect(panel.frame.maxX == screen.maxX && panel.frame.minY == screen.minY)
+
+        let clamped = panel.frame
+        start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: start)
+        controller.suspendForCapture()
+        #expect(!panel.isVisible && !hosting.isDragging)
+        controller.resumeAfterCapture()
+        try await waitUntil { panel.isVisible }
+        try send(.leftMouseDragged, at: CGPoint(x: start.x - 40, y: start.y + 40))
+        try send(.leftMouseUp, at: CGPoint(x: start.x - 40, y: start.y + 40))
+        #expect(panel.frame == clamped && MagneticDesktopSettings(defaults: defaults).isCollapsed)
+
+        start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: start)
+        try send(.leftMouseDragged, at: CGPoint(x: start.x - 1, y: start.y + 1))
+        try send(.leftMouseUp, at: CGPoint(x: start.x - 1, y: start.y + 1))
+        try await waitUntil { !panel.isVisible && controller.boxPanel?.isVisible == true }
+        #expect(!MagneticDesktopSettings(defaults: defaults).isCollapsed)
+        controller.setCollapsed(true)
+        try await waitUntil { panel.isVisible }
+        #expect(panel.frame == clamped)
+
+        screen = CGRect(x: -400, y: 0, width: 600, height: 400)
+        controller.refresh(force: true)
+        try await waitUntil { screen.contains(panel.frame) }
+        #expect(panel.frame.size == MagneticDesktopGeometry.foldedFrame(in: screen).size)
+        #expect(panel.frame.maxX == screen.maxX)
+        #expect(MagneticDesktopSettings(defaults: defaults).isCollapsed)
+    }
+
+    @Test("A deliberate pull morphs the folded strip into a free stack, preserves its grab point and snaps it back")
+    func nativeFoldedDetachment() async throws {
+        let app = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticFoldedDetach-\(UUID())")
+        let suite = "MagneticFoldedDetachTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        let screen = CGRect(x: 100, y: -100, width: 1200, height: 800)
+        var reducedMotion = false
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { reducedMotion }, screenFrames: { [screen] })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        let panel = try #require(controller.foldedPanel)
+        let hosting = try #require(panel.contentView as? MagneticFoldedHostingView)
+        let keyWindow = app.keyWindow
+        func send(_ type: NSEvent.EventType, at point: CGPoint) throws {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: panel.convertPoint(fromScreen: point),
+                modifierFlags: [], timestamp: 10, windowNumber: panel.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 0))
+            panel.sendEvent(event)
+        }
+        let start = CGPoint(x: panel.frame.minX + 2, y: panel.frame.midY)
+        try send(.leftMouseDown, at: start)
+        try send(.leftMouseDragged, at: CGPoint(x: start.x - 63, y: start.y))
+        #expect(!controller.foldedIsDetached && panel.frame.maxX == screen.maxX)
+        let detachedPoint = CGPoint(x: start.x - 80, y: start.y + 8)
+        try send(.leftMouseDragged, at: detachedPoint)
+        #expect(controller.foldedIsDetached && hosting.rootView.motion.progress == 1)
+        #expect(panel.frame.size == CGSize(width: 96, height: 112))
+        #expect(panel.frame.contains(detachedPoint) && panel.frame.maxX < screen.maxX - 16)
+        if ProcessInfo.processInfo.environment["PINBOARDSHOT_MAGNETIC_VISUAL_CHECK"] == "1" {
+            try await Task.sleep(for: .milliseconds(80))
+            try snapshot(panel, to: "/private/tmp/PinboardShot-folded-detaching.png")
+        }
+        let firstPose = panel.frame
+        _ = try store.add(syntheticImage(1))
+        try await waitUntil { hosting.rootView.count == 2 }
+        #expect(panel.contentView === hosting && hosting.isDragging && panel.frame == firstPose)
+        let movedPoint = CGPoint(x: detachedPoint.x - 80, y: detachedPoint.y + 40)
+        try send(.leftMouseDragged, at: movedPoint)
+        try send(.leftMouseUp, at: movedPoint)
+        let moved = panel.frame
+        #expect(moved.minX == firstPose.minX - 80 && moved.minY == firstPose.minY + 40)
+        #expect(controller.foldedIsDetached && !hosting.isDragging && app.keyWindow === keyWindow)
+        controller.refresh(force: true)
+        try await Task.sleep(for: .milliseconds(50))
+        #expect(panel.frame == moved && hosting.rootView.motion.progress == 1)
+        try await Task.sleep(for: .milliseconds(400))
+        try snapshot(panel, to: "/private/tmp/PinboardShot-folded-detached.png")
+        if ProcessInfo.processInfo.environment["PINBOARDSHOT_MAGNETIC_VISUAL_CHECK"] == "1" {
+            for dark in [false, true] {
+                panel.appearance = NSAppearance(named: dark ? .darkAqua : .aqua)
+                try await Task.sleep(for: .milliseconds(80))
+                try snapshot(panel, to: dark ? "/private/tmp/PinboardShot-folded-detached-dark.png"
+                    : "/private/tmp/PinboardShot-folded-detached-light.png")
+            }
+            panel.appearance = nil
+        }
+
+        var point = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: point)
+        controller.suspendForCapture()
+        #expect(!hosting.isDragging && !panel.isVisible)
+        controller.resumeAfterCapture()
+        try await waitUntil { panel.isVisible }
+        try send(.leftMouseDragged, at: CGPoint(x: point.x - 30, y: point.y + 30))
+        try send(.leftMouseUp, at: CGPoint(x: point.x - 30, y: point.y + 30))
+        #expect(panel.frame == moved && controller.foldedIsDetached)
+        point = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: point)
+        try send(.leftMouseUp, at: point)
+        try await waitUntil { !panel.isVisible && controller.boxPanel?.isVisible == true }
+        controller.setCollapsed(true)
+        try await waitUntil { panel.isVisible }
+        #expect(panel.frame == moved && controller.foldedIsDetached)
+
+        point = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: point)
+        let snapPoint = CGPoint(x: screen.maxX - 10, y: point.y + 15)
+        try send(.leftMouseDragged, at: snapPoint)
+        #expect(!controller.foldedIsDetached && hosting.rootView.motion.progress == 0)
+        #expect(panel.frame.maxX == screen.maxX && panel.frame.width == 32)
+        try send(.leftMouseUp, at: snapPoint)
+        #expect(MagneticDesktopSettings(defaults: defaults).isCollapsed)
+        try await Task.sleep(for: .milliseconds(400))
+        try snapshot(panel, to: "/private/tmp/PinboardShot-folded-reattached.png")
+
+        reducedMotion = true
+        point = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: point)
+        let offscreen = CGPoint(x: point.x - 10000, y: point.y - 10000)
+        try send(.leftMouseDragged, at: offscreen)
+        try send(.leftMouseUp, at: offscreen)
+        #expect(!controller.foldedIsDetached && hosting.rootView.motion.progress == 0)
+        #expect(screen.contains(panel.frame) && panel.frame.minX == screen.minX && panel.frame.minY == screen.minY)
+    }
+
+    @Test("Docking uses the nearest edge within sixteen points and preserves the edge at corner ties")
+    func foldedDockingThresholds() {
+        let screen = CGRect(x: -100, y: 50, width: 1000, height: 800)
+        #expect(MagneticDockEdge.nearest(to: CGRect(x: 200, y: 300, width: 96, height: 112),
+                                        in: screen, preferring: .right) == nil)
+        #expect(MagneticDockEdge.nearest(to: CGRect(x: -84, y: 300, width: 96, height: 112),
+                                        in: screen, preferring: .right) == .left)
+        #expect(MagneticDockEdge.nearest(to: CGRect(x: -83, y: 300, width: 96, height: 112),
+                                        in: screen, preferring: .right) == nil)
+        let corner = CGRect(x: -100, y: 50, width: 96, height: 112)
+        #expect(MagneticDockEdge.nearest(to: corner, in: screen, preferring: .bottom) == .bottom)
+        #expect(MagneticDockEdge.nearest(to: corner, in: screen, preferring: .left) == .left)
+        #expect(MagneticDockEdge.nearest(to: corner.offsetBy(dx: 8, dy: 12), in: screen, preferring: .bottom) == .left)
+    }
+
+    @Test("Folded handles snap to all four edges and keep their edge through compacting, hover and capture",
+          arguments: MagneticDockEdge.allCases, [true, false])
+    func nativeFoldedEdgeDocking(edge: MagneticDockEdge, motionReduced: Bool) async throws {
+        let app = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticEdges-\(UUID())")
+        let suite = "MagneticEdgesTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        let screen = CGRect(x: -500, y: 40, width: 1000, height: 800)
+        var now: TimeInterval = 0
+        var pointer = CGPoint(x: -10000, y: -10000)
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { motionReduced }, pointerLocation: { pointer }, idleClock: { now }, screenFrames: { [screen] })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        let panel = try #require(controller.foldedPanel)
+        let hosting = try #require(panel.contentView as? MagneticFoldedHostingView)
+        let keyWindow = app.keyWindow
+        func send(_ type: NSEvent.EventType, at point: CGPoint) throws {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: panel.convertPoint(fromScreen: point),
+                modifierFlags: [], timestamp: 10, windowNumber: panel.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 0))
+            panel.sendEvent(event)
+        }
+        try send(.leftMouseDown, at: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
+        try send(.leftMouseDragged, at: CGPoint(x: screen.midX, y: screen.midY))
+        try send(.leftMouseUp, at: CGPoint(x: screen.midX, y: screen.midY))
+        #expect(controller.foldedIsDetached)
+        let target: CGPoint
+        switch edge {
+        case .right: target = CGPoint(x: screen.maxX - 8, y: screen.midY)
+        case .left: target = CGPoint(x: screen.minX + 8, y: screen.midY)
+        case .top: target = CGPoint(x: screen.midX, y: screen.maxY - 8)
+        case .bottom: target = CGPoint(x: screen.midX, y: screen.minY + 8)
+        }
+        try send(.leftMouseDown, at: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
+        try send(.leftMouseDragged, at: target)
+        try send(.leftMouseUp, at: target)
+        #expect(!controller.foldedIsDetached && controller.foldedDockEdge == edge)
+        #expect(hosting.rootView.motion.dockEdge == edge && hosting.rootView.motion.progress == 0)
+        let docked = panel.frame
+        #expect(docked.size == (edge.isHorizontal ? CGSize(width: 144, height: 32) : CGSize(width: 32, height: 144)))
+        func touchesEdge() -> Bool {
+            switch edge {
+            case .right: panel.frame.maxX == screen.maxX
+            case .left: panel.frame.minX == screen.minX
+            case .top: panel.frame.maxY == screen.maxY
+            case .bottom: panel.frame.minY == screen.minY
+            }
+        }
+        #expect(touchesEdge() && screen.contains(docked))
+        controller.refresh(force: true)
+        try await Task.sleep(for: .milliseconds(40))
+        #expect(panel.frame == docked && panel.contentView === hosting)
+        now = 8
+        controller.checkForFoldedIdleCollapse()
+        #expect(controller.foldedIsCompact && touchesEdge())
+        #expect(panel.frame.size == (edge.isHorizontal ? CGSize(width: 56, height: 20) : CGSize(width: 20, height: 56)))
+        if motionReduced {
+            #expect(controller.foldedBubblePanel?.isVisible != true)
+        } else {
+            let bubbles = try #require(controller.foldedBubblePanel)
+            #expect(bubbles.isVisible && bubbles.ignoresMouseEvents && screen.contains(bubbles.frame))
+            let view = try #require(bubbles.contentView as? MagneticPassiveHostingView<MagneticCapsuleBubbles>)
+            #expect(view.rootView.edge == edge && view.rootView.capsuleFrame == panel.frame)
+        }
+        if edge.isHorizontal { #expect(panel.frame.midX == docked.midX) }
+        else { #expect(panel.frame.midY == docked.midY) }
+        pointer = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        controller.updateHover(at: pointer)
+        #expect(!controller.foldedIsCompact && panel.frame == docked)
+        #expect(controller.foldedBubblePanel?.isVisible != true)
+        pointer = CGPoint(x: -10000, y: -10000)
+        controller.updateHover(at: pointer)
+        controller.suspendForCapture()
+        controller.resumeAfterCapture()
+        try await waitUntil { panel.isVisible }
+        #expect(panel.frame == docked && controller.foldedDockEdge == edge)
+        try send(.leftMouseDown, at: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
+        try send(.leftMouseUp, at: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
+        try await waitUntil { controller.boxPanel?.isVisible == true && !panel.isVisible }
+        controller.setCollapsed(true)
+        try await waitUntil { panel.isVisible }
+        #expect(controller.foldedDockEdge == edge && panel.frame == docked)
+        let start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        let inward: CGPoint
+        switch edge {
+        case .right: inward = CGPoint(x: -96, y: 0)
+        case .left: inward = CGPoint(x: 96, y: 0)
+        case .top: inward = CGPoint(x: 0, y: -96)
+        case .bottom: inward = CGPoint(x: 0, y: 96)
+        }
+        let detached = CGPoint(x: start.x + inward.x, y: start.y + inward.y)
+        try send(.leftMouseDown, at: start)
+        try send(.leftMouseDragged, at: detached)
+        try send(.leftMouseUp, at: detached)
+        #expect(controller.foldedIsDetached && screen.contains(panel.frame))
+        #expect(app.keyWindow === keyWindow)
+    }
+
+    @Test("Folded capsule crosses displays, docks and keeps its destination through refresh, capture and expansion",
+          arguments: MagneticDockEdge.allCases, [
+            CGRect(x: 1200, y: 0, width: 1000, height: 800),
+            CGRect(x: -1100, y: -100, width: 1000, height: 900),
+            CGRect(x: 0, y: 900, width: 1200, height: 800)
+          ])
+    func nativeFoldedMultipleScreens(edge: MagneticDockEdge, targetScreen: CGRect) async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticFoldedScreens-\(UUID())")
+        let suite = "MagneticFoldedScreensTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        // Keep the synthetic upper display's tray within the real desktop's vertical range;
+        // AppKit otherwise constrains normal-level panels to the only physically connected display.
+        let ceiling = try #require(NSScreen.screens.first?.visibleFrame.maxY)
+        let primary = CGRect(x: 0, y: 0, width: 1200, height: (ceiling * 0.4).rounded(.down))
+        let targetScreen = targetScreen.minY > primary.maxY
+            ? CGRect(x: 0, y: (ceiling * 0.5).rounded(.down), width: 1200,
+                     height: (ceiling * 0.4).rounded(.down)) : targetScreen
+        var screens = [primary, targetScreen]
+        var now: TimeInterval = 0
+        let pointer = CGPoint(x: -10000, y: -10000)
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { false }, pointerLocation: { pointer }, idleClock: { now }, screenFrames: { screens })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        let panel = try #require(controller.foldedPanel)
+        let hosting = try #require(panel.contentView as? MagneticFoldedHostingView)
+        func send(_ type: NSEvent.EventType, at point: CGPoint, timestamp: TimeInterval) throws {
+            let event = try #require(NSEvent.mouseEvent(with: type, location: panel.convertPoint(fromScreen: point),
+                modifierFlags: [], timestamp: timestamp, windowNumber: panel.windowNumber, context: nil,
+                eventNumber: 0, clickCount: 1, pressure: 0))
+            panel.sendEvent(event)
+        }
+        func drag(to point: CGPoint, timestamp: TimeInterval) throws {
+            let start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+            try send(.leftMouseDown, at: start, timestamp: timestamp)
+            try send(.leftMouseDragged, at: point, timestamp: timestamp + 1)
+            try send(.leftMouseUp, at: point, timestamp: timestamp + 1.5)
+        }
+        let entryPoint: CGPoint
+        let gapPoint: CGPoint?
+        let entryEdge: MagneticDockEdge
+        if targetScreen.minX >= primary.maxX {
+            entryPoint = CGPoint(x: targetScreen.minX + 8, y: primary.midY)
+            gapPoint = nil
+            entryEdge = .left
+        } else if targetScreen.maxX <= primary.minX {
+            entryPoint = CGPoint(x: targetScreen.maxX - 8, y: primary.midY)
+            gapPoint = CGPoint(x: primary.minX - 1, y: primary.midY)
+            entryEdge = .right
+        } else {
+            entryPoint = CGPoint(x: primary.midX, y: targetScreen.minY + 8)
+            gapPoint = CGPoint(x: primary.midX, y: primary.maxY + 1)
+            entryEdge = .bottom
+        }
+        let start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: start, timestamp: 10)
+        if let gapPoint {
+            try send(.leftMouseDragged, at: gapPoint, timestamp: 11)
+            #expect(primary.contains(panel.frame))
+        }
+        try send(.leftMouseDragged, at: entryPoint, timestamp: 12)
+        try send(.leftMouseUp, at: entryPoint, timestamp: 12.5)
+        #expect(targetScreen.contains(panel.frame))
+        #expect(!controller.foldedIsDetached && controller.foldedDockEdge == entryEdge)
+
+        try drag(to: CGPoint(x: targetScreen.midX, y: targetScreen.midY), timestamp: 20)
+        #expect(controller.foldedIsDetached && targetScreen.contains(panel.frame))
+        let dockPoint: CGPoint
+        switch edge {
+        case .right: dockPoint = CGPoint(x: targetScreen.maxX - 8, y: targetScreen.midY)
+        case .left: dockPoint = CGPoint(x: targetScreen.minX + 8, y: targetScreen.midY)
+        case .top: dockPoint = CGPoint(x: targetScreen.midX, y: targetScreen.maxY - 8)
+        case .bottom: dockPoint = CGPoint(x: targetScreen.midX, y: targetScreen.minY + 8)
+        }
+        try drag(to: dockPoint, timestamp: 30)
+        #expect(!controller.foldedIsDetached && controller.foldedDockEdge == edge)
+        let docked = panel.frame
+        #expect(targetScreen.contains(docked))
+        controller.refresh(force: true)
+        try await Task.sleep(for: .milliseconds(40))
+        #expect(panel.frame == docked && panel.contentView === hosting)
+
+        _ = try store.add(syntheticImage(1))
+        controller.refresh(force: true)
+        try await waitUntil { hosting.rootView.count == 2 }
+        screens = [targetScreen, primary]
+        controller.refresh(force: true)
+        try await Task.sleep(for: .milliseconds(40))
+        #expect(panel.frame == docked && targetScreen.contains(panel.frame))
+        now = 8
+        controller.checkForFoldedIdleCollapse()
+        #expect(controller.foldedIsCompact && targetScreen.contains(panel.frame))
+        let bubbles = try #require(controller.foldedBubblePanel)
+        #expect(bubbles.isVisible && bubbles.ignoresMouseEvents && targetScreen.contains(bubbles.frame))
+        let bubbleView = try #require(bubbles.contentView as? MagneticPassiveHostingView<MagneticCapsuleBubbles>)
+        #expect(bubbleView.rootView.edge == edge && bubbleView.rootView.capsuleFrame == panel.frame)
+        controller.updateHover(at: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
+        #expect(!controller.foldedIsCompact && !bubbles.isVisible && panel.frame.size == docked.size)
+        controller.updateHover(at: pointer)
+        now = 16
+        controller.checkForFoldedIdleCollapse()
+        #expect(controller.foldedIsCompact && bubbles.isVisible)
+        let compact = panel.frame
+        controller.suspendForCapture()
+        controller.resumeAfterCapture()
+        try await waitUntil { panel.isVisible }
+        #expect(panel.frame == compact && controller.foldedDockEdge == edge)
+
+        let click = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
+        try send(.leftMouseDown, at: click, timestamp: 40)
+        try send(.leftMouseUp, at: click, timestamp: 40.5)
+        try await waitUntil { controller.boxPanel?.isVisible == true && !panel.isVisible && controller.cardPanels.count == 2 }
+        let boxFrame = try #require(controller.boxPanel?.frame)
+        #expect(targetScreen.contains(boxFrame), "Box frame: \(boxFrame), target: \(targetScreen)")
+        #expect(controller.cardPanels.values.allSatisfy { targetScreen.contains($0.frame) })
+        controller.setCollapsed(true)
+        try await waitUntil { panel.isVisible }
+        #expect(panel.frame == docked && controller.foldedDockEdge == edge && targetScreen.contains(panel.frame))
+
+        screens = [primary]
+        controller.refresh(force: true)
+        try await waitUntil { panel.isVisible && primary.contains(panel.frame) }
+        screens = [targetScreen, primary]
+        controller.refresh(force: true)
+        try await Task.sleep(for: .milliseconds(40))
+        #expect(panel.isVisible && primary.contains(panel.frame))
+    }
+
+    @Test("Capsule bubbles are click-through, pause near the pointer and release their timeline when hidden")
+    func capsuleBubbleLifecycle() async throws {
+        let app = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticBubbles-\(UUID())")
+        let suite = "MagneticBubblesTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer {
+            defaults.removePersistentDomain(forName: suite)
+            try? FileManager.default.removeItem(at: root)
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(true, forKey: MagneticDesktopSettings.collapsedKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        _ = try store.add(syntheticImage(0))
+        let screen = CGRect(x: 100, y: 50, width: 1000, height: 800)
+        let outside = CGPoint(x: -10000, y: -10000)
+        var pointer = outside
+        var now: TimeInterval = 0
+        var systemReduced = false
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { systemReduced }, pointerLocation: { pointer }, idleClock: { now }, screenFrames: { [screen] })
+        defer { controller.stop() }
+        controller.start()
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        #expect(controller.foldedBubblePanel == nil)
+        let capsule = try #require(controller.foldedPanel)
+        let keyWindow = app.keyWindow
+        now = 8
+        controller.checkForFoldedIdleCollapse()
+        let bubblePanel = try #require(controller.foldedBubblePanel)
+        #expect(bubblePanel.isVisible && bubblePanel.ignoresMouseEvents)
+        #expect(!bubblePanel.canBecomeKey && !bubblePanel.canBecomeMain && bubblePanel.sharingType == .none)
+        #expect(!bubblePanel.hasShadow && bubblePanel.level == capsule.level)
+        #expect(screen.contains(bubblePanel.frame))
+        if ProcessInfo.processInfo.environment["PINBOARDSHOT_MAGNETIC_VISUAL_CHECK"] == "1" {
+            let hosting = try #require(bubblePanel.contentView as? MagneticPassiveHostingView<MagneticCapsuleBubbles>)
+            let preview = hosting.rootView
+                .frame(width: bubblePanel.frame.width, height: bubblePanel.frame.height)
+                .background(Color(nsColor: .windowBackgroundColor))
+            let renderer = ImageRenderer(content: preview)
+            renderer.scale = 4
+            let image = try #require(renderer.cgImage)
+            let png = try #require(NSBitmapImageRep(cgImage: image).representation(using: .png, properties: [:]))
+            try png.write(to: URL(fileURLWithPath: "/private/tmp/PinboardShot-capsule-bubbles.png"))
+        }
+        let compact = capsule.frame
+        pointer = CGPoint(x: compact.minX - 10, y: compact.midY)
+        controller.updateHover(at: pointer)
+        #expect(controller.foldedIsCompact && capsule.frame == compact)
+        #expect(!bubblePanel.isVisible && bubblePanel.contentView == nil)
+        pointer = outside
+        controller.updateHover(at: pointer)
+        #expect(bubblePanel.isVisible && capsule.frame == compact)
+        for style in [MagneticAnimationStyle.simple, .elastic, .arc, .full] {
+            defaults.set(style.rawValue, forKey: MagneticDesktopSettings.animationStyleKey)
+            controller.refresh()
+            try await waitUntil { bubblePanel.isVisible == (style != .simple) }
+            if style == .simple { #expect(bubblePanel.contentView == nil) }
+        }
+        defaults.set(true, forKey: MagneticDesktopSettings.reduceMotionKey)
+        controller.refresh()
+        try await waitUntil { !bubblePanel.isVisible }
+        #expect(bubblePanel.contentView == nil)
+        defaults.set(false, forKey: MagneticDesktopSettings.reduceMotionKey)
+        controller.refresh()
+        try await waitUntil { bubblePanel.isVisible }
+        systemReduced = true
+        controller.refresh(force: true)
+        try await waitUntil { !bubblePanel.isVisible }
+        systemReduced = false
+        controller.refresh(force: true)
+        try await waitUntil { bubblePanel.isVisible }
+        controller.suspendForCapture()
+        #expect(!bubblePanel.isVisible && bubblePanel.contentView == nil)
+        controller.resumeAfterCapture()
+        try await waitUntil { bubblePanel.isVisible }
+        #expect(capsule.frame == compact && app.keyWindow === keyWindow)
+        controller.stop()
+        #expect(!bubblePanel.isVisible && bubblePanel.contentView == nil && controller.foldedBubblePanel == nil)
+    }
+
     @Test("Ordinary pins retain normal mouse behavior without source-return callbacks")
     func ordinaryPinDoubleClick() throws {
         _ = NSApplication.shared
@@ -2212,8 +3114,19 @@ final class PinboardShotNativeMenuSmoke: NSObject {
             do {
                 try await MagneticDesktopTests().foldingLifecycle()
                 try await MagneticDesktopTests().fanTransitionLifecycle()
+                try await MagneticDesktopTests().nativeFoldedDragging()
+                try await MagneticDesktopTests().nativeFoldedDetachment()
+                for edge in MagneticDockEdge.allCases {
+                    for targetScreen in [CGRect(x: 1200, y: 0, width: 1000, height: 800),
+                                         CGRect(x: -1100, y: -100, width: 1000, height: 900),
+                                         CGRect(x: 0, y: 900, width: 1200, height: 800)] {
+                        try await MagneticDesktopTests().nativeFoldedMultipleScreens(edge: edge, targetScreen: targetScreen)
+                    }
+                }
+                try await MagneticDesktopTests().secondFoldLifecycle()
+                try await MagneticDesktopTests().automaticSecondFoldTimer()
                 try await MagneticDesktopTests().nativeBoxClickForwarding()
-                print("Native folded fan smoke passed: reversible fan motion, capture cancellation, history refresh, reduced motion, lifecycle and focus preservation")
+                print("Native folded smoke passed: edge sliding, elastic detachment, free dragging, snap-back, capture recovery and focus preservation")
                 exit(0)
             } catch {
                 print("Native folded fan smoke failed: \(error)")

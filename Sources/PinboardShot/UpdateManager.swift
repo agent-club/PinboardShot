@@ -34,8 +34,9 @@ enum UpdateCheckFrequency: Int, CaseIterable, Identifiable {
 final class UpdateManager: NSObject, ObservableObject {
     private static let dismissedUpdateNoticeVersionDefaultsKey = "dismissedUpdateNoticeVersion"
 
+    private let startsUpdater: Bool
     private lazy var updaterController = SPUStandardUpdaterController(
-        startingUpdater: true,
+        startingUpdater: startsUpdater,
         updaterDelegate: self,
         userDriverDelegate: nil
     )
@@ -47,6 +48,14 @@ final class UpdateManager: NSObject, ObservableObject {
     var onUpdateStateChanged: (() -> Void)?
 
     override init() {
+        startsUpdater = true
+        super.init()
+        refreshSettings()
+    }
+
+    /// Rendering fixtures have no application bundle/feed; avoid starting Sparkle in that host.
+    init(startingUpdater: Bool) {
+        startsUpdater = startingUpdater
         super.init()
         refreshSettings()
     }

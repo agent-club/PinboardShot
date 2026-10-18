@@ -59,6 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let browserCaptureControlController = BrowserCaptureControlController()
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        AppAppearance.current().apply()
         NSApp.setActivationPolicy(.accessory)
         // Refresh the exact host allowlist on launch, including after a local or release upgrade.
         // A failed registration remains repairable from the explicit connection action in Settings.
@@ -1145,6 +1146,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         showPreferences(section: .shortcuts)
     }
 
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        showPreferences(section: preferencesNavigation.selectedSection)
+        return true
+    }
+
     private func showPreferences(section: PreferencesSection) {
         preferencesNavigation.selectedSection = section
         if preferencesWindowController == nil {
@@ -1242,7 +1248,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             )
             let controller = NSWindowController(window: NSWindow(contentViewController: NSHostingController(rootView: view)))
             controller.window?.title = L10n.text("preferences.windowTitle")
-            controller.window?.styleMask = [.titled, .closable, .miniaturizable]
+            controller.window?.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+            controller.window?.contentMinSize = NSSize(width: PreferencesWindowMetrics.width, height: PreferencesWindowMetrics.height)
+            controller.window?.setContentSize(NSSize(width: PreferencesWindowMetrics.width, height: PreferencesWindowMetrics.height))
             controller.window?.isReleasedWhenClosed = false
             preferencesWindowController = controller
         }
@@ -1341,7 +1349,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             window.center()
             return
         }
-        let contentSize = NSSize(width: PreferencesWindowMetrics.width, height: PreferencesWindowMetrics.height)
+        let contentSize = NSSize(
+            width: max(PreferencesWindowMetrics.width, window.contentView?.bounds.width ?? 960),
+            height: max(PreferencesWindowMetrics.height, window.contentView?.bounds.height ?? 660)
+        )
         let frame = window.frameRect(forContentRect: CGRect(origin: .zero, size: contentSize))
         window.setFrame(
             CGRect(

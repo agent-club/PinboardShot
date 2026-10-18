@@ -1,46 +1,46 @@
 {
-  "version": "0.15.0",
-  "build": "53",
-  "date": "2026.10.14",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.15.0",
+  "version": "0.16.0",
+  "build": "54",
+  "date": "2026.10.18",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.16.0",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.15.0-53.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.15.0/PinboardShot-0.15.0-53.dmg",
-      "sha256": "cfa1cb5042af3b5bb5ce803a43f6783f9c9ccc89a86bd463588eb4c44a434069"
+      "name": "PinboardShot-0.16.0-54.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.16.0/PinboardShot-0.16.0-54.dmg",
+      "sha256": "f8bfea1d5cc25676366a4a3d46a5c818fdf82a11955f157bcbed24eb939aac93"
     },
     "zip": {
-      "name": "PinboardShot-0.15.0-53.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.15.0/PinboardShot-0.15.0-53.zip",
-      "sha256": "3832e466c88d4c2a4982386973c11aa4d85883da1b285f37d913a6ef4576e908"
+      "name": "PinboardShot-0.16.0-54.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.16.0/PinboardShot-0.16.0-54.zip",
+      "sha256": "6e062423229de1351a9e461b59e38da9c425475a898910d7433ac7de8c2049d1"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.15.0/appcast.xml",
-      "sha256": "11ae269251429d5742d7ee5515ed533ac85c4f51c12ffe72c7ed0dfbf1332f30"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.16.0/appcast.xml",
+      "sha256": "8b7a8f0e7136e74aa142f508ddf1a01b67b593505e8d7a6e4b71098d87497afd"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "磁力桌面扇形收纳与渐进浏览",
+    "title": "设置界面、明暗外观与磁力桌面交互更新",
     "changes": [
-      "扇子式收放；扇面容量 1–100 张，每组最多 10 张",
-      "默认 10 张不显示切换器，截图盒中的图片不参与扇面分组计数",
-      "全集每页 20 张，支持跳页、旁侧预览和定位到扇面",
-      "修复右键菜单失效、闪退、悬浮穿透和收起抢输入焦点",
-      "桌面贴图可整体居中并保留相对位置，浏览分组不移动桌面贴图",
+      "重新整理设置导航、截图历史、工作区、工具栏和存储管理，支持调整窗口大小",
+      "新增跟随系统、浅色和深色外观，保存选择并在启动时应用",
+      "磁力桌面收起入口支持悬浮卡片堆、四边吸附、跨屏移动及空闲后进一步收起",
+      "新增弹性与弧线动画，保留简洁动画和减少动态效果",
+      "修复多显示器首次截图及跨屏复用时的选区定位",
       "磁力桌面依赖截图历史；应用与 DMG 已通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Magnetic Desktop fan storage and progressive browsing",
+    "title": "Settings, appearance, and Magnetic Desktop interaction updates",
     "changes": [
-      "Folding fan animation; capacity of 1–100 screenshots, with up to 10 per group.",
-      "The default 10-image fan has no switcher; boxed screenshots are excluded from fan groups and counts.",
-      "Browse all screenshots in pages of 20, with page selection, side previews and location in the fan.",
-      "Fixed unresponsive context menus, crashes, hover through the box, and folding that interrupted input focus.",
-      "Center desktop pins as a group while preserving relative positions; browsing groups keeps desktop pins in place.",
+      "Reorganized Settings navigation, capture history, workspaces, toolbar controls, and storage management, with a resizable window.",
+      "Added system, light, and dark appearance modes, saved and applied on launch.",
+      "The folded Magnetic Desktop handle supports a floating card stack, docking to all four edges, moving between displays, and further folding while idle.",
+      "Added elastic and arc animations while retaining simple animations and reduced motion support.",
+      "Fixed selection positioning on the first capture and when reusing the overlay across displays.",
       "Magnetic Desktop requires screenshot history. The app and DMG are Apple-notarized."
     ]
   }
