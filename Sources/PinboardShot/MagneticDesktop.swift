@@ -2,7 +2,27 @@ import AppKit
 import Foundation
 
 enum MagneticAnimationStyle: String, CaseIterable {
-    case full, simple
+    case full, elastic, arc, simple
+
+    func progress(_ value: CGFloat) -> CGFloat {
+        let t = min(1, max(0, value))
+        guard t > 0, t < 1 else { return t }
+        if self == .elastic {
+            // Keep native window frames within their endpoints; the card supplies the visual bounce.
+            return min(1, max(0, 1 - pow(1 - t, 3) + sin(t * .pi * 3) * sin(t * .pi) * 0.09))
+        }
+        return 1 - pow(1 - t, 3)
+    }
+
+    func point(from start: CGPoint, to end: CGPoint, progress: CGFloat) -> CGPoint {
+        let t = min(1, max(0, progress))
+        let dx = end.x - start.x, dy = end.y - start.y
+        let distance = hypot(dx, dy)
+        let bend = self == .arc && distance > 0 && t > 0 && t < 1
+            ? sin(t * .pi) * min(64, distance * 0.16) : 0
+        return CGPoint(x: start.x + dx * t - dy / max(1, distance) * bend,
+                       y: start.y + dy * t + dx / max(1, distance) * bend)
+    }
 }
 
 struct MagneticDesktopSettings: Equatable {
@@ -122,6 +142,36 @@ struct MagneticDesktopQueue {
 }
 
 enum MagneticCardHome: String, Codable, Sendable { case rail, box }
+
+enum MagneticDockEdge: CaseIterable, Sendable {
+    case right, left, top, bottom
+
+    var isHorizontal: Bool { self == .top || self == .bottom }
+
+    func inwardTravel(_ delta: CGPoint) -> CGFloat {
+        switch self {
+        case .right: -delta.x
+        case .left: delta.x
+        case .top: -delta.y
+        case .bottom: delta.y
+        }
+    }
+
+    static func nearest(to rect: CGRect, in bounds: CGRect, preferring preferred: Self) -> Self? {
+        func distance(_ edge: Self) -> CGFloat {
+            switch edge {
+            case .right: max(0, bounds.maxX - rect.maxX)
+            case .left: max(0, rect.minX - bounds.minX)
+            case .top: max(0, bounds.maxY - rect.maxY)
+            case .bottom: max(0, rect.minY - bounds.minY)
+            }
+        }
+        // Keep the current edge at a corner tie, with a smaller snap zone than the detach distance.
+        let edges = [preferred] + allCases.filter { $0 != preferred }
+        guard let nearest = edges.min(by: { distance($0) < distance($1) }), distance(nearest) <= 16 else { return nil }
+        return nearest
+    }
+}
 
 struct MagneticPinSource: Codable, Equatable, Sendable {
     let historyItemID: UUID

@@ -520,7 +520,7 @@ final class SelectionOverlayController: NSObject, SelectionOverlayViewDelegate {
 
         guard let overlayState = lifecycle.begin(makeWindow: {
             SelectionOverlayWindow(
-                contentRect: screen.frame,
+                contentRect: CGRect(origin: .zero, size: screen.frame.size),
                 styleMask: .borderless,
                 backing: .buffered,
                 defer: false,
@@ -531,9 +531,7 @@ final class SelectionOverlayController: NSObject, SelectionOverlayViewDelegate {
         overlay.restoreSelectionCaptureMode()
         // 截图窗口会复用；每次开始都读取设置，切换置顶无需重启。
         overlay.level = OverlaySafetyPolicy.configuredWindowLevel()
-        if overlayState.reused {
-            overlay.setFrame(screen.frame, display: false)
-        } else {
+        if !overlayState.reused {
             // 窗口必须保持不透明，亮区由冻结快照重绘；透明挖洞会把点击穿透到真实桌面。
             overlay.backgroundColor = .black
             overlay.isOpaque = true
@@ -543,6 +541,8 @@ final class SelectionOverlayController: NSObject, SelectionOverlayViewDelegate {
             overlay.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
             overlay.acceptsMouseMovedEvents = true
         }
+        // init 的原点相对指定屏幕，setFrame 使用全局坐标；新建和复用均以全局屏幕边界定位。
+        overlay.setFrame(screen.frame, display: false)
 
         let view = SelectionOverlayView(frame: CGRect(origin: .zero, size: screen.frame.size))
         view.delegate = self

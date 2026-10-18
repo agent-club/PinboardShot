@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { runInNewContext } from "node:vm";
-import { parse } from "parse5";
+import { parse, serialize } from "parse5";
 import currentRelease from "../content/current-release.json" with { type: "json" };
 
 const googleTagId = "G-WDBY7TDB0R";
@@ -184,6 +184,31 @@ test("server-renders the PinboardShot download page", async () => {
   assert.equal(software.applicationCategory, "ProductivityApplication");
   assert.equal(software.downloadUrl, "https://pinboardshot.agentclub.dev/download");
   assert.equal(software.softwareVersion, currentRelease.version);
+});
+
+test("introduces Magnetic Desktop on both homepages before the changelog", async () => {
+  for (const [path, title, history] of [
+    ["/zh", "磁力桌面", /截图历史/],
+    ["/en", "Magnetic Desktop", /screenshot history/i],
+  ]) {
+    const response = await render(path);
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    let section;
+    function findSection(node) {
+      if (node.nodeName === "section" && node.attrs?.some(({ name, value }) => name === "id" && value === "magnetic-desktop")) section = node;
+      for (const child of node.childNodes ?? []) findSection(child);
+    }
+    findSection(parse(html));
+    assert.ok(section, `${path} should introduce Magnetic Desktop outside release notes`);
+    const text = visibleText(serialize(section));
+    assert.ok(text.includes(title));
+    assert.match(text, history);
+    assert.match(text, /1\s*[–-]\s*100/);
+    assert.match(text, /20/);
+    assert.match(html, /href="#magnetic-desktop"/);
+    assert.ok(html.indexOf('id="magnetic-desktop"') < html.indexOf('id="changelog"'));
+  }
 });
 
 test("restores an analytics opt-out before loading Google tag on every page", async () => {

@@ -17,6 +17,11 @@ enum PreferencesWindowMetrics {
     }
 }
 
+private enum HistoryManagementPane: Int, Identifiable {
+    case saving, exclusions, storage
+    var id: Int { rawValue }
+}
+
 enum PreferencesSection: String, CaseIterable, Identifiable {
     case shortcuts
     case history
@@ -52,17 +57,8 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
         }
     }
 
-    var tint: Color {
-        switch self {
-        case .shortcuts: .accentColor
-        case .history: .orange
-        case .pins: .pink
-        case .ocr: .purple
-        case .watermark: .blue
-        case .toolbar: .indigo
-        case .general: .teal
-        }
-    }
+    var railTitle: String { L10n.text("settings.rail.\(rawValue)") }
+
 }
 
 @MainActor
@@ -79,6 +75,7 @@ final class AppHealthModel: ObservableObject {
 }
 
 struct PreferencesView: View {
+    @Environment(\.colorScheme) private var colorScheme
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     @ObservedObject var shortcutStore: ShortcutStore
     @ObservedObject var historyStore: HistoryStore
@@ -108,21 +105,25 @@ struct PreferencesView: View {
     let onOpenScreenCaptureSettings: () -> Void
     var onEditHistoryItem: (HistoryItem) -> Void = { _ in }
     var onHistoryTools: (HistoryItem) -> Void = { _ in }
-    var onPrepareBrowserExtension: () -> Void = { }
-    var onDownloadBrowserExtension: () -> Void = { }
-    var onStartBrowserCapture: () -> Void = { }
+    var onPrepareBrowserExtension: () -> Void = {}
+    var onDownloadBrowserExtension: () -> Void = {}
+    var onStartBrowserCapture: () -> Void = {}
 
     @AppStorage(EditableDraftSettings.enabledKey) private var editableDraftsEnabled = false
+    @AppStorage(AppAppearance.userDefaultsKey) private var appAppearance = AppAppearance.system
 
     @AppStorage("captureCursor") private var captureCursor = false
-    @AppStorage(OverlaySafetyPolicy.alwaysOnTopDefaultsKey) private var captureSelectionAlwaysOnTop = true
+    @AppStorage(OverlaySafetyPolicy.alwaysOnTopDefaultsKey) private var captureSelectionAlwaysOnTop =
+        true
     @AppStorage(CaptureQuality.userDefaultsKey)
     private var captureQualityRawValue = CaptureQuality.defaultValue.rawValue
     @AppStorage("clearHistoryOnQuit") private var clearHistoryOnQuit = false
     @AppStorage(OverlaySafetyPolicy.animationDefaultsKey) private var captureEntranceAnimation = true
-    @AppStorage(CaptureImageValidator.allowUniformDarkDefaultsKey) private var allowUniformDarkCaptures = false
+    @AppStorage(CaptureImageValidator.allowUniformDarkDefaultsKey) private
+        var allowUniformDarkCaptures = false
     @AppStorage(PinWindowManager.shadowDefaultsKey) private var pinWindowShadow = true
-    @AppStorage(QuickCaptureOverlaySettings.enabledDefaultsKey) private var quickCaptureOverlayEnabled = true
+    @AppStorage(QuickCaptureOverlaySettings.enabledDefaultsKey) private
+        var quickCaptureOverlayEnabled = true
     @AppStorage(TrayIconChoice.userDefaultsKey)
     private var trayIconRawValue = TrayIconChoice.defaultChoice.rawValue
     @AppStorage(InvisibleWatermarkSettings.enabledDefaultsKey)
@@ -150,8 +151,6 @@ struct PreferencesView: View {
     @State private var isClearingHistoryItems = false
     @State private var isAddingHistoryExclusion = false
     @State private var excludedApplications: [HistoryExcludedApplication] = []
-    @State private var isHistoryStorageExpanded = true
-    @State private var isHistoryExclusionsExpanded = true
     @State private var excludedApplicationMessage: String?
     @State private var historyStorageMetrics: HistoryStorageMetrics?
     @State private var pinWorkspaceStorageMetrics: PinWorkspaceStorageMetrics?
@@ -179,15 +178,28 @@ struct PreferencesView: View {
     @State private var pinWorkspaceRenameText = ""
     @State private var pinWorkspacePendingDuplicate: PinWorkspaceSummary?
     @State private var pinWorkspaceDuplicateText = ""
-    @State private var toolbarActionOrder: [SelectionToolbarAction] = SelectionToolbarConfiguration.manualOrder(defaults: UserDefaults.standard)
+    @State private var toolbarActionOrder: [SelectionToolbarAction] =
+        SelectionToolbarConfiguration.manualOrder(defaults: UserDefaults.standard)
     @State private var toolbarVisibleActions: [String: Bool] = Dictionary(
-        uniqueKeysWithValues: SelectionToolbarConfiguration.visibleActions(defaults: UserDefaults.standard)
-            .map { action in
-                (action.rawValue, true)
-            }
+        uniqueKeysWithValues: SelectionToolbarConfiguration.visibleActions(
+            defaults: UserDefaults.standard
+        )
+        .map { action in
+            (action.rawValue, true)
+        }
     )
-    @State private var toolbarAutoSort: Bool = SelectionToolbarConfiguration.automaticallySortsByUsage(defaults: UserDefaults.standard)
-    @Namespace private var sidebarSelection
+    @State private var toolbarAutoSort: Bool =
+        SelectionToolbarConfiguration.automaticallySortsByUsage(defaults: UserDefaults.standard)
+    @State private var historyManagementPane: HistoryManagementPane?
+    @State private var workspacePane = 0
+    @State private var generalPane = 0
+    @State private var toolbarPane = 0
+    @State private var selectedHistoryID: UUID?
+    @State private var historyKeptOnly = false
+    @State private var selectedWorkspaceID: UUID?
+    @State private var isSavingWorkspace = false
+    @State private var ocrPane = 0
+    @FocusState private var historyListFocused: Bool
 
     private var selectedSection: PreferencesSection { navigation.selectedSection }
 
@@ -197,83 +209,67 @@ struct PreferencesView: View {
             Divider()
             preferencesContent
         }
-        .frame(width: PreferencesWindowMetrics.width, height: PreferencesWindowMetrics.height)
+        .frame(minWidth: PreferencesWindowMetrics.width, minHeight: PreferencesWindowMetrics.height)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 
     private var preferencesSidebar: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            HStack(spacing: 11) {
-                Image(systemName: "viewfinder.rectangular")
-                    .font(.system(size: 17, weight: .semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 34, height: 34)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 10))
-
-                Text("PinboardShot")
-                    .font(.headline)
-                    .lineLimit(1)
+        VStack(spacing: 5) {
+            ForEach(PreferencesSection.allCases) { section in
+                PreferencesSidebarButton(
+                    section: section, isSelected: selectedSection == section,
+                    action: { select(section) })
             }
-            .padding(.horizontal, 4)
-
-            VStack(spacing: 6) {
-                ForEach(PreferencesSection.allCases) { section in
-                    PreferencesSidebarButton(
-                        section: section,
-                        isSelected: selectedSection == section,
-                        selectionNamespace: sidebarSelection,
-                        action: { select(section) }
-                    )
-                }
-            }
-
-            Spacer()
-
-            HStack(spacing: 7) {
-                Circle()
-                    .fill(appHealth.isReady ? Color.green : Color.orange)
-                    .frame(width: 7, height: 7)
-                Text(L10n.text(appHealth.isReady ? "menu.ready" : "preferences.healthNeedsAttention"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 8)
+            Spacer(minLength: 8)
+            Circle().fill(appHealth.isReady ? Color.secondary : Color.orange)
+                .frame(width: 5, height: 5)
+                .help(L10n.text(appHealth.isReady ? "menu.ready" : "preferences.healthNeedsAttention"))
+                .accessibilityLabel(L10n.text(appHealth.isReady ? "menu.ready" : "preferences.healthNeedsAttention"))
+                .padding(.bottom, 12)
         }
-        .padding(16)
-        .frame(width: 188)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
-        .background(.ultraThinMaterial)
+        .padding(.top, 12).frame(width: 56)
+        .frame(maxHeight: .infinity)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
     }
 
     private var preferencesContent: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 11) {
-                Image(systemName: selectedSection.systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(selectedSection.tint)
-                    .frame(width: 30, height: 30)
-                    .background(selectedSection.tint.opacity(0.11), in: RoundedRectangle(cornerRadius: 8))
-
-                Text(selectedSection.title)
-                    .font(.title2.bold())
-
-                Spacer()
-                pageHeaderAction
+            if selectedSection != .history && selectedSection != .pins {
+                HStack(alignment: .center, spacing: 12) {
+                    Image(systemName: selectedSection.systemImage)
+                        .font(.system(size: 17, weight: .medium))
+                        .frame(width: 34, height: 34)
+                        .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 9))
+                        .overlay(RoundedRectangle(cornerRadius: 9).strokeBorder(Color.primary.opacity(0.07)))
+                        .shadow(color: .black.opacity(0.04), radius: 3, y: 1)
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(selectedSection.title).font(.system(size: 18, weight: .semibold))
+                        Text(L10n.text("settings.description.\(selectedSection.rawValue)"))
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                    }
+                    Spacer(minLength: 12)
+                    pageHeaderAction
+                }
+                .padding(.horizontal, 28).padding(.top, 24).padding(.bottom, 18)
+                .frame(maxWidth: selectedSection == .shortcuts ? 696 : 776, alignment: .leading)
+                .frame(maxWidth: .infinity)
             }
-            .padding(.horizontal, 20)
-            .padding(.vertical, 15)
-
-            Divider()
-
-            ZStack(alignment: .topLeading) {
-                selectedContent
-                    .id(selectedSection)
-                    .transition(contentTransition)
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .clipped()
+            selectedContent
+                .id(selectedSection)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .background(Color(nsColor: .controlBackgroundColor).opacity(0.32))
+        .background {
+            if selectedSection == .history || selectedSection == .pins {
+                Color(nsColor: .textBackgroundColor)
+            } else {
+                colorScheme == .dark ? Color(white: 0.105) : Color(white: 0.955)
+            }
+        }
+        .font(.system(size: 12))
+        .toggleStyle(PreferencesRowToggleStyle())
+        .labeledContentStyle(PreferencesFieldStyle())
+        .controlSize(.small)
+        .tint(Color(nsColor: .labelColor))
     }
 
     @ViewBuilder
@@ -284,14 +280,14 @@ struct PreferencesView: View {
                 isAddingShortcut = true
             } label: {
                 Label(L10n.text("preferences.addShortcut"), systemImage: "plus")
-            }.clickCursor()
+            }.clickCursor().buttonStyle(.borderedProminent)
         case .history:
             Button {
                 onCreateBoard()
             } label: {
                 Label(L10n.text("composition.create"), systemImage: "rectangle.3.group")
             }.clickCursor()
-            .disabled(historyStore.items.isEmpty)
+                .disabled(historyStore.items.isEmpty)
         case .pins, .ocr, .watermark, .toolbar, .general:
             EmptyView()
         }
@@ -310,14 +306,6 @@ struct PreferencesView: View {
         }
     }
 
-    private var contentTransition: AnyTransition {
-        guard !accessibilityReduceMotion else { return .opacity }
-        return .asymmetric(
-            insertion: .offset(x: 10).combined(with: .opacity),
-            removal: .offset(x: -6).combined(with: .opacity)
-        )
-    }
-
     private func select(_ section: PreferencesSection) {
         guard section != selectedSection else { return }
         if accessibilityReduceMotion {
@@ -330,57 +318,66 @@ struct PreferencesView: View {
     }
 
     private var shortcutsTab: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(L10n.text("preferences.shortcutHelp"))
-                .foregroundStyle(.secondary)
+        PreferencesPage(maximumWidth: 640) {
+            PreferencesGroup(L10n.text("settings.shortcuts.actions"), spacing: 0) {
+                if shortcutStore.bindings.isEmpty {
+                    PreferencesEmptyState(symbol: "keyboard", title: L10n.text("settings.shortcuts.empty"),
+                        message: L10n.text("preferences.recordHelp"))
+                } else {
+                    ForEach(shortcutStore.bindings) { binding in
+                        HStack(spacing: 12) {
+                            Image(systemName: "command")
+                                .font(.system(size: 13, weight: .medium)).foregroundStyle(.secondary)
+                                .frame(width: 28, height: 28)
+                                .background(Color.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(binding.action.title).font(.system(size: 12, weight: .medium)).lineLimit(2)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
 
-            List {
-                ForEach(shortcutStore.bindings) { binding in
-                    HStack(spacing: 14) {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(binding.action.title)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                            ShortcutRecorderButton(shortcut: binding.shortcut) { shortcut in
+                                if shortcutStore.update(bindingID: binding.id, shortcut: shortcut) {
+                                    shortcutMessage = nil
+                                    onShortcutsChanged()
+                                } else {
+                                    shortcutMessage = L10n.text("preferences.shortcutConflict")
+                                }
+                            }
+                            .frame(width: 108, height: 30)
 
-                        ShortcutRecorderButton(shortcut: binding.shortcut) { shortcut in
-                            if shortcutStore.update(bindingID: binding.id, shortcut: shortcut) {
+                            Button(role: .destructive) {
+                                shortcutStore.remove(bindingID: binding.id)
                                 shortcutMessage = nil
                                 onShortcutsChanged()
-                            } else {
-                                shortcutMessage = L10n.text("preferences.shortcutConflict")
-                            }
+                            } label: {
+                                Image(systemName: "minus.circle")
+                            }.clickCursor()
+                                .buttonStyle(.borderless)
+                                .help(L10n.text("preferences.deleteShortcut"))
                         }
-                        .frame(width: 130, height: 28)
-
-                        Button(role: .destructive) {
-                            shortcutStore.remove(bindingID: binding.id)
-                            shortcutMessage = nil
-                            onShortcutsChanged()
-                        } label: {
-                            Image(systemName: "minus.circle")
-                        }.clickCursor()
-                        .buttonStyle(.borderless)
-                        .help(L10n.text("preferences.deleteShortcut"))
+                        .padding(.vertical, 8)
+                        if binding.id != shortcutStore.bindings.last?.id { Divider() }
                     }
                 }
-            }
-            .listStyle(.inset)
-
-            if let shortcutMessage {
-                Text(shortcutMessage).foregroundStyle(.red).font(.callout)
-            }
-
-            Spacer()
-            HStack {
-                Button(L10n.text("preferences.restoreShortcuts")) {
-                    shortcutStore.reset()
-                    onShortcutsChanged()
-                }.clickCursor()
-                .disabled(shortcutStore.bindings.isEmpty)
-                Spacer()
+                Divider().padding(.top, 6).padding(.bottom, 12)
+                HStack(alignment: .top, spacing: 12) {
+                    Image(systemName: "info.circle").foregroundStyle(.secondary).padding(.top, 2)
+                    Text(L10n.text("preferences.shortcutHelp"))
+                        .font(.system(size: 11)).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Button(L10n.text("preferences.restoreShortcuts")) {
+                        shortcutStore.reset()
+                        onShortcutsChanged()
+                    }.clickCursor().controlSize(.small)
+                        .disabled(shortcutStore.bindings.isEmpty)
+                }
+                if let shortcutMessage {
+                    Label(shortcutMessage, systemImage: "exclamationmark.circle")
+                        .foregroundStyle(.red).font(.system(size: 11)).padding(.top, 12)
+                }
             }
         }
-        .padding(12)
         .sheet(isPresented: $isAddingShortcut) {
             AddShortcutSheet { action, shortcut in
                 guard shortcutStore.add(action: action, shortcut: shortcut) != nil else {
@@ -395,257 +392,352 @@ struct PreferencesView: View {
     }
 
     private var historyTab: some View {
-        ScrollView {
+        VStack(spacing: 0) {
+            if let message = historyErrorMessage ?? historyStore.retentionErrorMessage {
+                Text(message).font(.system(size: 11)).foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(10)
+            }
+            HStack(spacing: 0) {
+                historyList
+                Divider()
+                historyPreview
+            }
+        }
+        .sheet(item: $historyManagementPane) { pane in
+            historyManagement(pane: pane.rawValue)
+        }
+        .sheet(item: $selectedHistoryItemForDetail) { item in
+            historyItemDetailSheet(for: item)
+        }
+    }
+
+    private var historyList: some View {
+        VStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Toggle(L10n.text("preferences.historyEnabled"), isOn: $historyEnabled).clickCursor()
-                    Spacer()
-                }
-                Toggle(L10n.text("preferences.pinSessionRecovery.title"), isOn: $pinSessionRecoveryEnabled).clickCursor()
-                    .onChange(of: pinSessionRecoveryEnabled) { _, enabled in
-                        onPinSessionRecoveryChanged(enabled)
-                    }
-                    .help(L10n.text("preferences.pinSessionRecovery.help"))
-                Toggle(L10n.text("preferences.historyOCRIndexing"), isOn: $historyOCRIndexingEnabled).clickCursor()
-                Toggle(L10n.text("feature.draft.setting"), isOn: $editableDraftsEnabled).clickCursor()
-                    .disabled(!historyEnabled)
-                    .help(L10n.text("feature.draft.privacy"))
-
-                if let historyErrorMessage = historyErrorMessage ?? historyStore.retentionErrorMessage {
-                    Text(historyErrorMessage)
-                        .font(.callout)
-                        .foregroundStyle(.red)
-                }
-
-                HStack(spacing: 10) {
-                    Picker(L10n.text("preferences.historyMaximumItems"), selection: $historyMaximumItems) {
-                        ForEach([10, 25, 50, 100, 250], id: \.self) { count in
-                            Text("\(count)").tag(count)
-                        }
-                    }.clickCursor()
-                    .frame(width: 120)
-                    Spacer()
-                    Picker(L10n.text("preferences.historyRetention"), selection: $historyRetentionDays) {
-                        Text(L10n.text("preferences.historyRetention.forever")).tag(0)
-                        Text(L10n.text("preferences.historyRetention.oneDay")).tag(1)
-                        Text(L10n.text("preferences.historyRetention.sevenDays")).tag(7)
-                        Text(L10n.text("preferences.historyRetention.thirtyDays")).tag(30)
-                        Text(L10n.text("preferences.historyRetention.ninetyDays")).tag(90)
-                    }.clickCursor()
-                    .frame(width: 160)
-                }
-
-                Text(L10n.text("history.keepHelp"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                TextField(L10n.text("preferences.historySearch"), text: $historySearch)
-                    .textFieldStyle(.roundedBorder)
+                Text(PreferencesSection.history.title).font(.system(size: 16, weight: .semibold))
+                Picker("", selection: $historyKeptOnly) {
+                    Text(L10n.text("history.cleanupAll")).tag(false)
+                    Text(L10n.text("settings.history.starred")).tag(true)
+                }.labelsHidden().pickerStyle(.segmented)
+                PreferencesSearchField(placeholder: L10n.text("preferences.historySearch"), text: $historySearch)
                     .help(L10n.text("history.searchHelp"))
-
-                HStack {
-                    Picker(L10n.text("history.clearByTime"), selection: $historyCleanupDays) {
-                        Text(L10n.text("history.cleanupOneDay")).tag(1)
-                        Text(L10n.text("history.cleanupSevenDays")).tag(7)
-                        Text(L10n.text("history.cleanupThirtyDays")).tag(30)
-                        Text(L10n.text("history.cleanupNinetyDays")).tag(90)
-                        Text(L10n.text("history.cleanupAll")).tag(0)
-                    }.clickCursor()
-                    .pickerStyle(.segmented)
-                    .help(L10n.text("history.cleanupHelp"))
-                    Spacer()
-                    Button(L10n.text("history.clearByTime")) {
-                        prepareHistoryCleanup()
-                    }.clickCursor()
-                    .disabled(historyStore.items.isEmpty)
+            }.padding(14)
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(filteredHistoryItems) { item in
+                            historyListRow(item).id(item.id)
+                        }
+                    }.padding(.horizontal, 6)
                 }
+                .onChange(of: selectedHistoryID) { _, value in
+                    if let value { withAnimation { proxy.scrollTo(value, anchor: .center) } }
+                }
+            }
+            Divider()
+            HStack(spacing: 6) {
+                Text(L10n.text("settings.history.results", filteredHistoryItems.count))
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                Spacer(minLength: 2)
+                Menu {
+                    ForEach(0..<3) { index in
+                        Button(L10n.text(["settings.history.saving", "history.applicationExclusions", "settings.history.maintenance"][index])) {
+                            historyManagementPane = HistoryManagementPane(rawValue: index)
+                        }
+                    }
+                    Divider()
+                    Button(L10n.text("composition.create"), action: onCreateBoard)
+                        .disabled(historyStore.items.isEmpty)
+                } label: {
+                    Image(systemName: "gearshape").frame(width: 24, height: 28)
+                }.menuStyle(.borderlessButton).fixedSize()
+                    .help(L10n.text("settings.history.manage"))
+                    .accessibilityLabel(L10n.text("settings.history.manage"))
+            }.padding(.horizontal, 14).frame(height: 42)
+        }
+        .frame(width: 224)
+        .background(Color(nsColor: .controlBackgroundColor).opacity(0.45))
+        .focusable().focusEffectDisabled().focused($historyListFocused)
+        .onMoveCommand { direction in
+            guard direction == .up || direction == .down, !filteredHistoryItems.isEmpty else { return }
+            let index = filteredHistoryItems.firstIndex { $0.id == selectedHistoryItem?.id } ?? 0
+            let next = min(max(0, index + (direction == .down ? 1 : -1)), filteredHistoryItems.count - 1)
+            selectedHistoryID = filteredHistoryItems[next].id
+        }
+    }
 
-                DisclosureGroup(L10n.text("history.storageAndPrivacy"), isExpanded: $isHistoryStorageExpanded) {
-                    VStack(alignment: .leading, spacing: 8) {
+    private func historyListRow(_ item: HistoryItem) -> some View {
+        HStack(spacing: 5) {
+            Button {
+                selectedHistoryID = item.id
+                historyListFocused = true
+            } label: {
+                HStack(spacing: 9) {
+                    HistoryThumbnailView(historyStore: historyStore, item: item)
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(item.createdAt, style: .date).font(.system(size: 11, weight: .medium)).lineLimit(1)
+                        Text(item.createdAt, style: .time).font(.system(size: 10)).foregroundStyle(.secondary)
+                        Text("\(item.pixelWidth) × \(item.pixelHeight)")
+                            .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(1)
+                    }.frame(maxWidth: .infinity, alignment: .leading)
+                }.contentShape(Rectangle())
+            }.buttonStyle(.plain)
+            Button { setHistoryItemKept(item, kept: !item.isKept) } label: {
+                Image(systemName: item.isKept ? "star.fill" : "star")
+                    .font(.system(size: 11)).foregroundStyle(.secondary)
+                    .frame(width: 22, height: 28)
+            }.buttonStyle(.plain)
+                .help(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
+                .accessibilityLabel(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
+        }
+        .padding(.horizontal, 7).frame(height: 60)
+        .background(selectedHistoryItem?.id == item.id ? Color.primary.opacity(0.065) : .clear,
+                    in: RoundedRectangle(cornerRadius: 5))
+        .overlay(alignment: .leading) {
+            if selectedHistoryItem?.id == item.id {
+                RoundedRectangle(cornerRadius: 1).fill(Color.primary.opacity(0.55)).frame(width: 2, height: 34)
+            }
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 5).strokeBorder(
+                selectedHistoryItem?.id == item.id && historyListFocused
+                    ? Color.primary.opacity(0.22) : .clear,
+                lineWidth: 1
+            )
+            .allowsHitTesting(false)
+        }
+        .contextMenu { historyActions(item) }
+    }
+
+    private var selectedHistoryItem: HistoryItem? {
+        filteredHistoryItems.first { $0.id == selectedHistoryID } ?? filteredHistoryItems.first
+    }
+
+    @ViewBuilder
+    private var historyPreview: some View {
+        if let item = selectedHistoryItem {
+            VStack(spacing: 0) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(item.createdAt, style: .date).font(.system(size: 12, weight: .semibold))
+                        HStack(spacing: 8) {
+                            Text(item.createdAt, style: .time)
+                            Text("\(item.pixelWidth) × \(item.pixelHeight)")
+                            let source = historyApplicationName(for: item.sourceApplicationBundleIdentifier)
+                            if !source.isEmpty { Text(source).lineLimit(1) }
+                        }.font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button { setHistoryItemKept(item, kept: !item.isKept) } label: {
+                        Image(systemName: item.isKept ? "star.fill" : "star")
+                    }.help(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
+                        .accessibilityLabel(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
+                    Menu { historyActions(item) } label: { Image(systemName: "ellipsis") }
+                        .menuStyle(.borderlessButton).frame(width: 25)
+                        .accessibilityLabel(L10n.text("settings.moreActions"))
+                }.padding(.horizontal, 22).frame(height: 64)
+                Divider()
+                HistoryPreviewImage(historyStore: historyStore, item: item)
+                    .id(item.id).padding(26)
+                    .onTapGesture(count: 2) { selectedHistoryItemForDetail = item }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .underPageBackgroundColor).opacity(0.45))
+                Divider()
+                HStack(spacing: 8) {
+                    Button { onPinHistoryItem(item) } label: {
+                        Label(L10n.text("preferences.pinToScreen"), systemImage: "pin")
+                    }.buttonStyle(.borderedProminent)
+                    Button { onCopyHistoryItem(item) } label: {
+                        Label(L10n.text("pin.copy"), systemImage: "doc.on.doc")
+                    }
+                    Button { onSaveHistoryItem(item) } label: {
+                        Label(L10n.text("pin.save"), systemImage: "square.and.arrow.down")
+                    }
+                    Spacer(minLength: 8)
+                    Text(historyOCRStatusText(for: item)).font(.system(size: 10)).foregroundStyle(.secondary)
+                        .lineLimit(1)
+                    Button { selectedHistoryItemForDetail = item } label: {
+                        Image(systemName: "arrow.up.left.and.arrow.down.right")
+                    }.buttonStyle(.plain).frame(width: 26, height: 28)
+                        .help(L10n.text("history.viewDetails"))
+                        .accessibilityLabel(L10n.text("history.viewDetails"))
+                }.padding(.horizontal, 20).frame(height: 54)
+            }
+        } else {
+            PreferencesEmptyState(
+                symbol: historySearch.isEmpty && !historyKeptOnly ? "photo.on.rectangle.angled" : "magnifyingglass",
+                title: L10n.text(historyStore.items.isEmpty ? "settings.history.empty" : "settings.search.empty"),
+                message: L10n.text(historyStore.items.isEmpty ? "settings.history.emptyHelp" : "settings.search.emptyHelp"))
+                .frame(maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private func historyActions(_ item: HistoryItem) -> some View {
+        Button(L10n.text("pin.copy")) { onCopyHistoryItem(item) }
+        Button(L10n.text("preferences.pinToScreen")) { onPinHistoryItem(item) }
+        Button(L10n.text("pin.save")) { onSaveHistoryItem(item) }
+        Divider()
+        Button(L10n.text("feature.draft.edit")) { onEditHistoryItem(item) }
+        Button(L10n.text("feature.tools.title")) { onHistoryTools(item) }
+        Button(L10n.text("history.viewDetails")) { selectedHistoryItemForDetail = item }
+        if item.ocrStatus == .indexed {
+            Button(L10n.text("history.copyRecognizedText")) { copyHistoryOCRText(item) }
+        }
+        if item.ocrStatus == .notIndexed || item.ocrStatus == .empty || item.ocrStatus == .failed {
+            Button(L10n.text("history.reindex")) { onReindexHistoryItem(item) }
+        }
+        Divider()
+        Button(L10n.text("preferences.deleteHistoryItem"), role: .destructive) { deleteHistoryItem(item) }
+    }
+
+    private func historyManagement(pane: Int) -> some View {
+        VStack(spacing: 0) {
+            HStack {
+                Text(L10n.text("settings.history.manage")).font(.system(size: 16, weight: .semibold))
+                Spacer()
+                Button(L10n.text("common.done")) { historyManagementPane = nil }.keyboardShortcut(.cancelAction)
+            }.padding(22)
+            PreferencesPanePicker(selection: Binding(
+                get: { pane },
+                set: { historyManagementPane = HistoryManagementPane(rawValue: $0) }
+            ), titles: [
+                L10n.text("settings.history.saving"), L10n.text("settings.history.exclusions"),
+                L10n.text("settings.history.maintenance")])
+            PreferencesPage {
+                if let message = historyErrorMessage ?? historyStore.retentionErrorMessage {
+                    Text(message).foregroundStyle(.red)
+                }
+                if pane == 0 {
+                    PreferencesGroup(L10n.text("settings.history.saving")) {
+                        Toggle(L10n.text("preferences.historyEnabled"), isOn: $historyEnabled).clickCursor()
+                        Toggle(
+                            L10n.text("preferences.pinSessionRecovery.title"), isOn: $pinSessionRecoveryEnabled
+                        ).clickCursor()
+                            .onChange(of: pinSessionRecoveryEnabled) { _, enabled in
+                                onPinSessionRecoveryChanged(enabled)
+                            }
+                            .help(L10n.text("preferences.pinSessionRecovery.help"))
+                        Toggle(L10n.text("preferences.historyOCRIndexing"), isOn: $historyOCRIndexingEnabled)
+                            .clickCursor()
+                        Toggle(L10n.text("feature.draft.setting"), isOn: $editableDraftsEnabled).clickCursor()
+                            .disabled(!historyEnabled)
+                            .help(L10n.text("feature.draft.privacy"))
+
                         HStack {
-                            Button(L10n.text("history.refreshStorage")) {
-                                loadHistoryStorageMetrics()
-                            }.clickCursor()
+                            Text(L10n.text("preferences.historyMaximumItems"))
                             Spacer()
-                            Button(L10n.text("history.clearOCRIndex"), role: .destructive) {
-                                isConfirmingClearOCRIndex = true
-                            }.clickCursor()
-                            .help(L10n.text("history.clearOCRIndexHelp"))
-                        }
-
-                        if let historyStorageMetrics {
-                            Text(L10n.text("history.storageHistory", historyStorageMetrics.itemCount))
-                            Text(L10n.text("history.storageHistoryImages", formatBytes(historyStorageMetrics.imageBytes)))
-                            Text(L10n.text("history.storageHistoryIndex", formatBytes(historyStorageMetrics.indexBytes)))
-                        }
-                        if let pinWorkspaceStorageMetrics {
-                            Text(L10n.text("pinWorkspace.storageSummary", pinWorkspaceStorageMetrics.totalBytes))
-                            Text(L10n.text("pinWorkspace.storageWorkspaceCount", pinWorkspaceStorageMetrics.workspaceCount))
-                            Text(L10n.text("pinWorkspace.storageRecovery", pinWorkspaceStorageMetrics.recoveryBytes))
-                            Text(L10n.text("pinWorkspace.storagePins", pinWorkspaceStorageMetrics.pinCount))
-                        }
-                        if let storageMetricsError {
-                            Text(storageMetricsError).foregroundStyle(.red).font(.caption)
-                        }
-
-                        Divider()
-                        DisclosureGroup(L10n.text("history.applicationExclusions"), isExpanded: $isHistoryExclusionsExpanded) {
-                            VStack(alignment: .leading, spacing: 6) {
-                                if let message = excludedApplicationMessage {
-                                    Text(message).foregroundStyle(.red).font(.caption)
+                            Picker(L10n.text("preferences.historyMaximumItems"), selection: $historyMaximumItems) {
+                                ForEach([10, 25, 50, 100, 250], id: \.self) { count in
+                                    Text("\(count)").tag(count)
                                 }
-                                ScrollView {
-                                    LazyVStack(alignment: .leading, spacing: 6) {
-                                        ForEach(excludedApplications) { application in
-                                            HStack {
-                                                VStack(alignment: .leading, spacing: 2) {
-                                                    Text(historyApplicationName(for: application.bundleIdentifier))
-                                                        .lineLimit(1)
-                                                    Text(application.bundleIdentifier)
-                                                        .font(.caption)
-                                                        .foregroundStyle(.secondary)
-                                                        .lineLimit(1)
-                                                }
-                                                Spacer()
-                                                Button(role: .destructive) {
-                                                    historyPrivacySettings.remove(bundleIdentifier: application.bundleIdentifier)
-                                                    loadHistoryPrivacyApplications()
-                                                } label: {
-                                                    Image(systemName: "xmark.circle")
-                                                }.clickCursor()
+                            }.clickCursor().pickerStyle(.menu)
+                                .labelsHidden().fixedSize()
+
+                        }.frame(minHeight: 32)
+                        HStack {
+                            Text(L10n.text("preferences.historyRetention"))
+                            Spacer()
+                            Picker(L10n.text("preferences.historyRetention"), selection: $historyRetentionDays) {
+                                Text(L10n.text("preferences.historyRetention.forever")).tag(0)
+                                Text(L10n.text("preferences.historyRetention.oneDay")).tag(1)
+                                Text(L10n.text("preferences.historyRetention.sevenDays")).tag(7)
+                                Text(L10n.text("preferences.historyRetention.thirtyDays")).tag(30)
+                                Text(L10n.text("preferences.historyRetention.ninetyDays")).tag(90)
+                            }.clickCursor().pickerStyle(.menu)
+                                .labelsHidden().fixedSize()
+
+                        }.frame(minHeight: 32)
+
+                        Text(L10n.text("history.keepHelp"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+
+                    }
+
+                } else if pane == 1 {
+                    PreferencesGroup(L10n.text("history.applicationExclusions")) {
+                        VStack(alignment: .leading, spacing: 6) {
+                            if let message = excludedApplicationMessage {
+                                Text(message).foregroundStyle(.red).font(.system(size: 10))
+                            }
+                            ScrollView {
+                                LazyVStack(alignment: .leading, spacing: 6) {
+                                    ForEach(excludedApplications) { application in
+                                        HStack {
+                                            VStack(alignment: .leading, spacing: 2) {
+                                                Text(historyApplicationName(for: application.bundleIdentifier))
+                                                    .lineLimit(1)
+                                                Text(application.bundleIdentifier)
+                                                    .font(.system(size: 10))
+                                                    .foregroundStyle(.secondary)
+                                                    .lineLimit(1)
+                                            }
+                                            Spacer()
+                                            Button(role: .destructive) {
+                                                historyPrivacySettings.remove(
+                                                    bundleIdentifier: application.bundleIdentifier)
+                                                loadHistoryPrivacyApplications()
+                                            } label: {
+                                                Image(systemName: "xmark.circle")
+                                            }.clickCursor()
                                                 .buttonStyle(.borderless)
                                                 .help(L10n.text("history.removeExcludedApplication"))
                                                 .accessibilityLabel(L10n.text("history.removeExcludedApplication"))
-                                            }
                                         }
                                     }
                                 }
-                                .frame(maxHeight: 120)
-                                if excludedApplications.isEmpty {
-                                    Text(L10n.text("history.noExcludedApplications"))
-                                        .foregroundStyle(.secondary)
-                                        .font(.caption)
-                                }
-                                Button(L10n.text("history.addExcludedApplication"), action: addHistoryExcludedApplication).clickCursor()
                             }
-                        }
-                        Text(L10n.text("history.exclusionFailClosedHelp"))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.top, 4)
-                }
-
-                LazyVStack(alignment: .leading, spacing: 0) {
-                    ForEach(filteredHistoryItems) { item in
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack(alignment: .top, spacing: 10) {
-                                HistoryThumbnailView(historyStore: historyStore, item: item)
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(item.createdAt, style: .date)
-                                        .lineLimit(1)
-                                    Text(item.createdAt, style: .time)
-                                        .foregroundStyle(.secondary)
-                                    Text("\(item.pixelWidth) × \(item.pixelHeight)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Button {
-                                    setHistoryItemKept(item, kept: !item.isKept)
-                                } label: {
-                                    Image(systemName: item.isKept ? "star.fill" : "star")
-                                }.clickCursor()
-                                .buttonStyle(.borderless)
-                                .help(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
-                                .accessibilityLabel(L10n.text(item.isKept ? "history.unkeep" : "history.keep"))
-                                Button {
-                                    onCopyHistoryItem(item)
-                                } label: {
-                                    Image(systemName: "doc.on.doc")
-                                }.clickCursor()
-                                .buttonStyle(.borderless)
-                                .help(L10n.text("pin.copy"))
-                                .accessibilityLabel(L10n.text("pin.copy"))
-                                Button(role: .none) {
-                                    onPinHistoryItem(item)
-                                } label: {
-                                    Image(systemName: "pin")
-                                }.clickCursor()
-                                .buttonStyle(.borderless)
-                                .help(L10n.text("preferences.pinToScreen"))
-                                .accessibilityLabel(L10n.text("preferences.pinToScreen"))
-                                Button {
-                                    onSaveHistoryItem(item)
-                                } label: {
-                                    Image(systemName: "square.and.arrow.down")
-                                }.clickCursor()
-                                .buttonStyle(.borderless)
-                                .help(L10n.text("pin.save"))
-                                .accessibilityLabel(L10n.text("pin.save"))
-                                Menu {
-                                    Button(L10n.text("feature.draft.edit")) { onEditHistoryItem(item) }.clickCursor()
-                                    Button(L10n.text("feature.tools.title")) { onHistoryTools(item) }.clickCursor()
-                                } label: { Image(systemName: "ellipsis.circle") }.clickCursor()
-                                .menuStyle(.borderlessButton)
-                                .fixedSize()
-                                .help(L10n.text("feature.tools.title"))
-                                Button(role: .destructive) {
-                                    deleteHistoryItem(item)
-                                } label: {
-                                    Image(systemName: "trash")
-                                }.clickCursor()
-                                .buttonStyle(.borderless)
-                                .help(L10n.text("preferences.deleteHistoryItem"))
-                                .accessibilityLabel(L10n.text("preferences.deleteHistoryItem"))
-                            }
-                            HStack(spacing: 8) {
-                                Text(historyOCRStatusText(for: item))
-                                    .font(.caption)
+                            .frame(maxHeight: 120)
+                            if excludedApplications.isEmpty {
+                                Text(L10n.text("history.noExcludedApplications"))
                                     .foregroundStyle(.secondary)
-                                Spacer()
-                                if item.ocrStatus == .indexed {
-                                    Button {
-                                        copyHistoryOCRText(item)
-                                    } label: {
-                                        Image(systemName: "doc.on.doc")
-                                    }.clickCursor()
-                                    .buttonStyle(.borderless)
-                                    .help(L10n.text("history.copyRecognizedText"))
-                                    .accessibilityLabel(L10n.text("history.copyRecognizedText"))
-                                }
-                                Button {
-                                    selectedHistoryItemForDetail = item
-                                } label: {
-                                    Image(systemName: "info.circle")
-                                }.clickCursor()
-                                .buttonStyle(.borderless)
-                                .help(L10n.text("history.viewDetails"))
-                                .accessibilityLabel(L10n.text("history.viewDetails"))
-                                if item.ocrStatus == .notIndexed || item.ocrStatus == .empty || item.ocrStatus == .failed {
-                                    Button {
-                                        onReindexHistoryItem(item)
-                                    } label: {
-                                        Image(systemName: "arrow.clockwise.circle")
-                                    }.clickCursor()
-                                    .buttonStyle(.borderless)
-                                    .help(L10n.text("history.reindex"))
-                                    .accessibilityLabel(L10n.text("history.reindex"))
-                                }
+                                    .font(.system(size: 10))
                             }
-                            Text(HistorySearchMatcher.summary(for: item, maximumLength: 140))
-                                .font(.caption)
-                                .lineLimit(2)
-                                .foregroundStyle(.secondary)
+                            Button(
+                                L10n.text("history.addExcludedApplication"), action: addHistoryExcludedApplication
+                            ).clickCursor()
                         }
-                        .padding(.vertical, 8)
-                        Divider()
+                    }
+                    Text(L10n.text("history.exclusionFailClosedHelp"))
+                        .font(.system(size: 10))
+                        .foregroundStyle(.secondary)
+
+                } else {
+                    historyStorageOverview
+                    PreferencesGroup(L10n.text("history.clearByTime")) {
+                        HStack {
+                            Picker(L10n.text("history.clearByTime"), selection: $historyCleanupDays) {
+                                Text(L10n.text("history.cleanupOneDay")).tag(1)
+                                Text(L10n.text("history.cleanupSevenDays")).tag(7)
+                                Text(L10n.text("history.cleanupThirtyDays")).tag(30)
+                                Text(L10n.text("history.cleanupNinetyDays")).tag(90)
+                                Text(L10n.text("history.cleanupAll")).tag(0)
+                            }.clickCursor()
+                                .pickerStyle(.menu)
+                                .help(L10n.text("history.cleanupHelp"))
+                            Spacer()
+                            Button(L10n.text("history.clearByTime")) {
+                                prepareHistoryCleanup()
+                            }.clickCursor()
+                                .disabled(historyStore.items.isEmpty)
+                        }
+
+                        Text(L10n.text("history.cleanupHelp")).font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                    PreferencesGroup(L10n.text("history.clearOCRIndex")) {
+                        Text(L10n.text("history.clearOCRIndexHelp")).font(.system(size: 11)).foregroundStyle(.secondary)
+                        Button(L10n.text("history.clearOCRIndex"), role: .destructive) {
+                            isConfirmingClearOCRIndex = true
+                        }.clickCursor()
                     }
                 }
             }
-            .padding(12)
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(width: 680, height: 510)
+        .font(.system(size: 12)).controlSize(.small)
+        .toggleStyle(PreferencesRowToggleStyle()).labeledContentStyle(PreferencesFieldStyle())
+        .tint(Color(nsColor: .labelColor))
         .onAppear {
             loadHistoryPrivacyApplications()
             loadHistoryStorageMetrics()
@@ -666,7 +758,10 @@ struct PreferencesView: View {
             }
         } message: {
             if let preview = historyClearPreview {
-                Text(L10n.text("history.clearHistoryMessage", preview.itemCount, formatBytes(preview.reclaimableBytes)))
+                Text(
+                    L10n.text(
+                        "history.clearHistoryMessage", preview.itemCount, formatBytes(preview.reclaimableBytes))
+                )
             }
         }
         .confirmationDialog(
@@ -681,157 +776,101 @@ struct PreferencesView: View {
         } message: {
             Text(L10n.text("history.clearOCRIndexMessage"))
         }
-        .sheet(isPresented: Binding(
-            get: { selectedHistoryItemForDetail != nil },
-            set: { if !$0 { selectedHistoryItemForDetail = nil } }
-        )) {
-            if let selectedItem = selectedHistoryItemForDetail {
-                historyItemDetailSheet(for: selectedItem)
-            }
-        }
         .alert(isPresented: $isClearingHistoryItems) {
             Alert(
                 title: Text(L10n.text("history.clearHistoryTitle")),
                 message: Text(historyClearLabel),
-                primaryButton: .default(Text(L10n.text("common.ok")),
-                                       action: {
-                    isClearingHistoryItems = false
-                }),
+                primaryButton: .default(
+                    Text(L10n.text("common.ok")),
+                    action: {
+                        isClearingHistoryItems = false
+                    }),
                 secondaryButton: .cancel()
             )
+        }
+
+    }
+
+    private var historyStorageOverview: some View {
+        PreferencesGroup(L10n.text("settings.history.storage")) {
+            HStack(alignment: .firstTextBaseline) {
+                if let history = historyStorageMetrics, let pins = pinWorkspaceStorageMetrics {
+                    Text(formatBytes(history.totalBytes + pins.totalBytes))
+                        .font(.system(size: 28, weight: .medium, design: .rounded))
+                }
+                Text(L10n.text("settings.history.localStorage")).font(.system(size: 11)).foregroundStyle(.secondary)
+                Spacer()
+                Button(L10n.text("history.refreshStorage"), action: loadHistoryStorageMetrics)
+            }
+            if let history = historyStorageMetrics, let pins = pinWorkspaceStorageMetrics {
+                PreferencesStorageBar(segments: [
+                    .init(title: L10n.text("settings.storage.images"), bytes: history.imageBytes, shade: 0.75),
+                    .init(title: L10n.text("settings.storage.index"), bytes: history.indexBytes, shade: 0.5),
+                    .init(title: PreferencesSection.pins.title, bytes: pins.workspaceBytes, shade: 0.3),
+                    .init(title: L10n.text("settings.storage.recovery"), bytes: pins.recoveryBytes, shade: 0.15)
+                ])
+                HStack {
+                    Text(L10n.text("history.storageHistory", history.itemCount))
+                    Spacer()
+                    Text(L10n.text("pinWorkspace.storageWorkspaceCount", pins.workspaceCount))
+                    Text(L10n.text("pinWorkspace.storagePins", pins.pinCount))
+                }.font(.system(size: 11)).foregroundStyle(.secondary)
+            }
+            if let storageMetricsError { Text(storageMetricsError).foregroundStyle(.red) }
         }
     }
 
     private var pinWorkspacesTab: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                MagneticDesktopPreferences()
-                Section(L10n.text("pinWorkspace.saveSection")) {
-                    HStack {
-                        TextField(L10n.text("pinWorkspace.namePlaceholder"), text: $pinWorkspaceName)
-                            .onSubmit(savePinWorkspace)
-                        Button(L10n.text("pinWorkspace.save"), action: savePinWorkspace).clickCursor()
-                            .disabled(pinWorkspaceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                    }
-                    Text(L10n.text("pinWorkspace.saveHelp"))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
+        VStack(spacing: 0) {
+            HStack {
+                Text(PreferencesSection.pins.title).font(.system(size: 18, weight: .semibold))
+                Spacer()
+                if workspacePane == 0 {
+                    Button {
+                        pinWorkspaceStatusMessage = nil
+                        isSavingWorkspace = true
+                    } label: {
+                        Label(L10n.text("pinWorkspace.save"), systemImage: "plus")
+                    }.buttonStyle(.borderedProminent)
                 }
-
-                Section(L10n.text("pinWorkspace.savedSection")) {
-                    HStack(spacing: 8) {
-                        TextField(L10n.text("preferences.search"), text: $pinWorkspaceSearch)
-                            .textFieldStyle(.roundedBorder)
-                            .help(L10n.text("history.searchHelp"))
-                        Picker(L10n.text("pinWorkspace.sort"), selection: $pinWorkspaceSort) {
-                            Text(L10n.text("pinWorkspace.sortUpdated")).tag(PinWorkspaceSort.updatedNewest)
-                            Text(L10n.text("pinWorkspace.sortName")).tag(PinWorkspaceSort.nameAscending)
-                            Text(L10n.text("pinWorkspace.sortRestored")).tag(PinWorkspaceSort.recentlyRestored)
-                        }.clickCursor()
-                        .pickerStyle(.menu)
-                        .frame(width: 168)
-                    }
-
-                    if pinWorkspaceStore.workspaces.isEmpty {
-                        ContentUnavailableView(
-                            L10n.text("pinWorkspace.emptyTitle"),
-                            systemImage: "rectangle.stack",
-                            description: Text(L10n.text("pinWorkspace.emptyMessage"))
-                        )
-                    } else if filteredPinWorkspaceStoreItems.isEmpty {
-                        ContentUnavailableView.search(text: pinWorkspaceSearch)
-                    } else {
-                        ForEach(filteredPinWorkspaceStoreItems) { workspace in
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack(spacing: 12) {
-                                    Image(systemName: "rectangle.stack.fill")
-                                        .foregroundStyle(.pink)
-                                        .frame(width: 24)
-                                    VStack(alignment: .leading, spacing: 2) {
-                                        Text(workspace.name)
-                                            .font(.body.weight(.medium))
-                                            .lineLimit(1)
-                                        Text(L10n.text(
-                                            "pinWorkspace.recentSummary",
-                                            workspace.lastRestoredAt.map { formattedHistoryDate($0) } ?? L10n.text("pinWorkspace.notRestored"),
-                                            workspace.noteCount,
-                                            workspace.aggregateTags.prefix(3).joined(separator: ", ")
-                                        ))
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                            .lineLimit(2)
-                                    }
-                                    Spacer()
-                                    Button(L10n.text("pinWorkspace.restore")) {
-                                        restorePinWorkspace(workspace)
-                                    }.clickCursor()
-                                    .help(L10n.text("pinWorkspace.restore"))
-                                    Menu {
-                                        Button(L10n.text("pinWorkspace.rename")) {
-                                            pinWorkspacePendingRename = workspace
-                                            pinWorkspaceRenameText = workspace.name
-                                        }.clickCursor()
-                                        Button(L10n.text("pinWorkspace.duplicate")) {
-                                            pinWorkspacePendingDuplicate = workspace
-                                            pinWorkspaceDuplicateText = ""
-                                        }.clickCursor()
-                                        Divider()
-                                        Button(L10n.text("pinWorkspace.exportImages")) {
-                                            exportPinWorkspace(workspace, format: .images)
-                                        }.clickCursor()
-                                        Button(L10n.text("pinWorkspace.exportPDF")) {
-                                            exportPinWorkspace(workspace, format: .pdf)
-                                        }.clickCursor()
-                                        Button(L10n.text("pinWorkspace.exportMarkdown")) {
-                                            exportPinWorkspace(workspace, format: .markdown)
-                                        }.clickCursor()
-                                        Divider()
-                                        Button(L10n.text("pinWorkspace.delete"), role: .destructive) {
-                                            pinWorkspacePendingDeletion = workspace
-                                        }.clickCursor()
-                                    } label: {
-                                        Image(systemName: "ellipsis.circle")
-                                    }.clickCursor()
-                                    .help(L10n.text("pinWorkspace.moreActions"))
-                                    .accessibilityLabel(L10n.text("pinWorkspace.moreActions"))
-                                }
-                                Text(L10n.text("pinWorkspace.itemSummary", workspace.pinCount, workspace.updatedAt.formatted()))
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Button(L10n.text("pinWorkspace.restoreAgain")) {
-                                    restorePinWorkspace(workspace)
-                                }.clickCursor()
-                                .controlSize(.small)
-                                .buttonStyle(.borderedProminent)
-                            }
-                            .padding(.vertical, 3)
-                            Divider()
-                        }
-                    }
-
-                    if pinWorkspaceStore.loadWarningCount > 0 {
-                        Label(
-                            L10n.text("pinWorkspace.loadWarnings", pinWorkspaceStore.loadWarningCount),
-                            systemImage: "exclamationmark.triangle.fill"
-                        )
-                        .foregroundStyle(.orange)
-                    }
-                }
-
-                Section {
-                    Text(L10n.text("pinWorkspace.privacyHelp"))
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
-                if let pinWorkspaceStatusMessage {
-                    Section {
-                        Text(pinWorkspaceStatusMessage)
-                            .foregroundStyle(pinWorkspaceStatusIsError ? .red : .secondary)
-                    }
-                }
+            }.padding(.horizontal, 24).frame(height: 62)
+            PreferencesPanePicker(selection: $workspacePane, titles: [
+                L10n.text("pinWorkspace.savedSection"), L10n.text("tray.section.magneticDesktop")])
+            if workspacePane == 1 {
+                PreferencesPage { MagneticDesktopPreferences() }
+            } else {
+                HStack(spacing: 0) {
+                    workspaceList
+                    Divider()
+                    workspacePreview
+                }.padding(.top, 12)
             }
-            .padding(12)
+            if let pinWorkspaceStatusMessage {
+                Text(pinWorkspaceStatusMessage)
+                    .font(.system(size: 11))
+                    .foregroundStyle(pinWorkspaceStatusIsError ? .red : .secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 22).padding(.vertical, 8)
+            }
+        }
+        .sheet(isPresented: $isSavingWorkspace) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(L10n.text("pinWorkspace.saveSection")).font(.system(size: 16, weight: .semibold))
+                Text(L10n.text("pinWorkspace.saveHelp")).foregroundStyle(.secondary)
+                TextField(L10n.text("pinWorkspace.namePlaceholder"), text: $pinWorkspaceName)
+                    .textFieldStyle(.roundedBorder)
+                    .onSubmit { submitPinWorkspace() }
+                if pinWorkspaceStatusIsError, let pinWorkspaceStatusMessage {
+                    Text(pinWorkspaceStatusMessage).font(.system(size: 11)).foregroundStyle(.red)
+                }
+                HStack {
+                    Spacer()
+                    Button(L10n.text("common.cancel")) { isSavingWorkspace = false }.keyboardShortcut(.cancelAction)
+                    Button(L10n.text("pinWorkspace.save")) { submitPinWorkspace() }
+                        .keyboardShortcut(.defaultAction).buttonStyle(.borderedProminent)
+                        .disabled(pinWorkspaceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }.font(.system(size: 12)).padding(24).frame(width: 390)
         }
         .onAppear {
             pinWorkspaceStore.refresh()
@@ -858,12 +897,125 @@ struct PreferencesView: View {
         .sheet(item: $pinWorkspacePendingDuplicate) { workspace in
             pinWorkspaceDuplicateSheet(for: workspace)
         }
+
+    }
+
+    private func submitPinWorkspace() {
+        guard !pinWorkspaceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+        savePinWorkspace()
+        if !pinWorkspaceStatusIsError { isSavingWorkspace = false }
+    }
+
+    private var selectedWorkspace: PinWorkspaceSummary? {
+        filteredPinWorkspaceStoreItems.first { $0.id == selectedWorkspaceID } ?? filteredPinWorkspaceStoreItems.first
+    }
+
+    private var workspaceList: some View {
+        VStack(spacing: 12) {
+            PreferencesSearchField(placeholder: L10n.text("preferences.search"), text: $pinWorkspaceSearch)
+                .padding(.horizontal, 12)
+            HStack {
+                Text(L10n.text("pinWorkspace.sort")).font(.system(size: 11)).foregroundStyle(.secondary)
+                Spacer(minLength: 4)
+                Picker(L10n.text("pinWorkspace.sort"), selection: $pinWorkspaceSort) {
+                    Text(L10n.text("pinWorkspace.sortUpdated")).tag(PinWorkspaceSort.updatedNewest)
+                    Text(L10n.text("pinWorkspace.sortName")).tag(PinWorkspaceSort.nameAscending)
+                    Text(L10n.text("pinWorkspace.sortRestored")).tag(PinWorkspaceSort.recentlyRestored)
+                }.labelsHidden().pickerStyle(.menu).fixedSize()
+            }.padding(.horizontal, 12)
+            ScrollView {
+                LazyVStack(spacing: 3) {
+                    ForEach(filteredPinWorkspaceStoreItems) { workspace in
+                        Button { selectedWorkspaceID = workspace.id } label: {
+                            HStack(spacing: 9) {
+                                Image(systemName: "rectangle.stack").font(.system(size: 17)).foregroundStyle(.secondary)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    Text(workspace.name).font(.system(size: 12, weight: .medium)).lineLimit(1)
+                                    Text(L10n.text("pinWorkspace.itemSummary", workspace.pinCount,
+                                        formattedHistoryDate(workspace.updatedAt)))
+                                        .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
+                                }.frame(maxWidth: .infinity, alignment: .leading)
+                            }.padding(10).frame(maxWidth: .infinity, minHeight: 60, alignment: .leading)
+                                .contentShape(Rectangle())
+                                .background(selectedWorkspace?.id == workspace.id ? Color.primary.opacity(0.065) : .clear,
+                                    in: RoundedRectangle(cornerRadius: 5))
+                        }.buttonStyle(.plain).contextMenu { workspaceActions(workspace) }
+                    }
+                }.padding(.horizontal, 6)
+            }
+            if pinWorkspaceStore.loadWarningCount > 0 {
+                Text(L10n.text("pinWorkspace.loadWarnings", pinWorkspaceStore.loadWarningCount))
+                    .font(.system(size: 10)).foregroundStyle(.orange).padding(12)
+            }
+        }.padding(.top, 2).frame(width: 224)
+            .background(Color(nsColor: .controlBackgroundColor).opacity(0.45))
+    }
+
+    @ViewBuilder
+    private var workspacePreview: some View {
+        if let workspace = selectedWorkspace {
+            VStack(spacing: 0) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(workspace.name).font(.system(size: 13, weight: .semibold)).lineLimit(1)
+                        Text(L10n.text("pinWorkspace.itemSummary", workspace.pinCount,
+                            formattedHistoryDate(workspace.updatedAt)))
+                            .font(.system(size: 10)).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Menu { workspaceActions(workspace) } label: { Image(systemName: "ellipsis") }
+                        .menuStyle(.borderlessButton).frame(width: 26)
+                        .accessibilityLabel(L10n.text("pinWorkspace.moreActions"))
+                }.padding(18)
+                Divider()
+                PreferencesWorkspacePreview(store: pinWorkspaceStore, workspace: workspace).id(workspace)
+                    .padding(24).frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color(nsColor: .underPageBackgroundColor).opacity(0.45))
+                Divider()
+                HStack {
+                    Button(L10n.text("pinWorkspace.restore")) { restorePinWorkspace(workspace) }
+                        .buttonStyle(.borderedProminent)
+                    Menu {
+                        Button(L10n.text("pinWorkspace.exportImages")) { exportPinWorkspace(workspace, format: .images) }
+                        Button(L10n.text("pinWorkspace.exportPDF")) { exportPinWorkspace(workspace, format: .pdf) }
+                        Button(L10n.text("pinWorkspace.exportMarkdown")) { exportPinWorkspace(workspace, format: .markdown) }
+                    } label: { Label(L10n.text("settings.workspace.export"), systemImage: "square.and.arrow.up") }
+                    Spacer()
+                }.padding(.horizontal, 20).frame(height: 54)
+                Text(L10n.text("pinWorkspace.privacyHelp")).font(.system(size: 10)).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading).padding(.horizontal, 20).padding(.bottom, 12)
+            }
+        } else {
+            PreferencesEmptyState(symbol: "rectangle.stack",
+                title: L10n.text(pinWorkspaceSearch.isEmpty ? "pinWorkspace.emptyTitle" : "settings.search.empty"),
+                message: L10n.text(pinWorkspaceSearch.isEmpty ? "settings.workspace.emptyHelp" : "settings.search.emptyHelp"))
+                .frame(maxHeight: .infinity)
+        }
+    }
+
+    @ViewBuilder
+    private func workspaceActions(_ workspace: PinWorkspaceSummary) -> some View {
+        Button(L10n.text("pinWorkspace.rename")) {
+            pinWorkspacePendingRename = workspace
+            pinWorkspaceRenameText = workspace.name
+        }
+        Button(L10n.text("pinWorkspace.duplicate")) {
+            pinWorkspacePendingDuplicate = workspace
+            pinWorkspaceDuplicateText = ""
+        }
+        Divider()
+        Button(L10n.text("pinWorkspace.exportImages")) { exportPinWorkspace(workspace, format: .images) }
+        Button(L10n.text("pinWorkspace.exportPDF")) { exportPinWorkspace(workspace, format: .pdf) }
+        Button(L10n.text("pinWorkspace.exportMarkdown")) { exportPinWorkspace(workspace, format: .markdown) }
+        Divider()
+        Button(L10n.text("pinWorkspace.delete"), role: .destructive) { pinWorkspacePendingDeletion = workspace }
     }
 
     private func savePinWorkspace() {
         do {
             let workspace = try onSavePinWorkspace(pinWorkspaceName)
             pinWorkspaceName = ""
+            selectedWorkspaceID = workspace.id
             pinWorkspaceStatusMessage = L10n.text(
                 "pinWorkspace.savedMessage",
                 workspace.name,
@@ -891,13 +1043,12 @@ struct PreferencesView: View {
 
     private var filteredHistoryItems: [HistoryItem] {
         let query = historySearch.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !query.isEmpty else { return historyStore.items }
         return historyStore.items.filter { item in
-            HistorySearchMatcher.matches(
+            (!historyKeptOnly || item.isKept) && (query.isEmpty || HistorySearchMatcher.matches(
                 item,
                 query: query,
                 displayName: historyApplicationName(for: item.sourceApplicationBundleIdentifier)
-            )
+            ))
         }
     }
 
@@ -974,7 +1125,7 @@ struct PreferencesView: View {
                 }.clickCursor()
             }
             Text(L10n.text("history.dimension", item.pixelWidth, item.pixelHeight))
-                .font(.caption)
+                .font(.system(size: 10))
                 .foregroundStyle(.secondary)
             if let image = historyStore.image(for: item) {
                 ScrollView([.horizontal, .vertical]) {
@@ -992,7 +1143,7 @@ struct PreferencesView: View {
             }
             if let text = item.recognizedText, !text.isEmpty {
                 Text(L10n.text("history.ocrTextTitle"))
-                    .font(.callout)
+                    .font(.system(size: 11))
                     .bold()
                 ScrollView {
                     Text(text)
@@ -1226,7 +1377,7 @@ struct PreferencesView: View {
     private func pinWorkspaceRenameSheet(for workspace: PinWorkspaceSummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L10n.text("pinWorkspace.renameTitle"))
-                .font(.title2.bold())
+                .font(.system(size: 16, weight: .semibold))
             TextField(L10n.text("pinWorkspace.namePlaceholder"), text: $pinWorkspaceRenameText)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit {
@@ -1251,10 +1402,10 @@ struct PreferencesView: View {
     private func pinWorkspaceDuplicateSheet(for workspace: PinWorkspaceSummary) -> some View {
         VStack(alignment: .leading, spacing: 14) {
             Text(L10n.text("pinWorkspace.duplicateTitle"))
-                .font(.title2.bold())
+                .font(.system(size: 16, weight: .semibold))
             Text(L10n.text("pinWorkspace.duplicateHelp", workspace.name))
                 .foregroundStyle(.secondary)
-                .font(.callout)
+                .font(.system(size: 11))
             TextField(L10n.text("pinWorkspace.duplicatePlaceholder"), text: $pinWorkspaceDuplicateText)
                 .textFieldStyle(.roundedBorder)
                 .onSubmit {
@@ -1279,50 +1430,54 @@ struct PreferencesView: View {
     }
 
     private var ocrTab: some View {
-        Form {
-            Section(L10n.text("ocr.preferences.providerSection")) {
-                Picker(L10n.text("ocr.preferences.provider"), selection: $ocrProviderID) {
-                    Text(L10n.text("ocr.preferences.localProvider"))
-                        .tag(OCRPluginConstants.localProviderID)
-                    ForEach(ocrPlugins) { plugin in
-                        Text(plugin.name).tag(plugin.id)
+        VStack(spacing: 0) {
+            PreferencesPanePicker(selection: $ocrPane, titles: [
+                L10n.text("ocr.preferences.providerSection"), L10n.text("ocr.preferences.pluginsSection")])
+            PreferencesPage {
+                if ocrPane == 0 {
+                    PreferencesGroup(L10n.text("ocr.preferences.providerSection")) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 240))], spacing: 12) {
+                            ocrProviderTile(id: OCRPluginConstants.localProviderID,
+                                title: L10n.text("ocr.preferences.localProvider"), symbol: "desktopcomputer")
+                            ForEach(ocrPlugins) { plugin in
+                                ocrProviderTile(id: plugin.id, title: plugin.name, symbol: "network")
+                            }
+                        }
+                        Text(L10n.text(ocrProviderID == OCRPluginConstants.localProviderID
+                            ? "ocr.preferences.localHelp" : "ocr.preferences.remoteHelp"))
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                        if ocrProviderID == OCRPluginConstants.localProviderID {
+                            Button(L10n.text("common.save"), action: saveOCRConfiguration).buttonStyle(.borderedProminent)
+                        }
                     }
-                }.clickCursor()
-                .pickerStyle(.menu)
-                .onChange(of: ocrProviderID) { _, _ in loadSelectedOCRPluginConfiguration() }
-
-                Text(L10n.text(
-                    ocrProviderID == OCRPluginConstants.localProviderID
-                        ? "ocr.preferences.localHelp"
-                        : "ocr.preferences.remoteHelp"
-                ))
-                .foregroundStyle(.secondary)
-
-                if ocrProviderID == OCRPluginConstants.localProviderID {
-                    Button(L10n.text("common.save"), action: saveOCRConfiguration).clickCursor()
-                }
-            }
-
             if ocrProviderID != OCRPluginConstants.localProviderID {
-                Section(L10n.text("ocr.preferences.connectionSection")) {
+                PreferencesGroup(L10n.text("ocr.preferences.connectionSection")) {
                     if selectedOCRPlugin == nil {
                         Text(L10n.text("ocr.preferences.pluginUnavailable"))
                             .foregroundStyle(.red)
                     }
-                    TextField(L10n.text("ocr.preferences.baseURL"), text: $ocrBaseURL)
-                        .textContentType(.URL)
-                    TextField(L10n.text("ocr.preferences.model"), text: $ocrModel)
+                    LabeledContent(L10n.text("ocr.preferences.baseURL")) {
+                        TextField("", text: $ocrBaseURL).textContentType(.URL)
+                            .accessibilityLabel(L10n.text("ocr.preferences.baseURL"))
+                    }
+                        LabeledContent(L10n.text("ocr.preferences.model")) {
+                        TextField("", text: $ocrModel)
+                            .accessibilityLabel(L10n.text("ocr.preferences.model"))
+                    }
+                    LabeledContent(L10n.text("ocr.preferences.apiKey")) {
                     SecureField(
                         ocrHasSavedAPIKey
                             ? L10n.text("ocr.preferences.apiKeySavedPlaceholder")
                             : L10n.text("ocr.preferences.apiKey"),
                         text: $ocrAPIKey
                     )
+                    }
                     Text(L10n.text("ocr.preferences.keychainHelp"))
                         .foregroundStyle(.secondary)
 
                     HStack {
                         Button(L10n.text("common.save"), action: saveOCRConfiguration).clickCursor()
+                            .buttonStyle(.borderedProminent)
                             .disabled(selectedOCRPlugin == nil)
                         if ocrHasSavedAPIKey {
                             Button(L10n.text("ocr.preferences.removeAPIKey"), role: .destructive) {
@@ -1333,9 +1488,12 @@ struct PreferencesView: View {
                 }
             }
 
-            Section(L10n.text("ocr.preferences.pluginsSection")) {
+
+                } else {
+            PreferencesGroup(L10n.text("ocr.preferences.pluginsSection")) {
                 HStack {
-                    Button(L10n.text("ocr.preferences.openPluginsFolder"), action: openOCRPluginsFolder).clickCursor()
+                    Button(L10n.text("ocr.preferences.openPluginsFolder"), action: openOCRPluginsFolder)
+                        .clickCursor()
                     Button(L10n.text("ocr.preferences.reloadPlugins"), action: reloadOCRPlugins).clickCursor()
                 }
                 Text(L10n.text("ocr.preferences.pluginsHelp"))
@@ -1347,19 +1505,32 @@ struct PreferencesView: View {
                 }
             }
 
-            if let ocrStatusMessage {
-                Section {
-                    Text(ocrStatusMessage)
-                        .foregroundStyle(ocrStatusIsError ? .red : .secondary)
+
+                }
+                if let ocrStatusMessage {
+                    Text(ocrStatusMessage).foregroundStyle(ocrStatusIsError ? .red : .secondary)
                 }
             }
         }
-        .formStyle(.grouped)
-        .padding(12)
-        .onAppear {
-            reloadOCRPlugins()
-            loadSelectedOCRPluginConfiguration()
-        }
+        .onChange(of: ocrProviderID) { _, _ in loadSelectedOCRPluginConfiguration() }
+        .onAppear { reloadOCRPlugins(); loadSelectedOCRPluginConfiguration() }
+    }
+
+    private func ocrProviderTile(id: String, title: String, symbol: String) -> some View {
+        Button { ocrProviderID = id } label: {
+            HStack(spacing: 10) {
+                Image(systemName: symbol).font(.system(size: 19)).foregroundStyle(.secondary)
+                Text(title).font(.system(size: 12, weight: .medium)).lineLimit(2)
+                Spacer(minLength: 4)
+                Image(systemName: ocrProviderID == id ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(ocrProviderID == id ? Color.primary : Color.secondary.opacity(0.5))
+            }.padding(14).frame(maxWidth: .infinity, minHeight: 64, alignment: .leading)
+                .background(ocrProviderID == id ? Color.primary.opacity(0.035) : Color.clear,
+                            in: RoundedRectangle(cornerRadius: 7))
+                .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(
+                    ocrProviderID == id ? Color.primary.opacity(0.5) : Color.primary.opacity(0.12)))
+                .contentShape(RoundedRectangle(cornerRadius: 7))
+        }.buttonStyle(.plain).accessibilityAddTraits(ocrProviderID == id ? [.isSelected] : [])
     }
 
     private func reloadOCRPlugins() {
@@ -1443,160 +1614,240 @@ struct PreferencesView: View {
     }
 
     private var privacyTab: some View {
-        Form {
-            Section(L10n.text("preferences.menuDisplay")) {
-                TrayMenuDisplayPreferences()
-                Text(L10n.text("preferences.menuDisplayHelp"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Section(L10n.text("browserExtension.title")) {
-                TimelineView(.periodic(from: .now, by: 3)) { context in
-                    let connected = (try? BrowserExtensionPresenceStore().connectedExtensionIDs(now: context.date)) ?? []
-                    Text(L10n.text(connected.isEmpty ? "browserExtension.notDetected" : "browserExtension.connected"))
-                        .font(.callout)
-                        .foregroundStyle(connected.isEmpty ? Color.secondary : Color.green)
-                }
-                Text(L10n.text("browserExtension.help"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-                HStack {
-                    Button(L10n.text("browserExtension.downloadLocal"), action: onDownloadBrowserExtension).clickCursor()
-                    Link(L10n.text("browserExtension.installFromStore"), destination: BrowserExtensionSetup.storeURL).clickCursor()
-                }
-                Text(L10n.text("browserExtension.localHelp"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Button(L10n.text("browserExtension.prepare"), action: onPrepareBrowserExtension).clickCursor()
-                Button(L10n.text("browserExtension.start"), action: onStartBrowserCapture).clickCursor()
-                Text(L10n.text("browserExtension.startHelp"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Section(L10n.text("preferences.screenCapturePermission")) {
-                HStack {
-                    Label(
-                        L10n.text(appHealth.screenCapturePermissionGranted ? "preferences.permissionGranted" : "preferences.permissionMissing"),
-                        systemImage: appHealth.screenCapturePermissionGranted ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
-                    )
-                    .foregroundStyle(appHealth.screenCapturePermissionGranted ? .green : .orange)
-                    Spacer()
-                    if !appHealth.screenCapturePermissionGranted {
-                        Button(L10n.text("onboarding.requestPermission"), action: onRequestScreenCapturePermission).clickCursor()
-                    }
-                    Button(L10n.text("permission.openSettings"), action: onOpenScreenCaptureSettings).clickCursor()
-                }
-                Text(L10n.text("preferences.permissionHelp"))
-                    .foregroundStyle(.secondary)
-                Button(L10n.text("preferences.copyDiagnostics")) {
-                    let pasteboard = NSPasteboard.general
-                    pasteboard.clearContents()
-                    pasteboard.setString(CaptureDiagnostics.report(), forType: .string)
-                }.clickCursor()
-                Text(L10n.text("preferences.diagnosticsHelp"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Section(L10n.text("preferences.languageSection")) {
-                Picker(L10n.text("preferences.language"), selection: languageBinding) {
-                    ForEach(AppLanguage.allCases) { language in
-                        Text(language.title).tag(language)
-                    }
-                }.clickCursor()
-                .pickerStyle(.menu)
-            }
-            Section(L10n.text("preferences.launch")) {
-                Toggle(
-                    L10n.text("preferences.launchAtLogin"),
-                    isOn: Binding(
-                        get: { launchAtLoginManager.isEnabled },
-                        set: { launchAtLoginManager.setEnabled($0) }
-                    )
-                ).clickCursor()
-                if launchAtLoginManager.state == .requiresApproval {
-                    Button(L10n.text("preferences.openLoginSettings")) { launchAtLoginManager.openSystemSettings() }.clickCursor()
-                }
-                if let message = launchAtLoginManager.message {
-                    Text(message).foregroundStyle(.secondary)
-                }
-            }
-            Section(L10n.text("preferences.trayIcon")) {
-                TimelineView(.periodic(from: .now, by: TrayIconChoice.animationInterval)) { context in
-                    VStack(alignment: .leading, spacing: 12) {
-                        trayIconGrid(
-                            title: L10n.text("preferences.trayIcon.monochrome"),
-                            choices: TrayIconChoice.monochromeChoices,
-                            date: context.date
-                        )
-                        trayIconGrid(
-                            title: L10n.text("preferences.trayIcon.color"),
-                            choices: TrayIconChoice.colorChoices,
-                            date: context.date
-                        )
+        VStack(spacing: 0) {
+            PreferencesPanePicker(
+                selection: $generalPane,
+                titles: [
+                    L10n.text("settings.general.basic"), L10n.text("preferences.capture"),
+                    L10n.text("settings.general.connections"), L10n.text("settings.general.advanced"),
+                ])
+            PreferencesPage {
+                if generalPane == 0 {
+                    PreferencesGroup(L10n.text("settings.general.basic")) {
+                        HStack {
+                            Text(L10n.text("preferences.appearance.mode"))
+                            Spacer(minLength: 12)
+                            Picker(L10n.text("preferences.appearance.mode"), selection: $appAppearance) {
+                                ForEach(AppAppearance.allCases) { appearance in
+                                    Text(appearance.title).tag(appearance)
+                                }
+                            }
+                            .labelsHidden().pickerStyle(.menu).fixedSize()
+                            .onChange(of: appAppearance) { _, appearance in appearance.apply() }
+                        }
+                        .frame(minHeight: 36)
+                        .overlay(alignment: .bottom) { Divider().opacity(0.45) }
+                        Text(L10n.text("preferences.appearance.help"))
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+
+                        HStack {
+                            Text(L10n.text("preferences.language"))
+                            Spacer(minLength: 12)
+                        Picker(L10n.text("preferences.language"), selection: languageBinding) {
+                            ForEach(AppLanguage.allCases) { language in
+                                Text(language.title).tag(language)
+                            }
+                        }.clickCursor()
+                            .labelsHidden().pickerStyle(.menu).fixedSize()
+                        }.frame(minHeight: 36)
+                            .overlay(alignment: .bottom) { Divider().opacity(0.45) }
+
+                        Toggle(
+                            L10n.text("preferences.launchAtLogin"),
+                            isOn: Binding(
+                                get: { launchAtLoginManager.isEnabled },
+                                set: { launchAtLoginManager.setEnabled($0) }
+                            )
+                        ).clickCursor()
+                        if launchAtLoginManager.state == .requiresApproval {
+                            Button(L10n.text("preferences.openLoginSettings")) {
+                                launchAtLoginManager.openSystemSettings()
+                            }.clickCursor()
+                        }
+                        if let message = launchAtLoginManager.message {
+                            Text(message).foregroundStyle(.secondary)
+                        }
                     }
                 }
-                Text(L10n.text("preferences.trayIconHelp"))
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
-            }
-            Section(L10n.text("preferences.capture")) {
-                Picker(L10n.text("preferences.outputQuality"), selection: captureQualityBinding) {
-                    ForEach(CaptureQuality.allCases) { quality in
-                        Text(quality.title).tag(quality)
+                if generalPane == 0 {
+                    PreferencesGroup(L10n.text("preferences.menuDisplay")) {
+                        TrayMenuDisplayPreferences()
+                        Text(L10n.text("preferences.menuDisplayHelp"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
                     }
-                }.clickCursor()
-                .pickerStyle(.menu)
-                Toggle(L10n.text("preferences.includeCursor"), isOn: $captureCursor).clickCursor()
-                Toggle(L10n.text("preferences.captureSelectionAlwaysOnTop"), isOn: $captureSelectionAlwaysOnTop).clickCursor()
-                Text(L10n.text("preferences.captureSelectionAlwaysOnTopHelp"))
-                    .foregroundStyle(.secondary)
-                Toggle(L10n.text("preferences.captureAnimation"), isOn: $captureEntranceAnimation).clickCursor()
-                Toggle(L10n.text("preferences.quickCaptureOverlay"), isOn: $quickCaptureOverlayEnabled).clickCursor()
-                Text(L10n.text("preferences.quickCaptureOverlayHelp"))
-                    .foregroundStyle(.secondary)
-                Toggle(L10n.text("preferences.allowDarkCaptures"), isOn: $allowUniformDarkCaptures).clickCursor()
-                Text(L10n.text("preferences.allowDarkCapturesHelp"))
-                    .foregroundStyle(.secondary)
-                Text(L10n.text("preferences.qualityHelp"))
-                    .foregroundStyle(.secondary)
-                if selectedCaptureQuality == .uhd8K {
-                    Text(L10n.text("preferences.8kWarning"))
-                        .foregroundStyle(.orange)
                 }
-            }
-            Section(L10n.text("preferences.updates")) {
-                Toggle(
-                    L10n.text("preferences.automaticallyCheckForUpdates"),
-                    isOn: automaticUpdateChecksBinding
-                ).clickCursor()
-                Picker(
-                    L10n.text("preferences.updateCheckFrequency"),
-                    selection: updateCheckFrequencyBinding
-                ) {
-                    ForEach(UpdateCheckFrequency.allCases) { frequency in
-                        Text(frequency.title).tag(frequency)
+                if generalPane == 2 {
+                    PreferencesGroup(L10n.text("browserExtension.title")) {
+                        TimelineView(.periodic(from: .now, by: 3)) { context in
+                            let connected =
+                                (try? BrowserExtensionPresenceStore().connectedExtensionIDs(now: context.date))
+                                ?? []
+                            Text(
+                                L10n.text(
+                                    connected.isEmpty ? "browserExtension.notDetected" : "browserExtension.connected")
+                            )
+                            .font(.system(size: 11))
+                            .foregroundStyle(Color.secondary)
+                        }
+                        Text(L10n.text("browserExtension.help"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                        HStack {
+                            Button(
+                                L10n.text("browserExtension.downloadLocal"), action: onDownloadBrowserExtension
+                            ).clickCursor()
+                            Link(
+                                L10n.text("browserExtension.installFromStore"),
+                                destination: BrowserExtensionSetup.storeURL
+                            ).clickCursor()
+                        }
+                        Text(L10n.text("browserExtension.localHelp"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Button(L10n.text("browserExtension.prepare"), action: onPrepareBrowserExtension)
+                            .clickCursor()
+                        Button(L10n.text("browserExtension.start"), action: onStartBrowserCapture).clickCursor()
+                        Text(L10n.text("browserExtension.startHelp"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
                     }
-                }.clickCursor()
-                .pickerStyle(.menu)
-                .disabled(!updateManager.automaticallyChecksForUpdates)
-                Text(L10n.text("preferences.updateCheckHelp"))
-                    .foregroundStyle(.secondary)
-            }
-            Section(L10n.text("preferences.privacy")) {
-                Toggle(L10n.text("preferences.clearOnQuit"), isOn: $clearHistoryOnQuit).clickCursor()
-                Text(L10n.text("preferences.localOnly"))
-                    .foregroundStyle(.secondary)
-            }
-            Section(L10n.text("preferences.pinOperations")) {
-                Toggle(L10n.text("preferences.pinShadow"), isOn: $pinWindowShadow).clickCursor()
-                    .onChange(of: pinWindowShadow) { _, enabled in onPinShadowChanged(enabled) }
-                Text(L10n.text("preferences.pinHelp"))
-                    .foregroundStyle(.secondary)
+                }
+                if generalPane == 2 {
+                    PreferencesGroup(L10n.text("preferences.screenCapturePermission")) {
+                        HStack {
+                            Label(
+                                L10n.text(
+                                    appHealth.screenCapturePermissionGranted
+                                        ? "preferences.permissionGranted" : "preferences.permissionMissing"),
+                                systemImage: appHealth.screenCapturePermissionGranted
+                                    ? "checkmark.circle.fill" : "exclamationmark.triangle.fill"
+                            )
+                            .foregroundStyle(appHealth.screenCapturePermissionGranted ? Color.secondary : Color.orange)
+                            Spacer()
+                            if !appHealth.screenCapturePermissionGranted {
+                                Button(
+                                    L10n.text("onboarding.requestPermission"),
+                                    action: onRequestScreenCapturePermission
+                                ).clickCursor()
+                            }
+                            Button(L10n.text("permission.openSettings"), action: onOpenScreenCaptureSettings)
+                                .clickCursor()
+                        }
+                        Text(L10n.text("preferences.permissionHelp"))
+                            .foregroundStyle(.secondary)
+                        Button(L10n.text("preferences.copyDiagnostics")) {
+                            let pasteboard = NSPasteboard.general
+                            pasteboard.clearContents()
+                            pasteboard.setString(CaptureDiagnostics.report(), forType: .string)
+                        }.clickCursor()
+                        Text(L10n.text("preferences.diagnosticsHelp"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                if generalPane == 0 {
+                    PreferencesGroup(L10n.text("preferences.trayIcon")) {
+                        TimelineView(.periodic(from: .now, by: TrayIconChoice.animationInterval)) { context in
+                            VStack(alignment: .leading, spacing: 12) {
+                                trayIconGrid(
+                                    title: L10n.text("preferences.trayIcon.monochrome"),
+                                    choices: TrayIconChoice.monochromeChoices,
+                                    date: context.date
+                                )
+                                trayIconGrid(
+                                    title: L10n.text("preferences.trayIcon.color"),
+                                    choices: TrayIconChoice.colorChoices,
+                                    date: context.date
+                                )
+                            }
+                        }
+                        Text(L10n.text("preferences.trayIconHelp"))
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if generalPane == 1 {
+                    PreferencesGroup(L10n.text("preferences.capture")) {
+                        HStack {
+                            Text(L10n.text("preferences.outputQuality"))
+                            Spacer(minLength: 12)
+                        Picker(L10n.text("preferences.outputQuality"), selection: captureQualityBinding) {
+                            ForEach(CaptureQuality.allCases) { quality in
+                                Text(quality.title).tag(quality)
+                            }
+                        }.clickCursor()
+                            .labelsHidden().pickerStyle(.menu).fixedSize()
+                        }.frame(minHeight: 36)
+                            .overlay(alignment: .bottom) { Divider().opacity(0.45) }
+                        Toggle(L10n.text("preferences.includeCursor"), isOn: $captureCursor).clickCursor()
+                        Toggle(
+                            L10n.text("preferences.captureSelectionAlwaysOnTop"),
+                            isOn: $captureSelectionAlwaysOnTop
+                        ).clickCursor()
+                        Text(L10n.text("preferences.captureSelectionAlwaysOnTopHelp"))
+                            .foregroundStyle(.secondary)
+                        Toggle(L10n.text("preferences.captureAnimation"), isOn: $captureEntranceAnimation)
+                            .clickCursor()
+                        Toggle(L10n.text("preferences.quickCaptureOverlay"), isOn: $quickCaptureOverlayEnabled)
+                            .clickCursor()
+                        Text(L10n.text("preferences.quickCaptureOverlayHelp"))
+                            .foregroundStyle(.secondary)
+                        Toggle(L10n.text("preferences.allowDarkCaptures"), isOn: $allowUniformDarkCaptures)
+                            .clickCursor()
+                        Text(L10n.text("preferences.allowDarkCapturesHelp"))
+                            .foregroundStyle(.secondary)
+                        Text(L10n.text("preferences.qualityHelp"))
+                            .foregroundStyle(.secondary)
+                        if selectedCaptureQuality == .uhd8K {
+                            Text(L10n.text("preferences.8kWarning"))
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                }
+                if generalPane == 3 {
+                    PreferencesGroup(L10n.text("preferences.updates")) {
+                        Toggle(
+                            L10n.text("preferences.automaticallyCheckForUpdates"),
+                            isOn: automaticUpdateChecksBinding
+                        ).clickCursor()
+                        HStack {
+                            Text(L10n.text("preferences.updateCheckFrequency"))
+                            Spacer(minLength: 12)
+                        Picker(
+                            L10n.text("preferences.updateCheckFrequency"),
+                            selection: updateCheckFrequencyBinding
+                        ) {
+                            ForEach(UpdateCheckFrequency.allCases) { frequency in
+                                Text(frequency.title).tag(frequency)
+                            }
+                        }.clickCursor()
+                            .labelsHidden().pickerStyle(.menu).fixedSize()
+                            .disabled(!updateManager.automaticallyChecksForUpdates)
+                        }.frame(minHeight: 36)
+                            .overlay(alignment: .bottom) { Divider().opacity(0.45) }
+                        Text(L10n.text("preferences.updateCheckHelp"))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if generalPane == 3 {
+                    PreferencesGroup(L10n.text("preferences.privacy")) {
+                        Toggle(L10n.text("preferences.clearOnQuit"), isOn: $clearHistoryOnQuit).clickCursor()
+                        Text(L10n.text("preferences.localOnly"))
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                if generalPane == 1 {
+                    PreferencesGroup(L10n.text("preferences.pinOperations")) {
+                        Toggle(L10n.text("preferences.pinShadow"), isOn: $pinWindowShadow).clickCursor()
+                            .onChange(of: pinWindowShadow) { _, enabled in onPinShadowChanged(enabled) }
+                        Text(L10n.text("preferences.pinHelp"))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
-        .formStyle(.grouped)
-        .toggleStyle(PreferencesSwitchToggleStyle())
-        .padding(12)
         .onAppear {
             launchAtLoginManager.refresh()
             updateManager.refreshSettings()
@@ -1604,87 +1855,124 @@ struct PreferencesView: View {
     }
 
     private var toolbarTab: some View {
-        Form {
-            Section(L10n.text("preferences.selectionToolbar.configuration")) {
-                ForEach(Array(toolbarConfiguredActionOrder.enumerated()), id: \.element.rawValue) { index, action in
-                    HStack(spacing: 10) {
-                        Image(systemName: action.symbolName())
-                            .font(.system(size: 16, weight: .semibold))
-                            .frame(width: 24, height: 24)
+        VStack(spacing: 0) {
+            PreferencesPanePicker(
+                selection: $toolbarPane,
+                titles: [
+                    L10n.text("settings.toolbar.arrange"), L10n.text("preferences.selectionToolbarIcons"),
+                ])
+            PreferencesPage {
+                if toolbarPane == 0 {
+                    PreferencesGroup(L10n.text("settings.toolbar.preview")) {
+                        ScrollView(.horizontal) {
+                            HStack(spacing: 4) {
+                                ForEach(
+                                    toolbarConfiguredActionOrder.filter {
+                                        toolbarRequiredActions.contains($0)
+                                            || toolbarVisibleActions[$0.rawValue] == true
+                                    }, id: \.rawValue
+                                ) { action in
+                                    Image(systemName: action.symbolName())
+                                        .font(.system(size: 15)).frame(width: 32, height: 32)
+                                        .help(L10n.text(action.titleKey))
+                                        .accessibilityLabel(L10n.text(action.titleKey))
+                                }
+                            }
+                            .padding(6)
+                            .background(Color(nsColor: .controlBackgroundColor), in: RoundedRectangle(cornerRadius: 7))
+                            .overlay(RoundedRectangle(cornerRadius: 7).strokeBorder(Color.primary.opacity(0.1)))
+                            .padding(16)
+                        }.background(Color.primary.opacity(0.025), in: RoundedRectangle(cornerRadius: 7))
+                    }
+                }
+                if toolbarPane == 0 {
+                    PreferencesGroup(L10n.text("preferences.selectionToolbar.configuration")) {
+                        ForEach(Array(toolbarConfiguredActionOrder.enumerated()), id: \.element.rawValue) {
+                            index, action in
+                            HStack(spacing: 10) {
+                                Image(systemName: action.symbolName())
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .frame(width: 24, height: 24)
 
-                        Text(L10n.text(action.titleKey))
-                            .frame(width: 160, alignment: .leading)
+                                Text(L10n.text(action.titleKey))
+                                    .frame(minWidth: 100, maxWidth: .infinity, alignment: .leading)
 
-                        if toolbarRequiredActions.contains(action) {
-                            Text(L10n.text("preferences.selectionToolbar.required"))
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                if toolbarRequiredActions.contains(action) {
+                                    Text(L10n.text("preferences.selectionToolbar.required"))
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                Spacer()
+
+                                Toggle(
+                                    "",
+                                    isOn: toolbarVisibilityBinding(for: action)
+                                ).clickCursor()
+                                    .labelsHidden().toggleStyle(.switch).fixedSize()
+                                    .accessibilityLabel(L10n.text(action.titleKey))
+                                    .disabled(toolbarRequiredActions.contains(action))
+
+                                Button {
+                                    moveToolbarAction(action, direction: -1)
+                                } label: {
+                                    Image(systemName: "chevron.up")
+                                }.clickCursor()
+                                    .buttonStyle(.plain)
+                                    .disabled(index == 0)
+                                    .help(L10n.text("preferences.selectionToolbar.moveUp"))
+                                    .accessibilityLabel(L10n.text("preferences.selectionToolbar.moveUp"))
+
+                                Button {
+                                    moveToolbarAction(action, direction: 1)
+                                } label: {
+                                    Image(systemName: "chevron.down")
+                                }.clickCursor()
+                                    .buttonStyle(.plain)
+                                    .disabled(index == toolbarConfiguredActionOrder.count - 1)
+                                    .help(L10n.text("preferences.selectionToolbar.moveDown"))
+                                    .accessibilityLabel(L10n.text("preferences.selectionToolbar.moveDown"))
+                            }
+                            .padding(.vertical, 4)
                         }
-
-                        Spacer()
 
                         Toggle(
-                            "",
-                            isOn: toolbarVisibilityBinding(for: action)
+                            L10n.text("preferences.selectionToolbar.autoSort"),
+                            isOn: Binding(
+                                get: { toolbarAutoSort },
+                                set: { enabled in
+                                    toolbarAutoSort = enabled
+                                    SelectionToolbarConfiguration.setAutomaticallySortsByUsage(
+                                        enabled, defaults: UserDefaults.standard)
+                                }
+                            )
                         ).clickCursor()
-                        .disabled(toolbarRequiredActions.contains(action))
-
-                        Button {
-                            moveToolbarAction(action, direction: -1)
-                        } label: {
-                            Image(systemName: "chevron.up")
-                        }.clickCursor()
-                        .buttonStyle(.plain)
-                        .disabled(index == 0)
-                        .help(L10n.text("preferences.selectionToolbar.moveUp"))
-                        .accessibilityLabel(L10n.text("preferences.selectionToolbar.moveUp"))
-
-                        Button {
-                            moveToolbarAction(action, direction: 1)
-                        } label: {
-                            Image(systemName: "chevron.down")
-                        }.clickCursor()
-                        .buttonStyle(.plain)
-                        .disabled(index == toolbarConfiguredActionOrder.count - 1)
-                        .help(L10n.text("preferences.selectionToolbar.moveDown"))
-                        .accessibilityLabel(L10n.text("preferences.selectionToolbar.moveDown"))
+                        Text(L10n.text("preferences.selectionToolbar.autoSortHelp"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
+                        Text(L10n.text("preferences.selectionToolbar.visibilityHelp"))
+                            .font(.system(size: 10))
+                            .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 4)
                 }
 
-                Toggle(
-                    L10n.text("preferences.selectionToolbar.autoSort"),
-                    isOn: Binding(
-                        get: { toolbarAutoSort },
-                        set: { enabled in
-                            toolbarAutoSort = enabled
-                            SelectionToolbarConfiguration.setAutomaticallySortsByUsage(enabled, defaults: UserDefaults.standard)
+                if toolbarPane == 1 {
+                    PreferencesGroup(L10n.text("preferences.selectionToolbarIcons")) {
+                        ForEach(SelectionToolbarAction.allCases.filter { $0 != .annotate }, id: \.rawValue) {
+                            action in
+                            SelectionToolbarIconField(action: action)
                         }
-                    )
-                ).clickCursor()
-                Text(L10n.text("preferences.selectionToolbar.autoSortHelp"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Text(L10n.text("preferences.selectionToolbar.visibilityHelp"))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section(L10n.text("preferences.selectionToolbarIcons")) {
-                ForEach(SelectionToolbarAction.allCases.filter { $0 != .annotate }, id: \.rawValue) { action in
-                    SelectionToolbarIconField(action: action)
+                        Text(L10n.text("preferences.selectionToolbarIconsHelp"))
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                Text(L10n.text("preferences.selectionToolbarIconsHelp"))
-                    .foregroundStyle(.secondary)
-            }
 
-            Button(L10n.text("preferences.selectionToolbar.reset")) {
-                resetToolbarConfiguration()
-            }.clickCursor()
-            .padding(.top, 6)
+                Button(L10n.text("preferences.selectionToolbar.reset")) {
+                    resetToolbarConfiguration()
+                }.clickCursor()
+                    .padding(.top, 6)
+            }
         }
-        .formStyle(.grouped)
-        .padding(12)
         .onAppear {
             refreshToolbarConfiguration()
         }
@@ -1761,37 +2049,45 @@ struct PreferencesView: View {
     }
 
     private var watermarkTab: some View {
-        Form {
-            Section(L10n.text("watermark.preferences.section")) {
-                Toggle(L10n.text("watermark.preferences.enabled"), isOn: $invisibleWatermarkEnabled).clickCursor()
+        PreferencesPage {
+            PreferencesGroup(L10n.text("watermark.preferences.section")) {
+                Toggle(L10n.text("watermark.preferences.enabled"), isOn: $invisibleWatermarkEnabled)
+                    .clickCursor()
                 Text(L10n.text("watermark.preferences.enabledHelp"))
                     .foregroundStyle(.secondary)
             }
-            Section(L10n.text("watermark.preferences.details")) {
-                TextField(L10n.text("watermark.preferences.project"), text: $watermarkProject)
+            PreferencesGroup(L10n.text("watermark.preferences.details")) {
+                LabeledContent(L10n.text("watermark.preferences.project")) {
+                        TextField("", text: $watermarkProject)
+                            .accessibilityLabel(L10n.text("watermark.preferences.project"))
+                    }
                     .disabled(!invisibleWatermarkEnabled)
-                TextField(L10n.text("watermark.preferences.recipient"), text: $watermarkRecipient)
+                LabeledContent(L10n.text("watermark.preferences.recipient")) {
+                        TextField("", text: $watermarkRecipient)
+                            .accessibilityLabel(L10n.text("watermark.preferences.recipient"))
+                    }
                     .disabled(!invisibleWatermarkEnabled)
-                TextField(L10n.text("watermark.preferences.customText"), text: $watermarkCustomText, axis: .vertical)
-                    .lineLimit(2...4)
-                    .disabled(!invisibleWatermarkEnabled)
+                LabeledContent(L10n.text("watermark.preferences.customText")) {
+                TextField(
+                    "", text: $watermarkCustomText, axis: .vertical
+                )
+                .lineLimit(2...4)
+                .disabled(!invisibleWatermarkEnabled)
+                }
                 Text(L10n.text("watermark.preferences.privacyPreview"))
                     .foregroundStyle(.secondary)
             }
-            Section(L10n.text("watermark.preferences.localRecords")) {
+            PreferencesGroup(L10n.text("watermark.preferences.localRecords")) {
                 Text(L10n.text("watermark.preferences.recordCount", watermarkStore.records.count))
                 Button(L10n.text("watermark.preferences.clearRecords"), role: .destructive) {
                     isConfirmingWatermarkClear = true
                 }.clickCursor()
-                .disabled(watermarkStore.records.isEmpty)
+                    .disabled(watermarkStore.records.isEmpty)
                 if let watermarkErrorMessage {
                     Text(watermarkErrorMessage).foregroundStyle(.red)
                 }
             }
         }
-        .formStyle(.grouped)
-        .toggleStyle(PreferencesSwitchToggleStyle())
-        .padding(12)
         .confirmationDialog(
             L10n.text("watermark.preferences.clearConfirmTitle"),
             isPresented: $isConfirmingWatermarkClear,
@@ -1802,7 +2098,8 @@ struct PreferencesView: View {
                     try watermarkStore.clear()
                     watermarkErrorMessage = nil
                 } catch {
-                    watermarkErrorMessage = L10n.text("watermark.preferences.clearFailed", error.localizedDescription)
+                    watermarkErrorMessage = L10n.text(
+                        "watermark.preferences.clearFailed", error.localizedDescription)
                 }
             }
             Button(L10n.text("common.cancel"), role: .cancel) {}
@@ -1824,7 +2121,7 @@ struct PreferencesView: View {
             Text(title)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(.secondary)
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: 6), spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 58, maximum: 68), spacing: 8)], spacing: 8) {
                 ForEach(choices) { choice in
                     trayIconButton(choice, date: date)
                 }
@@ -1836,7 +2133,7 @@ struct PreferencesView: View {
         let frameIndex = accessibilityReduceMotion ? 0 : choice.frameIndex(at: date)
         let iconColor = choice.color(frameIndex: frameIndex).map(Color.init(nsColor:)) ?? .primary
         let isSelected = selectedTrayIcon == choice
-        let displayedIconColor: Color = isSelected && !choice.usesColor ? .accentColor : iconColor
+        let displayedIconColor: Color = iconColor
         return Button {
             trayIconRawValue = choice.rawValue
             onTrayIconChanged(choice)
@@ -1849,26 +2146,26 @@ struct PreferencesView: View {
                 .frame(maxWidth: .infinity, minHeight: 34)
                 .background(
                     RoundedRectangle(cornerRadius: 7)
-                        .fill(isSelected ? Color.accentColor.opacity(0.16) : Color.secondary.opacity(0.07))
+                        .fill(isSelected ? Color.primary.opacity(0.06) : Color.secondary.opacity(0.07))
                 )
                 .overlay {
                     RoundedRectangle(cornerRadius: 7)
-                        .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 1.5)
+                        .stroke(isSelected ? Color.primary.opacity(0.5) : Color.primary.opacity(0.08), lineWidth: 1.5)
                 }
                 .overlay(alignment: .topTrailing) {
                     if isSelected {
                         ZStack {
-                            Circle().fill(Color.accentColor)
+                            Circle().fill(Color(nsColor: .labelColor))
                             Image(systemName: "checkmark")
                                 .font(.system(size: 7, weight: .black))
-                                .foregroundStyle(.white)
+                                .foregroundStyle(Color(nsColor: .textBackgroundColor))
                         }
                         .frame(width: 14, height: 14)
                         .offset(x: 4, y: -4)
                     }
                 }
                 .shadow(
-                    color: isSelected ? Color.accentColor.opacity(0.22) : .clear,
+                    color: .clear,
                     radius: 3,
                     y: 1
                 )
@@ -1927,53 +2224,129 @@ struct PreferencesView: View {
     }
 }
 
-private struct PreferencesSwitchToggleStyle: ToggleStyle {
-    @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
-    @Environment(\.isEnabled) private var isEnabled
-
+private struct PreferencesRowToggleStyle: ToggleStyle {
     func makeBody(configuration: Configuration) -> some View {
-        Button {
-            configuration.isOn.toggle()
-        } label: {
-            HStack(spacing: 12) {
-                configuration.label
-                Spacer(minLength: 12)
-                PreferencesSwitch(isOn: configuration.isOn, isEnabled: isEnabled)
-            }
-            .contentShape(Rectangle())
-        }.clickCursor()
-        .buttonStyle(.plain)
-        .animation(
-            accessibilityReduceMotion ? nil : .easeOut(duration: 0.16),
-            value: configuration.isOn
-        )
+        HStack(spacing: 16) {
+            configuration.label.frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityHidden(true)
+            Toggle(isOn: configuration.$isOn) { configuration.label }
+                .labelsHidden().toggleStyle(.switch).fixedSize()
+        }
+        .frame(minHeight: 36)
+        .overlay(alignment: .bottom) { Divider().opacity(0.45) }
     }
 }
 
-private struct PreferencesSwitch: View {
-    let isOn: Bool
-    let isEnabled: Bool
-
-    var body: some View {
-        Capsule()
-            .fill(trackColor)
-            .frame(width: 52, height: 30)
-            .overlay(alignment: isOn ? .trailing : .leading) {
-                Circle()
-                    .fill(Color.white)
-                    .frame(width: 24, height: 24)
-                    .padding(3)
-                    .shadow(color: Color.black.opacity(0.16), radius: 2, y: 1)
-            }
-            .overlay {
-                Capsule()
-                    .stroke(Color.primary.opacity(isOn ? 0 : 0.08), lineWidth: 0.5)
-            }
-            .opacity(isEnabled ? 1 : 0.46)
+private struct PreferencesFieldStyle: LabeledContentStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 16) {
+            configuration.label.frame(width: 132, alignment: .leading).foregroundStyle(.secondary)
+            configuration.content.frame(maxWidth: 320)
+            Spacer(minLength: 0)
+        }.frame(minHeight: 34)
     }
+}
 
-    private var trackColor: Color {
-        isOn ? Color.accentColor : Color.secondary.opacity(0.28)
+private struct PreferencesPage<Content: View>: View {
+    var maximumWidth: CGFloat = 720
+    @ViewBuilder var content: Content
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) { content }
+                .frame(maxWidth: maximumWidth, alignment: .leading)
+                .padding(.horizontal, 28).padding(.top, 8).padding(.bottom, 24)
+                .frame(maxWidth: .infinity)
+        }
+        .textFieldStyle(.roundedBorder)
+    }
+}
+
+private struct PreferencesGroup<Content: View>: View {
+    @Environment(\.colorScheme) private var colorScheme
+    var title: String?
+    var spacing: CGFloat
+    @ViewBuilder var content: Content
+    init(_ title: String? = nil, spacing: CGFloat = 10, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.spacing = spacing
+        self.content = content()
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let title {
+                Text(title).font(.system(size: 11, weight: .semibold)).foregroundStyle(.secondary)
+            }
+            VStack(alignment: .leading, spacing: spacing) { content }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(16)
+                .background(colorScheme == .dark ? Color(white: 0.16) : Color(nsColor: .controlBackgroundColor),
+                            in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Color.primary.opacity(0.08)))
+                .shadow(color: .black.opacity(colorScheme == .dark ? 0.12 : 0.04), radius: 5, y: 2)
+        }
+    }
+}
+
+private struct PreferencesPanePicker: View {
+    @Binding var selection: Int
+    let titles: [String]
+    var body: some View {
+        HStack(spacing: 18) {
+            ForEach(titles.indices, id: \.self) { index in
+                Button { selection = index } label: {
+                    Text(titles[index]).font(.system(size: 12, weight: selection == index ? .medium : .regular))
+                        .foregroundStyle(selection == index ? Color.primary : Color.secondary)
+                        .padding(.vertical, 11)
+                        .overlay(alignment: .bottom) {
+                            if selection == index { Rectangle().fill(Color.primary.opacity(0.7)).frame(height: 2) }
+                        }
+                        .contentShape(Rectangle())
+                }.buttonStyle(.plain).accessibilityAddTraits(selection == index ? [.isSelected] : [])
+            }
+            Spacer(minLength: 0)
+        }
+        .overlay(alignment: .bottom) { Divider() }
+        .padding(.horizontal, 28)
+        .frame(maxWidth: 776, alignment: .leading)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(L10n.text("settings.pageNavigation"))
+    }
+}
+
+private struct PreferencesSearchField: View {
+    let placeholder: String
+    @Binding var text: String
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary).font(.system(size: 10))
+            TextField(placeholder, text: $text).textFieldStyle(.plain).font(.system(size: 11))
+                .accessibilityLabel(placeholder)
+            if !text.isEmpty {
+                Button { text = "" } label: { Image(systemName: "xmark.circle.fill") }
+                    .buttonStyle(.plain).foregroundStyle(.secondary)
+                    .accessibilityLabel(L10n.text("settings.search.clear"))
+            }
+        }
+        .padding(.horizontal, 8).frame(height: 28)
+        .background(Color(nsColor: .textBackgroundColor), in: RoundedRectangle(cornerRadius: 4))
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Color.primary.opacity(0.12)))
+    }
+}
+
+private struct PreferencesEmptyState: View {
+    let symbol: String
+    let title: String
+    let message: String
+    var body: some View {
+        VStack(spacing: 9) {
+            Image(systemName: symbol).font(.system(size: 26, weight: .light)).foregroundStyle(.tertiary)
+                .padding(.bottom, 4)
+            Text(title).font(.system(size: 13, weight: .medium))
+            Text(message).font(.system(size: 11)).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                .frame(maxWidth: 280)
+        }
+        .frame(maxWidth: .infinity).padding(.vertical, 32).padding(.horizontal, 24)
     }
 }
 
@@ -1984,23 +2357,135 @@ private struct HistoryThumbnailView: View {
 
     var body: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 5)
-                .fill(Color.black.opacity(0.06))
+            RoundedRectangle(cornerRadius: 3).fill(Color.primary.opacity(0.04))
             if let thumbnail {
-                Image(nsImage: thumbnail)
-                    .resizable()
-                    .scaledToFit()
+                Image(nsImage: thumbnail).resizable().scaledToFit()
             } else {
-                Image(systemName: "photo")
-                    .font(.system(size: 18, weight: .medium))
-                    .foregroundStyle(.secondary)
+                Image(systemName: "photo").font(.system(size: 14)).foregroundStyle(.tertiary)
             }
         }
-        .frame(width: 76, height: 52)
-        .clipShape(RoundedRectangle(cornerRadius: 5))
+        .frame(width: 59, height: 42).clipShape(RoundedRectangle(cornerRadius: 3))
+        .overlay(RoundedRectangle(cornerRadius: 3).strokeBorder(Color.primary.opacity(0.09)))
         .task(id: item.id) {
             thumbnail = nil
             thumbnail = await historyStore.thumbnail(for: item)
+        }
+    }
+}
+
+private struct HistoryPreviewImage: View {
+    @ObservedObject var historyStore: HistoryStore
+    let item: HistoryItem
+    @State private var preview: NSImage?
+    @State private var loaded = false
+
+    var body: some View {
+        ZStack {
+            if let preview {
+                Image(nsImage: preview).resizable().scaledToFit()
+                    .shadow(color: .black.opacity(0.08), radius: 8, y: 2)
+                    .accessibilityLabel(L10n.text("history.dimension", item.pixelWidth, item.pixelHeight))
+            } else if loaded {
+                Text(L10n.text("history.imageMissing")).font(.system(size: 12)).foregroundStyle(.secondary)
+            } else {
+                ProgressView().controlSize(.small)
+            }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+        .task(id: item.id) {
+            preview = nil
+            loaded = false
+            let image = await historyStore.thumbnail(for: item, maxPixelSize: 2400)
+            guard !Task.isCancelled else { return }
+            preview = image
+            loaded = true
+        }
+    }
+}
+
+private struct PreferencesWorkspacePreview: View {
+    let store: PinWorkspaceStore
+    let workspace: PinWorkspaceSummary
+    @State private var result: PinWorkspaceLoadResult?
+    @State private var message: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let result {
+                GeometryReader { geometry in
+                    let bounds = result.entries.map(\.state.frame).reduce(CGRect.null) { $0.union($1) }
+                    let scale = min(geometry.size.width / max(bounds.width, 1), geometry.size.height / max(bounds.height, 1))
+                    let origin = CGPoint(x: (geometry.size.width - bounds.width * scale) / 2,
+                                         y: (geometry.size.height - bounds.height * scale) / 2)
+                    ZStack(alignment: .topLeading) {
+                        ForEach(Array(result.entries.enumerated()), id: \.offset) { _, entry in
+                            Image(nsImage: entry.image).resizable().scaledToFit()
+                                .frame(width: entry.state.frame.width * scale, height: entry.state.frame.height * scale)
+                                .background(Color(nsColor: .textBackgroundColor))
+                                .opacity(entry.state.opacity)
+                                .shadow(color: .black.opacity(0.12), radius: 5, y: 2)
+                                .position(x: origin.x + (entry.state.frame.midX - bounds.minX) * scale,
+                                          y: origin.y + (bounds.maxY - entry.state.frame.midY) * scale)
+                        }
+                    }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
+                if result.skippedPinCount > 0 {
+                    Text(L10n.text("settings.workspace.skipped", result.skippedPinCount))
+                        .font(.system(size: 10)).foregroundStyle(.secondary)
+                }
+                if !workspace.aggregateTags.isEmpty {
+                    Text(workspace.aggregateTags.joined(separator: " · "))
+                        .font(.system(size: 10)).foregroundStyle(.secondary).lineLimit(2)
+                }
+                if !workspace.searchableNotes.isEmpty {
+                    Text(workspace.searchableNotes.joined(separator: "\n"))
+                        .font(.system(size: 11)).foregroundStyle(.secondary).lineLimit(3)
+                }
+            } else if let message {
+                Text(message).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else { ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity) }
+        }
+        .task(id: workspace) {
+            result = nil
+            message = nil
+            do { result = try store.load(workspace) }
+            catch { message = error.localizedDescription }
+        }
+    }
+}
+
+private struct PreferencesStorageBar: View {
+    struct Segment {
+        let title: String
+        let bytes: Int64
+        let shade: Double
+    }
+    let segments: [Segment]
+    private var total: Int64 { segments.reduce(0) { $0 + $1.bytes } }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            GeometryReader { geometry in
+                HStack(spacing: 2) {
+                    ForEach(segments.indices, id: \.self) { index in
+                        if segments[index].bytes > 0 {
+                            Rectangle().fill(Color.primary.opacity(segments[index].shade))
+                                .frame(width: max(0, geometry.size.width - CGFloat(segments.filter { $0.bytes > 0 }.count - 1) * 2)
+                                    * CGFloat(segments[index].bytes) / CGFloat(max(total, 1)))
+                        }
+                    }
+                }
+            }.frame(height: 8).clipShape(RoundedRectangle(cornerRadius: 3))
+                .background(Color.primary.opacity(0.04))
+                .accessibilityHidden(true)
+            ForEach(segments.indices, id: \.self) { index in
+                HStack(spacing: 8) {
+                    Circle().fill(Color.primary.opacity(segments[index].shade)).frame(width: 6, height: 6)
+                    Text(segments[index].title)
+                    Spacer()
+                    Text(ByteCountFormatter.string(fromByteCount: segments[index].bytes, countStyle: .file))
+                        .monospacedDigit().foregroundStyle(.secondary)
+                }.font(.system(size: 11))
+            }
         }
     }
 }
@@ -2032,16 +2517,20 @@ private struct SelectionToolbarIconField: View {
                             .frame(width: 36, height: 30)
                             .background(
                                 RoundedRectangle(cornerRadius: 7)
-                                    .fill(candidate == selectedSymbolName ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04))
+                                    .fill(
+                                        candidate == selectedSymbolName
+                                            ? Color.accentColor.opacity(0.12) : Color.primary.opacity(0.04))
                             )
                             .overlay {
                                 RoundedRectangle(cornerRadius: 7)
-                                    .stroke(candidate == selectedSymbolName ? Color.accentColor : Color.secondary.opacity(0.18), lineWidth: 1)
+                                    .stroke(
+                                        candidate == selectedSymbolName
+                                            ? Color.accentColor : Color.secondary.opacity(0.18), lineWidth: 1)
                             }
                     }.clickCursor()
-                    .buttonStyle(.plain)
-                    .help(candidate)
-                    .accessibilityLabel("\(L10n.text(action.titleKey)) \(candidate)")
+                        .buttonStyle(.plain)
+                        .help(candidate)
+                        .accessibilityLabel("\(L10n.text(action.titleKey)) \(candidate)")
                 }
             }
             Spacer(minLength: 0)
@@ -2078,55 +2567,29 @@ private struct PreferencesSidebarButton: View {
     @Environment(\.accessibilityReduceMotion) private var accessibilityReduceMotion
     let section: PreferencesSection
     let isSelected: Bool
-    let selectionNamespace: Namespace.ID
     let action: () -> Void
 
     @State private var isHovering = false
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
-                Image(systemName: section.systemImage)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundStyle(isSelected ? section.tint : Color.secondary)
-                    .frame(width: 27, height: 27)
-                    .background(
-                        section.tint.opacity(isSelected ? 0.14 : isHovering ? 0.09 : 0),
-                        in: RoundedRectangle(cornerRadius: 7)
-                    )
-
-                Text(section.title)
-                    .font(.callout.weight(isSelected ? .semibold : .medium))
-                    .foregroundStyle(isSelected ? Color.primary : Color.secondary)
-                    .lineLimit(1)
-
-                Spacer(minLength: 4)
+            VStack(spacing: 4) {
+                Image(systemName: section.systemImage).font(.system(size: 16, weight: .regular))
+                    .frame(width: 22, height: 20)
+                Text(section.railTitle).font(.system(size: 9)).lineLimit(1)
             }
-            .padding(.horizontal, 9)
-            .frame(maxWidth: .infinity, minHeight: 40)
+            .foregroundStyle(isSelected ? Color(nsColor: .textBackgroundColor) : Color.secondary)
+            .frame(width: 42, height: 46)
             .background {
-                if isSelected {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(section.tint.opacity(0.11))
-                } else if isHovering {
-                    RoundedRectangle(cornerRadius: 10)
-                        .fill(Color.primary.opacity(0.045))
-                }
+                RoundedRectangle(cornerRadius: 6).fill(
+                    isSelected ? Color(nsColor: .labelColor) : Color.primary.opacity(isHovering ? 0.05 : 0))
             }
-            .overlay(alignment: .leading) {
-                if isSelected {
-                    Capsule()
-                        .fill(section.tint)
-                        .frame(width: 3, height: 21)
-                        .offset(x: 2)
-                        .matchedGeometryEffect(id: "preferences-sidebar-selection", in: selectionNamespace)
-                }
-            }
-            .contentShape(RoundedRectangle(cornerRadius: 10))
-        }.clickCursor()
-        .buttonStyle(.plain)
-        .onHover { isHovering = $0 }
-        .animation(accessibilityReduceMotion ? nil : .easeOut(duration: 0.16), value: isHovering)
+            .contentShape(RoundedRectangle(cornerRadius: 6))
+        }.clickCursor().buttonStyle(.plain)
+            .help(section.title).accessibilityLabel(section.title)
+            .accessibilityAddTraits(isSelected ? [.isSelected] : [])
+            .onHover { isHovering = $0 }
+            .animation(accessibilityReduceMotion ? nil : .easeOut(duration: 0.12), value: isHovering)
     }
 }
 
@@ -2140,8 +2603,8 @@ private struct AddShortcutSheet: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(L10n.text("preferences.addShortcut")).font(.title2.bold())
+        VStack(alignment: .leading, spacing: 14) {
+            Text(L10n.text("preferences.addShortcut")).font(.system(size: 16, weight: .semibold))
 
             Picker(L10n.text("preferences.triggerAction"), selection: $selectedAction) {
                 ForEach(CaptureAction.allCases) { action in
@@ -2157,17 +2620,17 @@ private struct AddShortcutSheet: View {
             }
 
             Text(L10n.text("preferences.recordHelp"))
-                .font(.callout)
+                .font(.system(size: 11))
                 .foregroundStyle(.secondary)
 
             if let errorMessage {
-                Text(errorMessage).font(.callout).foregroundStyle(.red)
+                Text(errorMessage).font(.system(size: 11)).foregroundStyle(.red)
             }
 
-            Spacer()
             HStack {
                 Spacer()
                 Button(L10n.text("common.cancel")) { dismiss() }.clickCursor()
+                    .keyboardShortcut(.cancelAction)
                 Button(L10n.text("common.add")) {
                     if onAdd(selectedAction, shortcut) {
                         dismiss()
@@ -2175,11 +2638,14 @@ private struct AddShortcutSheet: View {
                         errorMessage = L10n.text("preferences.shortcutConflict")
                     }
                 }.clickCursor()
-                .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+                    .keyboardShortcut(.defaultAction)
             }
         }
         .padding(22)
-        .frame(width: 400, height: 250)
+        .frame(width: 400)
+        .fixedSize(horizontal: false, vertical: true)
+        .font(.system(size: 12)).controlSize(.small)
     }
 }
 
@@ -2190,8 +2656,12 @@ struct ShortcutRecorderButton: NSViewRepresentable {
     func makeCoordinator() -> Coordinator { Coordinator(onChange: onChange) }
 
     func makeNSView(context: Context) -> NSButton {
-        let button = ActionButton(title: shortcut.displayText, target: context.coordinator, action: #selector(Coordinator.beginRecording(_:)))
+        let button = ActionButton(
+            title: shortcut.displayText, target: context.coordinator,
+            action: #selector(Coordinator.beginRecording(_:)))
         button.bezelStyle = .rounded
+        button.controlSize = .regular
+        button.font = .monospacedSystemFont(ofSize: 12, weight: .medium)
         context.coordinator.button = button
         return button
     }
