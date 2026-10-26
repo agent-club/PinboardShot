@@ -5,6 +5,18 @@ import Testing
 
 @testable import PinboardShot
 
+@Test("设置搜索可按功能查找并处理空白和无结果")
+func preferencesSearchFindsFeatures() {
+    #expect(PreferencesSection.capture.matches("光标"))
+    #expect(PreferencesSection.general.matches(" 语言 "))
+    #expect(PreferencesSection.updates.matches("检查 周期"))
+    #expect(PreferencesSection.ocr.matches("api"))
+    #expect(PreferencesSection.pins.matches("阴影"))
+    #expect(!PreferencesSection.capture.matches("语言"))
+    #expect(PreferencesSection.allCases.allSatisfy { $0.matches("  ") })
+    #expect(!PreferencesSection.allCases.contains { $0.matches("不存在的设置xyz") })
+}
+
 private final class PreferencesFixtureFileManager: FileManager {
     let root: URL
     init(root: URL) {
@@ -19,7 +31,7 @@ private final class PreferencesFixtureFileManager: FileManager {
 }
 
 /// Exercise the real SwiftUI pages using isolated stores; optional renders contain no user captures.
-@Test("设置七个分区在深浅色及最小和宽窗口下完成布局")
+@Test("设置各分区在深浅色及最小和宽窗口下完成布局")
 @MainActor
 func preferencesPagesLayoutWithIsolatedStores() async throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(
@@ -87,7 +99,10 @@ func preferencesPagesLayoutWithIsolatedStores() async throws {
     for scheme in [ColorScheme.light, .dark] {
         for section in PreferencesSection.allCases {
             navigation.selectedSection = section
-            for size in [NSSize(width: 840, height: 580), NSSize(width: 960, height: 660)] {
+            for size in [
+                NSSize(width: PreferencesWindowMetrics.width, height: PreferencesWindowMetrics.height),
+                NSSize(width: 1080, height: 660),
+            ] {
                 let host = NSHostingView(rootView: view.environment(\.colorScheme, scheme).frame(width: size.width, height: size.height))
                 host.frame = NSRect(origin: .zero, size: size)
                 host.layoutSubtreeIfNeeded()

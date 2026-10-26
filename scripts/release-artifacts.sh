@@ -18,6 +18,11 @@ dmg="$feed_dir/PinboardShot-${version}-${build}.dmg"
 appcast="$feed_dir/appcast.xml"
 
 ./scripts/check-notary-profile.sh "$notary_profile"
+if [[ ! -x .build/dmg-tools/bin/python ]]; then
+  echo "Set up DMG tools first; see docs/release-process.md (Build Assets)." >&2
+  exit 1
+fi
+.build/dmg-tools/bin/python scripts/build-dmg.py --check-tools
 echo "==> Building, signing, notarizing app, and generating Sparkle update feed"
 ./scripts/prepare-update.sh "$version" "$build"
 
@@ -33,11 +38,7 @@ if [[ -e "$dmg" ]]; then
 fi
 
 echo "==> Creating signed and notarized DMG"
-hdiutil create \
-  -volname PinboardShot \
-  -srcfolder .build/app/PinboardShot.app \
-  -format UDZO \
-  "$dmg"
+.build/dmg-tools/bin/python scripts/build-dmg.py "$dmg"
 codesign --force --sign "$signing_identity" --timestamp "$dmg"
 xcrun notarytool submit "$dmg" \
   --keychain-profile "$notary_profile" \

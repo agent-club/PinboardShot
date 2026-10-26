@@ -129,7 +129,7 @@ actions tied to the current ChatGPT user. Leave public content anonymous.
 
 - `pnpm run dev`: start local development
 - `pnpm run build`: verify the vinext build output
-- `pnpm test`: 构建网站并验证服务端渲染的下载页
+- `pnpm test`: 构建网站，并通过 Wrangler 的本地 workerd 测试环境验证服务端渲染页面、响应头与资源路由（不部署）
 - `pnpm run check:cloudflare`: 检查 vinext 与 Cloudflare Workers 的兼容性
 - `pnpm run deploy:dry-run`: 生成部署包但不上传
 - `pnpm run deploy`: 构建并部署到 Cloudflare Workers

@@ -71,11 +71,13 @@ final class MagneticDesktopController {
     private var cardMotions: [UUID: MagneticCardMotion] = [:]
     private let trailState = MagneticFlightTrailState()
     private(set) var trailPanel: NSPanel?
+    private var dockFlightPanels: [NSPanel] = []
     private var effectGeneration = 0
     private let fanMotion = MagneticFanMotion()
     private var fanPanels: [NSPanel] = []
     private(set) var fanAnimationPanel: NSPanel?
-    var fanAnimationProgress: CGFloat { fanMotion.progress }
+    private var dockMotionView: MagneticDockMotionView?
+    var fanAnimationProgress: CGFloat { dockMotionView?.progress ?? fanMotion.progress }
     private var dragVelocity = MagneticDragVelocity()
     private var dragStart: (id: UUID, mouse: CGPoint, origin: CGPoint)?
     private var desktopLayoutWasAdjusted = false
@@ -644,6 +646,8 @@ final class MagneticDesktopController {
 
     private func clearFanAnimation() {
         fanAnimationPanel?.orderOut(nil)
+        fanAnimationPanel?.contentView = nil
+        dockMotionView = nil
         fanMotion.leaves = []
         fanPanels.removeAll()
         foldedPanel?.alphaValue = 1
@@ -653,9 +657,11 @@ final class MagneticDesktopController {
         guard !panels.isEmpty, !motionReduced else { clearFanAnimation(); return }
         let simple = settings.animationStyle == .simple
         let continuing = fanAnimationPanel?.isVisible == true
-        let start = continuing ? fanMotion.progress : (opening ? CGFloat(0) : CGFloat(1))
+        let start = continuing ? fanAnimationProgress : (opening ? CGFloat(0) : CGFloat(1))
         let end: CGFloat = opening ? 1 : 0
-        let leaves = panels.enumerated().compactMap { index, panel -> MagneticFanLeaf? in
+        let reusingLeaves = continuing && dockMotionView != nil && panels.count == fanPanels.count
+            && zip(panels, fanPanels).allSatisfy { $0.0 === $0.1 }
+        let leaves = reusingLeaves ? fanMotion.leaves : panels.enumerated().compactMap { index, panel -> MagneticFanLeaf? in
             guard let view = panel.contentView else { return nil }
             view.layoutSubtreeIfNeeded()
             guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
@@ -684,9 +690,20 @@ final class MagneticDesktopController {
         overlay.hasShadow = false
         // Only the visual leaves move. They must never take clicks or activate another app's keyboard focus.
         overlay.ignoresMouseEvents = true
-        overlay.contentView = MagneticPassiveHostingView(rootView:
-            MagneticFanMotionView(motion: fanMotion, screenFrame: screen, pivot: pivot,
-                                  simple: simple, style: settings.animationStyle))
+        let baseDuration = settings.animationStyle == .full ? 0.32 : 0.56
+        let duration = simple ? 0.16 : max(settings.animationStyle == .full ? 0.12 : 0.16,
+                                         baseDuration * Double(abs(end - start)))
+        if settings.animationStyle == .full {
+            let dock = MagneticDockMotionView(leaves: leaves, screen: screen, pivot: pivot,
+                                             start: start, end: end, duration: duration)
+            dockMotionView = dock
+            overlay.contentView = dock
+        } else {
+            dockMotionView = nil
+            overlay.contentView = MagneticPassiveHostingView(rootView:
+                MagneticFanMotionView(motion: fanMotion, screenFrame: screen, pivot: pivot,
+                                      simple: simple, style: settings.animationStyle))
+        }
         overlay.setFrame(screen, display: true)
         overlay.orderFrontRegardless()
         panels.forEach { $0.orderOut(nil) }
@@ -694,8 +711,13 @@ final class MagneticDesktopController {
             // A cancelled transition must not hide the newer animation created by a rapid reversal.
             if generation == refreshGeneration { clearFanAnimation() }
         }
-        let baseDuration = settings.animationStyle == .full ? 0.46 : 0.56
-        let duration = simple ? 0.16 : max(0.16, baseDuration * Double(abs(end - start)))
+        if dockMotionView != nil {
+            // Progress is derived from elapsed time so reversals remain continuous at any refresh rate.
+            do { try await Task.sleep(for: .seconds(duration)) } catch { return }
+            guard !Task.isCancelled, generation == refreshGeneration, !suspended else { return }
+            fanMotion.progress = end
+            return
+        }
         let steps = max(1, Int(duration * 60))
         for step in 0...steps {
             guard !Task.isCancelled, generation == refreshGeneration, !suspended else { return }
@@ -719,6 +741,9 @@ final class MagneticDesktopController {
         cardMotions.values.forEach { $0.finish() }
         trailState.flights = []
         trailPanel?.orderOut(nil)
+        trailPanel?.contentView = nil
+        dockFlightPanels.forEach { $0.orderFrontRegardless() }
+        dockFlightPanels.removeAll()
     }
 
     private func animateMany(_ targets: [(NSPanel, CGRect)], duration: TimeInterval = 0.24,
@@ -750,13 +775,42 @@ final class MagneticDesktopController {
             trail.level = .normal
             trail.hasShadow = false
             trail.ignoresMouseEvents = true
-            trail.contentView = MagneticPassiveHostingView(rootView: MagneticFlightTrailView(state: trailState, screenFrame: screen))
-            trail.setFrame(screen, display: true)
-            trail.orderFrontRegardless()
-            for (id, _) in flying { cardPanels[id]?.orderFrontRegardless() }
+            if style == .full {
+                // Animate cached pixels instead of resizing SwiftUI windows and redrawing effects every frame.
+                dockFlightPanels = changing.map(\.0)
+                let leaves = changing.enumerated().compactMap { index, target -> MagneticFanLeaf? in
+                    let panel = target.0
+                    panel.orderOut(nil)
+                    let capture = starts[index].width * starts[index].height > target.1.width * target.1.height
+                        ? starts[index] : target.1
+                    panel.setFrame(capture, display: false)
+                    defer { panel.setFrame(target.1, display: false) }
+                    guard let view = panel.contentView else { return nil }
+                    view.layoutSubtreeIfNeeded()
+                    guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { return nil }
+                    view.cacheDisplay(in: view.bounds, to: bitmap)
+                    guard let image = bitmap.cgImage else { return nil }
+                    return MagneticFanLeaf(id: index, image: NSImage(cgImage: image, size: capture.size), frame: capture)
+                }
+                let frames = leaves.map { (start: starts[$0.id], end: changing[$0.id].1) }
+                let viewport = frames.reduce(screen) { $0.union($1.start).union($1.end) }
+                trail.contentView = MagneticDockMotionView(leaves: leaves, screen: viewport, frames: frames,
+                                                          duration: 0.32)
+                trail.setFrame(viewport, display: true)
+                trail.orderFrontRegardless()
+            } else {
+                trail.contentView = MagneticPassiveHostingView(rootView: MagneticFlightTrailView(state: trailState, screenFrame: screen))
+                trail.setFrame(screen, display: true)
+                trail.orderFrontRegardless()
+                for (id, _) in flying { cardPanels[id]?.orderFrontRegardless() }
+            }
         }
         defer {
             if let generation, generation == effectGeneration { clearEffects() }
+        }
+        if style == .full, generation != nil {
+            do { try await Task.sleep(for: .seconds(0.32)) } catch { return }
+            return
         }
         // Window frames and visual progress share one clock, including all-card returns.
         let animationDuration = duration * (style == .elastic || style == .arc ? 1.25 : 1)
@@ -880,35 +934,44 @@ final class MagneticDesktopController {
         for id in partition.visible { cardPanels[id]?.level = .floating }
         for id in desktopOrder { cardPanels[id]?.level = .normal }
         hasPresented = true
-        let box = boxPanel ?? makePanel(frame: boxFrame)
-        boxPanel = box
-        // Separate levels keep box controls above the rail even when another magnetic window is clicked.
-        box.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
-        let content = MagneticBoxView(
-            images: partition.boxed.prefix(5).compactMap { thumbnails[$0] }, count: partition.boxed.count,
-            desktopCount: desktopFrames.count, motion: boxMotion,
-            onReturnAll: { [weak self] in self?.returnAllToEdge() },
-            onOpen: { [weak self] in self?.toggleBox() },
-            onCollapse: { [weak self] in self?.setCollapsed(true) },
-            motionReduced: motionReduced, decorativeEffects: decorativeEffects, animationStyle: settings.animationStyle)
-        if let hosting = box.contentView as? MagneticBoxHostingView {
-            // A history refresh during a drag must retain its original press coordinates.
-            hosting.rootView = content
+        if !partition.boxed.isEmpty {
+            let box = boxPanel ?? makePanel(frame: boxFrame)
+            boxPanel = box
+            // Separate levels keep box controls above the rail even when another magnetic window is clicked.
+            box.level = NSWindow.Level(rawValue: NSWindow.Level.floating.rawValue + 1)
+            let content = MagneticBoxView(
+                images: partition.boxed.prefix(5).compactMap { thumbnails[$0] }, count: partition.boxed.count,
+                desktopCount: desktopFrames.count, motion: boxMotion,
+                onReturnAll: { [weak self] in self?.returnAllToEdge() },
+                onOpen: { [weak self] in self?.toggleBox() },
+                onCollapse: { [weak self] in self?.setCollapsed(true) },
+                motionReduced: motionReduced, decorativeEffects: decorativeEffects, animationStyle: settings.animationStyle)
+            if let hosting = box.contentView as? MagneticBoxHostingView {
+                // A history refresh during a drag must retain its original press coordinates.
+                hosting.rootView = content
+            } else {
+                let hosting = MagneticBoxHostingView(rootView: content)
+                hosting.onMove = { [weak self] in self?.moveBox(to: $0) }
+                box.contentView = hosting
+            }
+            // Thumbnail loads and flights await; the user may have moved the tray in the meantime.
+            box.setFrame(resolvedBoxFrame(in: frame), display: true)
         } else {
-            let hosting = MagneticBoxHostingView(rootView: content)
-            hosting.onMove = { [weak self] in self?.moveBox(to: $0) }
-            box.contentView = hosting
+            (boxPanel?.contentView as? MagneticBoxHostingView)?.cancelDrag()
+            stopBoxMotion()
+            boxPanel?.orderOut(nil)
+            closeBox()
+            shouldRestoreContents = false
         }
-        // Thumbnail loads and flights await; the user may have moved the tray in the meantime.
-        box.setFrame(resolvedBoxFrame(in: frame), display: true)
         if unfolding {
-            await animateFan(partition.visible.compactMap { cardPanels[$0] } + [box],
+            let boxes = partition.boxed.isEmpty ? [] : [boxPanel].compactMap { $0 }
+            await animateFan(partition.visible.compactMap { cardPanels[$0] } + boxes,
                              opening: true, in: frame, generation: generation)
             guard isCurrent() else { return }
             foldedPanel?.orderOut(nil)
             for id in partition.visible { cardPanels[id]?.orderFrontRegardless() }
         }
-        box.orderFrontRegardless()
+        if !partition.boxed.isEmpty { boxPanel?.orderFrontRegardless() }
         updatePager(in: frame)
         if !changingPage && outgoing.contains(where: { items[$0] != nil && partition.boxed.contains($0) }) { shakeBox() }
         if shouldRestoreContents {
@@ -1276,7 +1339,7 @@ final class MagneticDesktopController {
         guard screen == visibleFrame else { return [] }
         if settings.isCollapsed { return [resolvedFoldedFrame(in: screen)] }
         let cards = MagneticDesktopGeometry.cardFrames(count: partition.visible.count, in: screen)
-        return [resolvedBoxFrame(in: screen)] + cards
+        return (partition.boxed.isEmpty ? [] : [resolvedBoxFrame(in: screen)]) + cards
             + (railPageCount > 1 ? [MagneticDesktopGeometry.pagerFrame(beside: cards, in: screen)] : [])
     }
 
@@ -1517,7 +1580,8 @@ final class MagneticDesktopController {
     func toggleBox() {
         recordInteraction()
         if contentsPanel?.isVisible == true { closeBox(); return }
-        guard let frame = visibleFrame, settings.isEnabled, !settings.isCollapsed, !suspended else { return }
+        guard let frame = visibleFrame, settings.isEnabled, !settings.isCollapsed, !suspended,
+              !partition.boxed.isEmpty else { return }
         let rect = boxContentsFrame(in: frame)
         guard rect.width > 0, rect.height > 0 else { return }
         let panel = contentsPanel ?? makePanel(frame: rect)

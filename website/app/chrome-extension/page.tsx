@@ -58,9 +58,9 @@ export default function ChromeExtensionPage() {
           <h3>Choose an installation method</h3>
           <ol>
             <li><Link href="/download">Install and open PinboardShot on your Mac</Link>.</li>
-            <li>In the app, open Settings → Preferences and choose <strong>Download locally</strong> or <a href={storeUrl}>Install from the Chrome Web Store</a>.</li>
+            <li>In the app, open Settings → Chrome webpage capture and choose <strong>Download locally</strong> or <a href={storeUrl}>Install from the Chrome Web Store</a>.</li>
             <li>For the local copy, open <code>chrome://extensions</code>, turn on Developer mode, choose Load unpacked, and select the exported folder in Downloads. Keep that folder in place.</li>
-            <li>In PinboardShot, open Settings → Preferences → Chrome Web Capture and choose Connect local app.</li>
+            <li>In PinboardShot, open Settings → Chrome webpage capture and choose Connect local app.</li>
             <li>Open an ordinary web page and start a capture from the extension button or ⌘⇧Y. Keep that tab active until the capture finishes.</li>
           </ol>
           <p>
@@ -110,9 +110,9 @@ export default function ChromeExtensionPage() {
           <h3>选择安装方式</h3>
           <ol>
             <li><Link href="/download">安装并打开 Mac 版 PinboardShot</Link>。</li>
-            <li>在应用“设置 → 偏好”中选择“下载到本地”或<a href={storeUrl}>“从商店安装”</a>。</li>
+            <li>在应用“设置 → Chrome 网页长截图”中选择“下载到本地”或<a href={storeUrl}>“从商店安装”</a>。</li>
             <li>本地版本下载后，打开 <code>chrome://extensions</code>，开启“开发者模式”，选择“加载已解压的扩展程序”，并选取下载目录中的导出文件夹。请保留这个文件夹。</li>
-            <li>在 PinboardShot“设置 → 偏好 → Chrome 网页长截图”中点击“连接本机应用”。</li>
+            <li>在 PinboardShot“设置 → Chrome 网页长截图”中点击“连接本机应用”。</li>
             <li>打开普通网页，点击扩展按钮或按 ⌘⇧Y 开始采集；完成前不要切换该标签页。</li>
           </ol>
           <p>

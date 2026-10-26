@@ -723,8 +723,8 @@
 "magnetic.animationStyle.arc" = "Arc";
 "magnetic.animationStyle.elastic.help" = "Use spring timing for unfolding, extraction, returns, and centering, with gentle card and tray bounces.";
 "magnetic.animationStyle.arc.help" = "Use curved paths for unfolding, extraction, returns, and centering, with gentle tilts and curved flight trails.";
-"magnetic.animationStyle.full.help" = "Keep fan unfolding, card flips, flight trails, and arrival bounces.";
-"magnetic.animationStyle.simple.help" = "Keep smooth movement and fades without flips, trails, shakes, or bounces.";
+"magnetic.animationStyle.full.help" = "Use Dock-style shrinking and expanding, smooth scaling when pulling out or returning cards, and arrival bounces.";
+"magnetic.animationStyle.simple.help" = "Keep smooth movement and fades without trails, shakes, or bounces.";
 "magnetic.reduceMotion" = "Reduce motion";
 "magnetic.reduceMotion.help" = "Disable animated movement, rotation, and bouncing for instant transitions. Also follows the system Reduce Motion setting.";
 "magnetic.reduceMotion.system" = "System Reduce Motion is on, so magnetic animations are reduced. Your selected style is preserved.";
@@ -773,7 +773,7 @@
 "settings.description.ocr" = "Choose how text is recognized and connect a provider.";
 "settings.description.watermark" = "Manage invisible marks and local records.";
 "settings.description.toolbar" = "Keep your favorite tools within easy reach.";
-"settings.description.general" = "Make PinboardShot work the way you do.";
+"settings.description.general" = "Appearance, language, launch at login and menu bar";
 "settings.shortcuts.actions" = "Actions & shortcuts";
 "settings.history.library" = "Captures";
 "settings.history.saving" = "Saving & privacy";
@@ -820,3 +820,14 @@
 "preferences.appearance.section" = "Appearance";
 "preferences.appearance.mode" = "Color mode";
 "preferences.appearance.help" = "Use light or dark appearance, or switch automatically with macOS.";
+
+"settings.search.placeholder" = "Search settings";
+"settings.group.0" = "Everyday settings";
+"settings.group.1" = "Captures & content";
+"settings.group.2" = "Connections & maintenance";
+"settings.title.permissions" = "Permissions & diagnostics";
+"settings.description.capture" = "Image quality, cursor and capture selection behavior";
+"settings.description.browser" = "Install the Chrome extension and capture webpages";
+"settings.description.permissions" = "Check screen recording access and capture diagnostics";
+"settings.description.privacy" = "Manage capture cleanup when the app quits";
+"settings.description.updates" = "Manage automatic update checks and their frequency";
