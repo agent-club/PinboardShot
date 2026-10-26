@@ -716,6 +716,18 @@
 "magnetic.maximumLabel" = "Fan capacity";
 "magnetic.maximumCount" = "%d screenshots";
 "magnetic.help" = "Recent screenshots snap to the main screen edge. Fan capacities above 10 use browsable groups; screenshots beyond the capacity stay in the box. Click the box to browse all screenshots by page. History retention and app exclusions still apply. Turning this mode off does not delete images.";
+"magnetic.animationStyle" = "Animation style";
+"magnetic.animationStyle.full" = "Full";
+"magnetic.animationStyle.simple" = "Simple";
+"magnetic.animationStyle.elastic" = "Elastic";
+"magnetic.animationStyle.arc" = "Arc";
+"magnetic.animationStyle.elastic.help" = "Use spring timing for unfolding, extraction, returns, and centering, with gentle card and tray bounces.";
+"magnetic.animationStyle.arc.help" = "Use curved paths for unfolding, extraction, returns, and centering, with gentle tilts and curved flight trails.";
+"magnetic.animationStyle.full.help" = "Use Dock-style shrinking and expanding, smooth scaling when pulling out or returning cards, and arrival bounces.";
+"magnetic.animationStyle.simple.help" = "Keep smooth movement and fades without trails, shakes, or bounces.";
+"magnetic.reduceMotion" = "Reduce motion";
+"magnetic.reduceMotion.help" = "Disable animated movement, rotation, and bouncing for instant transitions. Also follows the system Reduce Motion setting.";
+"magnetic.reduceMotion.system" = "System Reduce Motion is on, so magnetic animations are reduced. Your selected style is preserved.";
 "magnetic.needsHistory" = "Enable screenshot history to display captures on the Magnetic Desktop.";
 "magnetic.card" = "Screenshot: %d × %d. Click to pull out or drag.";
 "magnetic.cardHelp" = "Hover to preview. Drag onto the desktop to create a pin. Double-click or throw right to return to its source, or use Return all to gather every pin.";
@@ -750,3 +762,72 @@
 "magnetic.nextPage" = "Next page";
 "magnetic.collectionPage" = "%d / %d";
 "magnetic.locate" = "Locate in fan";
+
+/* Settings workspace */
+"settings.sidebar.subtitle" = "Capture & desktop tools";
+"settings.sidebar.library" = "LIBRARY";
+"settings.sidebar.customize" = "CUSTOMIZE";
+"settings.description.shortcuts" = "Make frequent actions a keystroke away.";
+"settings.description.history" = "Find a capture. Pick up where you left off.";
+"settings.description.pins" = "Save your layout and return to your workspace.";
+"settings.description.ocr" = "Choose how text is recognized and connect a provider.";
+"settings.description.watermark" = "Manage invisible marks and local records.";
+"settings.description.toolbar" = "Keep your favorite tools within easy reach.";
+"settings.description.general" = "Appearance, language, launch at login and menu bar";
+"settings.shortcuts.actions" = "Actions & shortcuts";
+"settings.history.library" = "Captures";
+"settings.history.saving" = "Saving & privacy";
+"settings.history.storage" = "Local storage";
+"settings.history.localStorage" = "Stored on this Mac";
+"settings.history.results" = "%d captures";
+"settings.history.empty" = "Your captures will appear here";
+"settings.history.emptyHelp" = "Take a screenshot to view, copy or pin it here.";
+"settings.search.empty" = "No matching results";
+"settings.search.emptyHelp" = "Try another keyword or clear the search.";
+"settings.search.clear" = "Clear search";
+"settings.moreActions" = "More actions";
+"settings.pageNavigation" = "Page sections";
+"settings.general.basic" = "General";
+"settings.general.connections" = "Connections";
+"settings.general.advanced" = "Updates & privacy";
+"settings.toolbar.arrange" = "Layout & visibility";
+"settings.toolbar.preview" = "Toolbar preview";
+"settings.history.maintenance" = "Storage & cleanup";
+"settings.shortcuts.empty" = "No shortcuts yet";
+
+/* Compact settings navigation and storage */
+"settings.rail.shortcuts" = "Keys";
+"settings.rail.history" = "History";
+"settings.rail.pins" = "Spaces";
+"settings.rail.ocr" = "OCR";
+"settings.rail.watermark" = "Mark";
+"settings.rail.toolbar" = "Tools";
+"settings.rail.general" = "Settings";
+"settings.history.starred" = "Starred";
+"settings.history.manage" = "Manage history";
+"settings.history.exclusions" = "Exclusions";
+"settings.storage.images" = "Screenshot images";
+"settings.storage.index" = "Text index";
+"settings.storage.recovery" = "Session recovery";
+"settings.workspace.export" = "Export";
+"settings.workspace.skipped" = "%d images unavailable for preview";
+"settings.workspace.emptyHelp" = "Arrange your pins, then choose Save workspace above.";
+
+/* Application appearance */
+"appearance.system" = "Follow system";
+"appearance.light" = "Light";
+"appearance.dark" = "Dark";
+"preferences.appearance.section" = "Appearance";
+"preferences.appearance.mode" = "Color mode";
+"preferences.appearance.help" = "Use light or dark appearance, or switch automatically with macOS.";
+
+"settings.search.placeholder" = "Search settings";
+"settings.group.0" = "Everyday settings";
+"settings.group.1" = "Captures & content";
+"settings.group.2" = "Connections & maintenance";
+"settings.title.permissions" = "Permissions & diagnostics";
+"settings.description.capture" = "Image quality, cursor and capture selection behavior";
+"settings.description.browser" = "Install the Chrome extension and capture webpages";
+"settings.description.permissions" = "Check screen recording access and capture diagnostics";
+"settings.description.privacy" = "Manage capture cleanup when the app quits";
+"settings.description.updates" = "Manage automatic update checks and their frequency";

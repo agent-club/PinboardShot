@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import test, { after, before } from "node:test";
+import { createTestHarness } from "wrangler";
 import { runInNewContext } from "node:vm";
-import { parse } from "parse5";
+import { parse, serialize } from "parse5";
 import currentRelease from "../content/current-release.json" with { type: "json" };
 
 const googleTagId = "G-WDBY7TDB0R";
@@ -16,25 +17,20 @@ const contentPages = [
   { path: "/compare/pinboardshot-vs-cleanshot-x", title: "PinboardShot 与 CleanShot X：本地截图工具还是完整内容套件" },
 ];
 
-async function render(path = "/", accept = "text/html") {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
-  const { default: worker } = await import(workerUrl.href);
+// Run the production bundle in workerd: vinext uses cloudflare: modules that
+// cannot be imported by Node's ESM loader. Use the generated config so these
+// tests exercise the same compatibility flags and assets as the built Worker.
+const worker = createTestHarness({
+  workers: [{ configPath: new URL("../dist/server/wrangler.json", import.meta.url) }],
+});
+before(() => worker.listen());
+after(() => worker.close());
 
-  return worker.fetch(
-    new Request(`https://pinboardshot.example${path}`, {
-      headers: { accept },
-    }),
-    {
-      ASSETS: {
-        fetch: async () => new Response("Not found", { status: 404 }),
-      },
-    },
-    {
-      waitUntil() {},
-      passThroughOnException() {},
-    },
-  );
+async function render(path = "/", accept = "text/html") {
+  return worker.fetch(`https://pinboardshot.example${path}`, {
+    headers: { accept },
+    redirect: "manual",
+  });
 }
 
 function visibleText(html) {
@@ -134,7 +130,7 @@ test("server-renders the PinboardShot download page", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-  assert.equal(response.headers.get("cache-control"), "no-transform");
+  assert.equal(response.headers.get("cache-control"), "no-store, must-revalidate, no-transform");
 
   const html = await response.text();
   assert.match(html, /<title>PinboardShot - Mac 截图标注与贴图 Pinboard 工具<\/title>/i);
@@ -186,6 +182,31 @@ test("server-renders the PinboardShot download page", async () => {
   assert.equal(software.softwareVersion, currentRelease.version);
 });
 
+test("introduces Magnetic Desktop on both homepages before the changelog", async () => {
+  for (const [path, title, history] of [
+    ["/zh", "磁力桌面", /截图历史/],
+    ["/en", "Magnetic Desktop", /screenshot history/i],
+  ]) {
+    const response = await render(path);
+    assert.equal(response.status, 200);
+    const html = await response.text();
+    let section;
+    function findSection(node) {
+      if (node.nodeName === "section" && node.attrs?.some(({ name, value }) => name === "id" && value === "magnetic-desktop")) section = node;
+      for (const child of node.childNodes ?? []) findSection(child);
+    }
+    findSection(parse(html));
+    assert.ok(section, `${path} should introduce Magnetic Desktop outside release notes`);
+    const text = visibleText(serialize(section));
+    assert.ok(text.includes(title));
+    assert.match(text, history);
+    assert.match(text, /1\s*[–-]\s*100/);
+    assert.match(text, /20/);
+    assert.match(html, /href="#magnetic-desktop"/);
+    assert.ok(html.indexOf('id="magnetic-desktop"') < html.indexOf('id="changelog"'));
+  }
+});
+
 test("restores an analytics opt-out before loading Google tag on every page", async () => {
   for (const path of ["/", "/zh", "/en", "/privacy", "/chrome-extension", ...contentPages.map((page) => page.path)]) {
     const response = await render(path);
@@ -220,7 +241,7 @@ test("server-renders citeable feature, use-case, and comparison pages", async ()
     const response = await render(page.path);
     assert.equal(response.status, 200, page.path);
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-    assert.equal(response.headers.get("cache-control"), "no-transform");
+    assert.equal(response.headers.get("cache-control"), "s-maxage=31536000, stale-while-revalidate, no-transform");
 
     const html = await response.text();
     assert.match(html, /<html lang="zh-CN">/i);
@@ -270,7 +291,7 @@ test("server-renders substantial localized Chinese HTML", async () => {
   const response = await render("/zh");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-  assert.equal(response.headers.get("cache-control"), "no-transform");
+  assert.equal(response.headers.get("cache-control"), "s-maxage=31536000, stale-while-revalidate, no-transform");
 
   const html = await response.text();
   assert.match(html, /<main lang="zh-CN">/i);
@@ -304,7 +325,7 @@ test("server-renders the localized English page", async () => {
   const response = await render("/en");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-  assert.equal(response.headers.get("cache-control"), "no-transform");
+  assert.equal(response.headers.get("cache-control"), "s-maxage=31536000, stale-while-revalidate, no-transform");
 
   const html = await response.text();
   assert.match(html, /<title>PinboardShot - Screenshot Annotation and Pinboard App for Mac<\/title>/i);
@@ -327,7 +348,7 @@ test("server-renders the privacy policy", async () => {
   const response = await render("/privacy");
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
-  assert.equal(response.headers.get("cache-control"), "no-transform");
+  assert.equal(response.headers.get("cache-control"), "s-maxage=31536000, stale-while-revalidate, no-transform");
 
   const html = await response.text();
   assert.match(html, /<title>Privacy Policy - PinboardShot<\/title>/i);

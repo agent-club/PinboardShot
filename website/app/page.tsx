@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SpatialShowcase } from "./_components/spatial-showcase";
 import { PinWorkbench } from "./_components/pin-workbench";
+import { MagneticShowcase } from "./_components/magnetic-showcase";
 import currentRelease from "@/content/current-release.json";
 import {
   DOWNLOAD_PATH,
@@ -131,7 +132,7 @@ function CaptureDemoScene({
 
 const copy = {
   zh: {
-    nav: { features: "功能", workflow: "使用方式", compare: "原则", privacy: "隐私", faq: "问答", changelog: "更新日志", download: "下载" },
+    nav: { features: "功能", workflow: "使用方式", magnetic: "磁力桌面", compare: "原则", privacy: "隐私", faq: "问答", changelog: "更新日志", download: "下载" },
     eyebrow: "CAPTURE. ANNOTATE. LEVITATE.",
     title: "打破屏幕\n边界。",
     intro: "原生 macOS 截图、标注与贴图工具，从框选到马赛克、文字和贴屏，全程只在本机完成",
@@ -165,6 +166,7 @@ const copy = {
       ["可搜索历史", "数量与期限可配置，本机 OCR 搜索、逐项管理并创建截图拼板"],
       ["自动化入口", "全局快捷键、URL Scheme 与 macOS 快捷指令串联常用流程"],
       ["快速结果", "截图后立即复制、保存、标注、贴屏，或拖入任意 App"],
+      ["磁力桌面", "最近截图吸附桌边，扇形展开、抽出贴图，用完随手收回"],
     ],
     workflowEyebrow: "捕捉 → 标注 → 贴屏 → 继续工作",
     workflowTitle: "需要的信息，\n当场变成参考",
@@ -270,7 +272,7 @@ const copy = {
     },
   },
   en: {
-    nav: { features: "Features", workflow: "How it works", compare: "Principles", privacy: "Privacy", faq: "FAQ", changelog: "Changelog", download: "Download" },
+    nav: { features: "Features", workflow: "How it works", magnetic: "Magnetic Desktop", compare: "Principles", privacy: "Privacy", faq: "FAQ", changelog: "Changelog", download: "Download" },
     eyebrow: "CAPTURE. ANNOTATE. LEVITATE.",
     title: "Beyond the\nscreen.",
     intro: "A native capture, annotation, and pinboard tool for macOS. From selection to markup and pinning, everything stays on your Mac.",
@@ -304,6 +306,7 @@ const copy = {
       ["Searchable history", "Choose limits and retention, search local OCR text, manage items, and build comparison boards."],
       ["Automation", "Connect common workflows through global shortcuts, a URL scheme, and macOS Shortcuts actions."],
       ["Quick result", "Copy, save, annotate, pin, or drag a finished capture into any app."],
+      ["Magnetic Desktop", "Keep recent screenshots at the edge, unfold the fan, pull out a pin, and tuck it back."],
     ],
     workflowEyebrow: "Capture → Annotate → Pin → Keep moving",
     workflowTitle: "Turn a passing detail\ninto a working reference.",
@@ -469,6 +472,7 @@ export function PinboardShotHome({
         <nav aria-label={language === "zh" ? "主导航" : "Main navigation"}>
           <a href="#features">{content.nav.features}</a>
           <a href="#workflow">{content.nav.workflow}</a>
+          <a href="#magnetic-desktop">{content.nav.magnetic}</a>
           <a href="#compare">{content.nav.compare}</a>
           <a href="#privacy">{content.nav.privacy}</a>
           <a href="#faq">{content.nav.faq}</a>
@@ -511,6 +515,8 @@ export function PinboardShotHome({
         <PinWorkbench language={language} />
         <div className="pin-stats">{content.pinStats.map(([label, value]) => <span key={label}><small>{label}</small><strong>{value}</strong></span>)}</div>
       </section>
+
+      <MagneticShowcase language={language} />
 
       <section className="features section" id="features">
         <div className="section-heading">
