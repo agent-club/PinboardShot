@@ -206,7 +206,7 @@
 "preferences.windowTitle" = "PinboardShot 设置";
 "preferences.shortcuts" = "快捷键";
 "preferences.history" = "历史";
-"preferences.general" = "偏好";
+"preferences.general" = "通用";
 "preferences.shortcutCenter" = "快捷键中心";
 "preferences.addShortcut" = "添加快捷键";
 "preferences.shortcutHelp" = "默认不启用快捷键。每个动作可以绑定多组快捷键；普通字母组合必须包含 ⌘、⌥ 或 ⌃。";
@@ -723,8 +723,8 @@
 "magnetic.animationStyle.arc" = "弧线";
 "magnetic.animationStyle.elastic.help" = "展开、抽出、吸回和居中采用弹性节奏，配合卡片轻弹与截图盒回弹。";
 "magnetic.animationStyle.arc.help" = "展开、抽出、吸回和居中沿弧线移动，配合轻微摆转与弧形光轨。";
-"magnetic.animationStyle.full.help" = "保留折扇展开、卡片翻转、飞行光轨和回收弹跳。";
-"magnetic.animationStyle.simple.help" = "保留平滑移动与淡入淡出，去掉翻转、光轨、抖动和弹跳。";
+"magnetic.animationStyle.full.help" = "使用 Dock 式收缩与展开，贴出与回吸平滑缩放，保留回收弹跳。";
+"magnetic.animationStyle.simple.help" = "保留平滑移动与淡入淡出，去掉光轨、抖动和弹跳。";
 "magnetic.reduceMotion" = "弱化动效";
 "magnetic.reduceMotion.help" = "关闭位移、旋转和弹跳动效，操作即时完成。系统开启“减少动态效果”时也会自动生效。";
 "magnetic.reduceMotion.system" = "系统已开启“减少动态效果”，磁吸动效已弱化。所选风格会保留。";
@@ -773,7 +773,7 @@
 "settings.description.ocr" = "选择文字识别方式与连接服务";
 "settings.description.watermark" = "管理隐形标记与本机记录";
 "settings.description.toolbar" = "把常用工具放在最顺手的位置";
-"settings.description.general" = "让 PinboardShot 配合你的工作习惯";
+"settings.description.general" = "外观、语言、开机启动与菜单栏";
 "settings.shortcuts.actions" = "动作与快捷键";
 "settings.history.library" = "截图记录";
 "settings.history.saving" = "保存规则";
@@ -820,3 +820,14 @@
 "preferences.appearance.section" = "外观";
 "preferences.appearance.mode" = "颜色模式";
 "preferences.appearance.help" = "选择浅色或深色，或随 macOS 外观自动切换。";
+
+"settings.search.placeholder" = "搜索设置";
+"settings.group.0" = "常用设置";
+"settings.group.1" = "截图与内容";
+"settings.group.2" = "连接与维护";
+"settings.title.permissions" = "权限与诊断";
+"settings.description.capture" = "截图画质、光标与选区行为";
+"settings.description.browser" = "安装 Chrome 扩展并启动网页长截图";
+"settings.description.permissions" = "检查屏幕录制权限与截图诊断信息";
+"settings.description.privacy" = "管理退出时的截图清理行为";
+"settings.description.updates" = "管理自动更新检查与检查周期";

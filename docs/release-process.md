@@ -53,6 +53,13 @@ This process publishes public release assets only. Do not upload credentials, lo
 
 ## Build Assets
 
+Set up the pinned DMG layout tools once (or after `requirements-dmg.txt` changes):
+
+```bash
+python3 -m venv .build/dmg-tools
+.build/dmg-tools/bin/python -m pip install -r scripts/requirements-dmg.txt
+```
+
 Run the release artifact CLI:
 
 ```bash
@@ -67,10 +74,19 @@ The script performs:
 - Stapling and Gatekeeper validation for the app.
 - Sparkle ZIP and `appcast.xml` generation.
 - DMG creation, Developer ID signing, Apple notarization, stapling, and Gatekeeper validation.
+- A 720 × 512 installation window with a Retina background, bilingual instructions, and an Applications shortcut. Drag the app onto Applications, then open the installed app from Applications and use its menu-bar icon.
 - SHA-256 output for ZIP, DMG, and appcast.
 - ZIP inspection to ensure no `Sources`, `Tests`, `website`, `Package.swift`, `.env`, or `AGENTS.md` entries are present.
 
 If the DMG is rejected with `source=no usable signature`, the DMG itself was not signed before notarization. `release-artifacts.sh` signs the DMG before submission; do not upload an unsigned DMG.
+
+To inspect only the installation layout using the existing app build, run:
+
+```bash
+.build/dmg-tools/bin/python scripts/build-dmg.py .build/dmg-preview/PinboardShot-install-preview.dmg
+```
+
+This command does not build or modify the app, sign or notarize the DMG, or publish anything. It refuses to overwrite an existing DMG. Mount the preview to inspect both icons and the background, verify the Applications shortcut targets `/Applications`, and eject the volume when finished. This preview is not a release asset; official distribution still uses `release-artifacts.sh`.
 
 ## Release Notes
 

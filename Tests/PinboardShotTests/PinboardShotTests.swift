@@ -204,7 +204,7 @@ func trayPanelScrollsOnlyWhenHeightIsConstrained() {
 @MainActor
 func preferencesNavigationTargetsSpecificSection() {
     let navigation = PreferencesNavigationModel()
-    #expect(PreferencesWindowMetrics.width == 840)
+    #expect(PreferencesWindowMetrics.width == 960)
     #expect(PreferencesWindowMetrics.height == 580)
     #expect(navigation.selectedSection == .shortcuts)
 
