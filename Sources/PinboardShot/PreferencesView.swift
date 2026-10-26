@@ -6,7 +6,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 enum PreferencesWindowMetrics {
-    static let width: CGFloat = 840
+    static let width: CGFloat = 960
     static let height: CGFloat = 580
 
     static func centeredOrigin(windowSize: CGSize, in screenFrame: CGRect) -> CGPoint {
@@ -23,13 +23,18 @@ private enum HistoryManagementPane: Int, Identifiable {
 }
 
 enum PreferencesSection: String, CaseIterable, Identifiable {
+    case general
+    case capture
     case shortcuts
+    case toolbar
     case history
     case pins
     case ocr
     case watermark
-    case toolbar
-    case general
+    case browser
+    case permissions
+    case privacy
+    case updates
 
     var id: String { rawValue }
 
@@ -38,10 +43,15 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
         case .shortcuts: L10n.text("preferences.shortcuts")
         case .history: L10n.text("preferences.history")
         case .pins: L10n.text("pinWorkspace.preferencesTab")
-        case .ocr: L10n.text("ocr.preferences.tab")
+        case .ocr: L10n.text("settings.rail.ocr")
         case .watermark: L10n.text("watermark.preferences.tab")
         case .toolbar: L10n.text("preferences.toolbar")
         case .general: L10n.text("preferences.general")
+        case .capture: L10n.text("preferences.capture")
+        case .browser: L10n.text("browserExtension.title")
+        case .permissions: L10n.text("settings.title.permissions")
+        case .privacy: L10n.text("preferences.privacy")
+        case .updates: L10n.text("preferences.updates")
         }
     }
 
@@ -54,10 +64,42 @@ enum PreferencesSection: String, CaseIterable, Identifiable {
         case .watermark: "eye.slash"
         case .toolbar: "slider.horizontal.2.square"
         case .general: "slider.horizontal.3"
+        case .capture: "viewfinder"
+        case .browser: "globe"
+        case .permissions: "lock.shield"
+        case .privacy: "hand.raised"
+        case .updates: "arrow.triangle.2.circlepath"
         }
     }
 
-    var railTitle: String { L10n.text("settings.rail.\(rawValue)") }
+    static let sidebarGroups: [[PreferencesSection]] = [
+        [.general, .capture, .shortcuts, .toolbar],
+        [.history, .pins, .ocr, .watermark],
+        [.browser, .permissions, .privacy, .updates],
+    ]
+
+    var searchKeys: [String] {
+        switch self {
+        case .general: ["preferences.appearance.mode", "preferences.language", "preferences.launchAtLogin", "preferences.menuDisplay", "preferences.trayIcon"]
+        case .capture: ["preferences.outputQuality", "preferences.includeCursor", "preferences.captureSelectionAlwaysOnTop", "preferences.captureAnimation", "preferences.quickCaptureOverlay", "preferences.allowDarkCaptures"]
+        case .shortcuts: ["preferences.addShortcut", "settings.shortcuts.actions"]
+        case .toolbar: ["preferences.selectionToolbar.configuration", "preferences.selectionToolbarIcons", "preferences.selectionToolbar.autoSort"]
+        case .history: ["settings.history.manage", "settings.history.exclusions", "preferences.historyRetention", "preferences.historyMaximumItems", "preferences.historyEnabled", "preferences.pinSessionRecovery.title", "preferences.historyOCRIndexing", "feature.draft.setting", "settings.history.storage"]
+        case .pins: ["pinWorkspace.preferencesTab", "tray.section.magneticDesktop", "preferences.pinShadow"]
+        case .ocr: ["ocr.preferences.providerSection", "ocr.preferences.pluginsSection", "ocr.preferences.baseURL", "ocr.preferences.model", "ocr.preferences.apiKey"]
+        case .watermark: ["watermark.preferences.section", "watermark.preferences.customText", "watermark.preferences.project", "watermark.preferences.recipient"]
+        case .browser: ["browserExtension.installFromStore", "browserExtension.downloadLocal", "browserExtension.start"]
+        case .permissions: ["preferences.screenCapturePermission", "preferences.copyDiagnostics"]
+        case .privacy: ["preferences.clearOnQuit"]
+        case .updates: ["preferences.automaticallyCheckForUpdates", "preferences.updateCheckFrequency"]
+        }
+    }
+
+    func matches(_ query: String) -> Bool {
+        let terms = query.split(whereSeparator: { $0.isWhitespace })
+        let text = ([title, rawValue, L10n.text("settings.description.\(rawValue)")] + searchKeys.map { L10n.text($0) }).joined(separator: " ")
+        return terms.allSatisfy { text.localizedStandardContains(String($0)) }
+    }
 
 }
 
@@ -192,7 +234,7 @@ struct PreferencesView: View {
         SelectionToolbarConfiguration.automaticallySortsByUsage(defaults: UserDefaults.standard)
     @State private var historyManagementPane: HistoryManagementPane?
     @State private var workspacePane = 0
-    @State private var generalPane = 0
+    @State private var settingsSearch = ""
     @State private var toolbarPane = 0
     @State private var selectedHistoryID: UUID?
     @State private var historyKeptOnly = false
@@ -214,20 +256,58 @@ struct PreferencesView: View {
     }
 
     private var preferencesSidebar: some View {
-        VStack(spacing: 5) {
-            ForEach(PreferencesSection.allCases) { section in
-                PreferencesSidebarButton(
-                    section: section, isSelected: selectedSection == section,
-                    action: { select(section) })
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 6) {
+                Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+                TextField(L10n.text("settings.search.placeholder"), text: $settingsSearch)
+                .textFieldStyle(.roundedBorder)
+                .accessibilityLabel(L10n.text("settings.search.placeholder"))
+                .onSubmit {
+                    guard !settingsSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+                    if let section = PreferencesSection.allCases.first(where: { $0.matches(settingsSearch) }) {
+                        select(section)
+                    }
+                }
+                if !settingsSearch.isEmpty {
+                    Button {
+                        settingsSearch = ""
+                    } label: {
+                        Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                    }.buttonStyle(.plain)
+                        .accessibilityLabel(L10n.text("settings.search.clear"))
+                }
+            }.padding(.horizontal, 10)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(Array(PreferencesSection.sidebarGroups.enumerated()), id: \.offset) { index, sections in
+                        let matches = sections.filter { $0.matches(settingsSearch) }
+                        if !matches.isEmpty {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(L10n.text("settings.group.\(index)"))
+                                    .font(.system(size: 10, weight: .medium)).foregroundStyle(.secondary)
+                                    .padding(.horizontal, 10).padding(.bottom, 3)
+                                ForEach(matches) { section in
+                                    PreferencesSidebarButton(
+                                        section: section, isSelected: selectedSection == section,
+                                        action: { select(section) })
+                                }
+                            }
+                        }
+                    }
+                    if !PreferencesSection.allCases.contains(where: { $0.matches(settingsSearch) }) {
+                        Text(L10n.text("settings.search.empty"))
+                            .font(.system(size: 11)).foregroundStyle(.secondary)
+                            .padding(10)
+                    }
+                }.padding(.horizontal, 8)
             }
-            Spacer(minLength: 8)
-            Circle().fill(appHealth.isReady ? Color.secondary : Color.orange)
-                .frame(width: 5, height: 5)
+            Label(L10n.text(appHealth.isReady ? "menu.ready" : "preferences.healthNeedsAttention"),
+                  systemImage: appHealth.isReady ? "checkmark.circle" : "exclamationmark.circle")
+                .font(.system(size: 10)).foregroundStyle(appHealth.isReady ? Color.secondary : Color.orange)
                 .help(L10n.text(appHealth.isReady ? "menu.ready" : "preferences.healthNeedsAttention"))
-                .accessibilityLabel(L10n.text(appHealth.isReady ? "menu.ready" : "preferences.healthNeedsAttention"))
-                .padding(.bottom, 12)
+                .padding(.horizontal, 16).padding(.bottom, 12)
         }
-        .padding(.top, 12).frame(width: 56)
+        .padding(.top, 14).frame(width: 184)
         .frame(maxHeight: .infinity)
         .background(Color(nsColor: .controlBackgroundColor).opacity(0.55))
     }
@@ -288,7 +368,7 @@ struct PreferencesView: View {
                 Label(L10n.text("composition.create"), systemImage: "rectangle.3.group")
             }.clickCursor()
                 .disabled(historyStore.items.isEmpty)
-        case .pins, .ocr, .watermark, .toolbar, .general:
+        case .pins, .ocr, .watermark, .toolbar, .general, .capture, .browser, .permissions, .privacy, .updates:
             EmptyView()
         }
     }
@@ -302,11 +382,30 @@ struct PreferencesView: View {
         case .ocr: ocrTab
         case .watermark: watermarkTab
         case .toolbar: toolbarTab
-        case .general: privacyTab
+        case .general, .capture, .browser, .permissions, .privacy, .updates: privacyTab
         }
     }
 
     private func select(_ section: PreferencesSection) {
+        let query = settingsSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !query.isEmpty {
+            if section == .toolbar {
+                toolbarPane = L10n.text("preferences.selectionToolbarIcons").localizedStandardContains(query) ? 1 : 0
+            } else if section == .pins {
+                workspacePane = L10n.text("tray.section.magneticDesktop").localizedStandardContains(query) ? 1
+                    : L10n.text("preferences.pinShadow").localizedStandardContains(query) ? 2 : 0
+            } else if section == .history {
+                if L10n.text("settings.history.exclusions").localizedStandardContains(query) {
+                    historyManagementPane = .exclusions
+                } else if L10n.text("settings.history.storage").localizedStandardContains(query) {
+                    historyManagementPane = .storage
+                } else if section.searchKeys.dropFirst(2).contains(where: { L10n.text($0).localizedStandardContains(query) }) {
+                    historyManagementPane = .saving
+                }
+            } else if section == .ocr {
+                ocrPane = L10n.text("ocr.preferences.pluginsSection").localizedStandardContains(query) ? 1 : 0
+            }
+        }
         guard section != selectedSection else { return }
         if accessibilityReduceMotion {
             navigation.selectedSection = section
@@ -835,9 +934,19 @@ struct PreferencesView: View {
                 }
             }.padding(.horizontal, 24).frame(height: 62)
             PreferencesPanePicker(selection: $workspacePane, titles: [
-                L10n.text("pinWorkspace.savedSection"), L10n.text("tray.section.magneticDesktop")])
+                L10n.text("pinWorkspace.savedSection"), L10n.text("tray.section.magneticDesktop"),
+                L10n.text("preferences.pinOperations")])
             if workspacePane == 1 {
                 PreferencesPage { MagneticDesktopPreferences() }
+            } else if workspacePane == 2 {
+                PreferencesPage {
+                    PreferencesGroup(L10n.text("preferences.pinOperations")) {
+                        Toggle(L10n.text("preferences.pinShadow"), isOn: $pinWindowShadow).clickCursor()
+                            .onChange(of: pinWindowShadow) { _, enabled in onPinShadowChanged(enabled) }
+                        Text(L10n.text("preferences.pinHelp"))
+                            .foregroundStyle(.secondary)
+                    }
+                }
             } else {
                 HStack(spacing: 0) {
                     workspaceList
@@ -1614,15 +1723,9 @@ struct PreferencesView: View {
     }
 
     private var privacyTab: some View {
-        VStack(spacing: 0) {
-            PreferencesPanePicker(
-                selection: $generalPane,
-                titles: [
-                    L10n.text("settings.general.basic"), L10n.text("preferences.capture"),
-                    L10n.text("settings.general.connections"), L10n.text("settings.general.advanced"),
-                ])
+        ScrollViewReader { proxy in
             PreferencesPage {
-                if generalPane == 0 {
+                if selectedSection == .general {
                     PreferencesGroup(L10n.text("settings.general.basic")) {
                         HStack {
                             Text(L10n.text("preferences.appearance.mode"))
@@ -1668,16 +1771,18 @@ struct PreferencesView: View {
                             Text(message).foregroundStyle(.secondary)
                         }
                     }
+                    .id("settings.general.basic")
                 }
-                if generalPane == 0 {
+                if selectedSection == .general {
                     PreferencesGroup(L10n.text("preferences.menuDisplay")) {
                         TrayMenuDisplayPreferences()
                         Text(L10n.text("preferences.menuDisplayHelp"))
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
+                    .id("preferences.menuDisplay")
                 }
-                if generalPane == 2 {
+                if selectedSection == .browser {
                     PreferencesGroup(L10n.text("browserExtension.title")) {
                         TimelineView(.periodic(from: .now, by: 3)) { context in
                             let connected =
@@ -1713,7 +1818,7 @@ struct PreferencesView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                if generalPane == 2 {
+                if selectedSection == .permissions {
                     PreferencesGroup(L10n.text("preferences.screenCapturePermission")) {
                         HStack {
                             Label(
@@ -1747,7 +1852,7 @@ struct PreferencesView: View {
                     }
                 }
 
-                if generalPane == 0 {
+                if selectedSection == .general {
                     PreferencesGroup(L10n.text("preferences.trayIcon")) {
                         TimelineView(.periodic(from: .now, by: TrayIconChoice.animationInterval)) { context in
                             VStack(alignment: .leading, spacing: 12) {
@@ -1767,8 +1872,9 @@ struct PreferencesView: View {
                             .font(.system(size: 11))
                             .foregroundStyle(.secondary)
                     }
+                    .id("preferences.trayIcon")
                 }
-                if generalPane == 1 {
+                if selectedSection == .capture {
                     PreferencesGroup(L10n.text("preferences.capture")) {
                         HStack {
                             Text(L10n.text("preferences.outputQuality"))
@@ -1806,7 +1912,7 @@ struct PreferencesView: View {
                         }
                     }
                 }
-                if generalPane == 3 {
+                if selectedSection == .updates {
                     PreferencesGroup(L10n.text("preferences.updates")) {
                         Toggle(
                             L10n.text("preferences.automaticallyCheckForUpdates"),
@@ -1831,27 +1937,30 @@ struct PreferencesView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                if generalPane == 3 {
+                if selectedSection == .privacy {
                     PreferencesGroup(L10n.text("preferences.privacy")) {
                         Toggle(L10n.text("preferences.clearOnQuit"), isOn: $clearHistoryOnQuit).clickCursor()
                         Text(L10n.text("preferences.localOnly"))
                             .foregroundStyle(.secondary)
                     }
                 }
-                if generalPane == 1 {
-                    PreferencesGroup(L10n.text("preferences.pinOperations")) {
-                        Toggle(L10n.text("preferences.pinShadow"), isOn: $pinWindowShadow).clickCursor()
-                            .onChange(of: pinWindowShadow) { _, enabled in onPinShadowChanged(enabled) }
-                        Text(L10n.text("preferences.pinHelp"))
-                            .foregroundStyle(.secondary)
-                    }
-                }
             }
+            .onAppear { scrollToGeneralSearch(proxy) }
+            .onChange(of: settingsSearch) { _, _ in scrollToGeneralSearch(proxy) }
         }
         .onAppear {
             launchAtLoginManager.refresh()
             updateManager.refreshSettings()
         }
+    }
+
+    private func scrollToGeneralSearch(_ proxy: ScrollViewProxy) {
+        let query = settingsSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard selectedSection == .general, !query.isEmpty else { return }
+        let target = ["preferences.menuDisplay", "preferences.trayIcon"].first {
+            L10n.text($0).localizedStandardContains(query)
+        } ?? "settings.general.basic"
+        proxy.scrollTo(target, anchor: .top)
     }
 
     private var toolbarTab: some View {
@@ -2573,13 +2682,16 @@ private struct PreferencesSidebarButton: View {
 
     var body: some View {
         Button(action: action) {
-            VStack(spacing: 4) {
-                Image(systemName: section.systemImage).font(.system(size: 16, weight: .regular))
-                    .frame(width: 22, height: 20)
-                Text(section.railTitle).font(.system(size: 9)).lineLimit(1)
+            HStack(spacing: 9) {
+                Image(systemName: section.systemImage).font(.system(size: 14, weight: .regular))
+                    .frame(width: 20, height: 20)
+                Text(section.title).font(.system(size: 12, weight: isSelected ? .medium : .regular))
+                    .fixedSize(horizontal: false, vertical: true)
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, 10).padding(.vertical, 5)
             .foregroundStyle(isSelected ? Color(nsColor: .textBackgroundColor) : Color.secondary)
-            .frame(width: 42, height: 46)
+            .frame(maxWidth: .infinity, minHeight: 32, alignment: .leading)
             .background {
                 RoundedRectangle(cornerRadius: 6).fill(
                     isSelected ? Color(nsColor: .labelColor) : Color.primary.opacity(isHovering ? 0.05 : 0))

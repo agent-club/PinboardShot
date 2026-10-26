@@ -1,47 +1,45 @@
 {
-  "version": "0.16.0",
-  "build": "54",
-  "date": "2026.10.18",
-  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.16.0",
+  "version": "0.17.0",
+  "build": "55",
+  "date": "2026.10.26",
+  "releaseUrl": "https://github.com/agent-club/PinboardShot/releases/tag/v0.17.0",
   "downloads": {
     "dmg": {
-      "name": "PinboardShot-0.16.0-54.dmg",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.16.0/PinboardShot-0.16.0-54.dmg",
-      "sha256": "f8bfea1d5cc25676366a4a3d46a5c818fdf82a11955f157bcbed24eb939aac93"
+      "name": "PinboardShot-0.17.0-55.dmg",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.17.0/PinboardShot-0.17.0-55.dmg",
+      "sha256": "0cc86d4cdcec6bc6a07ffb63ea369b054b987b5cea1d2bba55db7b1d13c25113"
     },
     "zip": {
-      "name": "PinboardShot-0.16.0-54.zip",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.16.0/PinboardShot-0.16.0-54.zip",
-      "sha256": "6e062423229de1351a9e461b59e38da9c425475a898910d7433ac7de8c2049d1"
+      "name": "PinboardShot-0.17.0-55.zip",
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.17.0/PinboardShot-0.17.0-55.zip",
+      "sha256": "2eed9805aa066c12fc429d5bff0fbb8cc186dc428db475fcf32fe21ab9e49561"
     },
     "appcast": {
       "name": "appcast.xml",
-      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.16.0/appcast.xml",
-      "sha256": "8b7a8f0e7136e74aa142f508ddf1a01b67b593505e8d7a6e4b71098d87497afd"
+      "url": "https://github.com/agent-club/PinboardShot/releases/download/v0.17.0/appcast.xml",
+      "sha256": "ddbd70364fcc1a5d126c77d3e1dc03e2f334c17f1d1ef6607a1b9d86c0532d51"
     }
   },
   "zh": {
     "label": "最新版本",
-    "title": "设置界面、明暗外观与磁力桌面交互更新",
+    "title": "设置搜索、磁力桌面动画与安装引导更新",
     "changes": [
-      "重新整理设置导航、截图历史、工作区、工具栏和存储管理，支持调整窗口大小",
-      "新增跟随系统、浅色和深色外观，保存选择并在启动时应用",
-      "磁力桌面收起入口支持悬浮卡片堆、四边吸附、跨屏移动及空闲后进一步收起",
-      "新增弹性与弧线动画，保留简洁动画和减少动态效果",
-      "修复多显示器首次截图及跨屏复用时的选区定位",
-      "磁力桌面依赖截图历史；应用与 DMG 已通过 Apple 公证"
+      "设置采用分组文字侧栏，新增功能搜索，截图、浏览器连接、权限、隐私和更新可直接进入",
+      "磁力桌面默认使用 Dock 式平滑缩放完成展开、收起、抽出和回收，保留其他动画与减少动态效果",
+      "截图盒没有图片时自动隐藏，不再占用桌面布局空间",
+      "DMG 新增中英双语拖放安装引导、Applications 快捷入口和菜单栏启动说明",
+      "支持 macOS 14 及以上，包含 Apple Silicon 与 Intel 架构；应用与 DMG 均通过 Apple 公证"
     ]
   },
   "en": {
     "label": "Latest",
-    "title": "Settings, appearance, and Magnetic Desktop interaction updates",
+    "title": "Settings search, Magnetic Desktop motion, and installation guidance",
     "changes": [
-      "Reorganized Settings navigation, capture history, workspaces, toolbar controls, and storage management, with a resizable window.",
-      "Added system, light, and dark appearance modes, saved and applied on launch.",
-      "The folded Magnetic Desktop handle supports a floating card stack, docking to all four edges, moving between displays, and further folding while idle.",
-      "Added elastic and arc animations while retaining simple animations and reduced motion support.",
-      "Fixed selection positioning on the first capture and when reusing the overlay across displays.",
-      "Magnetic Desktop requires screenshot history. The app and DMG are Apple-notarized."
+      "Settings has a grouped text sidebar and feature search, with direct access to capture, browser connections, permissions, privacy, and updates.",
+      "Magnetic Desktop uses smooth Dock-style scaling by default for unfolding, folding, extraction, and returns, retaining other animation styles and reduced motion.",
+      "An empty screenshot box stays hidden and no longer occupies desktop layout space.",
+      "The DMG adds bilingual drag-to-install instructions, an Applications shortcut, and menu-bar launch guidance.",
+      "Supports macOS 14 or later on Apple Silicon and Intel. The app and DMG are Apple-notarized."
     ]
   }
 }

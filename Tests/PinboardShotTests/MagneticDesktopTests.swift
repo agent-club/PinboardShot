@@ -131,7 +131,7 @@ struct MagneticDesktopTests {
         #expect(fan.rootView.style == style && !fan.rootView.simple)
         try await Task.sleep(for: .milliseconds(180))
         try snapshot(controller.fanAnimationPanel, to: "/private/tmp/PinboardShot-\(style.rawValue)-fan.png")
-        try await waitUntil { controller.boxPanel?.isVisible == true }
+        try await waitUntil { controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         let id = try #require(store.items.first?.id)
         let rail = try #require(controller.cardPanels[id]?.frame)
         controller.extract(id)
@@ -155,11 +155,11 @@ struct MagneticDesktopTests {
         try await waitUntil { controller.desktopPins[id] == nil && controller.cardPanels[id]?.frame == rail
             && controller.activeFlightCount == 0 }
         controller.setCollapsed(true)
-        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible == false }
+        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible != true }
         defaults.set(true, forKey: MagneticDesktopSettings.reduceMotionKey)
         controller.refresh()
         controller.setCollapsed(false)
-        try await waitUntil { controller.boxPanel?.isVisible == true }
+        try await waitUntil { controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         #expect(controller.fanAnimationPanel?.isVisible != true)
         controller.extract(id)
         try await waitUntil { controller.desktopPins[id] != nil }
@@ -284,6 +284,68 @@ struct MagneticDesktopTests {
     }
 
 
+    @Test("Photo box appears only with boxed screenshots and closes when the last one leaves")
+    func boxVisibilityLifecycle() async throws {
+        _ = NSApplication.shared
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticBoxVisibility-\(UUID())")
+        let suite = "MagneticBoxVisibilityTests.\(UUID())"
+        let defaults = try #require(UserDefaults(suiteName: suite))
+        defer { defaults.removePersistentDomain(forName: suite); try? FileManager.default.removeItem(at: root) }
+        defaults.set(true, forKey: MagneticDesktopSettings.enabledKey)
+        defaults.set(2, forKey: MagneticDesktopSettings.maximumVisibleKey)
+        let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
+        let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
+            reduceMotion: { true }, pointerLocation: { CGPoint(x: -10000, y: -10000) }, idleTimeout: 600)
+        defer { controller.stop() }
+        controller.start()
+        controller.toggleBox()
+        #expect(controller.boxPanel?.isVisible != true && controller.contentsPanel?.isVisible != true)
+        for index in 0..<2 {
+            _ = try store.add(syntheticImage(index))
+            try await waitUntil { controller.cardPanels.count == index + 1 && controller.cardPanels.values.allSatisfy(\.isVisible) }
+            #expect(controller.boxPanel?.isVisible != true)
+        }
+        _ = try store.add(syntheticImage(2))
+        try await waitUntil { controller.boxPanel?.isVisible == true && controller.overflowCount == 1 }
+        let boxed = try #require(store.items.last)
+        controller.toggleBox()
+        let contents = try #require(controller.contentsPanel)
+        controller.setBoxHover(boxed, entered: true)
+        try await waitUntil { controller.boxPreviewPanel?.isVisible == true }
+        controller.extract(boxed.id, from: .box)
+        try await waitUntil { controller.desktopPins[boxed.id] != nil && controller.boxPanel?.isVisible == false }
+        #expect(!contents.isVisible && controller.boxPreviewPanel?.isVisible != true)
+        #expect(controller.overflowCount == 0)
+        controller.toggleBox()
+        #expect(!contents.isVisible)
+        controller.returnToEdge(boxed.id)
+        try await waitUntil { controller.boxPanel?.isVisible == true && controller.overflowCount == 1 }
+        controller.locateInFan(boxed.id)
+        try await waitUntil { controller.cardPanels[boxed.id]?.isVisible == true && controller.overflowCount == 1 }
+        controller.toggleBox()
+        defaults.set(3, forKey: MagneticDesktopSettings.maximumVisibleKey)
+        controller.refresh()
+        try await waitUntil { controller.cardPanels.count == 3 && controller.boxPanel?.isVisible == false }
+        #expect(!contents.isVisible)
+        controller.setCollapsed(true)
+        try await waitUntil { controller.foldedPanel?.isVisible == true }
+        controller.setCollapsed(false)
+        try await waitUntil { controller.foldedPanel?.isVisible == false && controller.cardPanels.values.allSatisfy(\.isVisible) }
+        #expect(controller.boxPanel?.isVisible == false)
+        controller.suspendForCapture()
+        controller.resumeAfterCapture()
+        try await waitUntil { controller.cardPanels.values.allSatisfy(\.isVisible) }
+        #expect(controller.boxPanel?.isVisible == false && !contents.isVisible)
+        defaults.set(2, forKey: MagneticDesktopSettings.maximumVisibleKey)
+        controller.refresh()
+        try await waitUntil { controller.boxPanel?.isVisible == true }
+        try store.delete(boxed)
+        try await waitUntil { controller.boxPanel?.isVisible == false && controller.cardPanels.count == 2 }
+        for item in store.items { try store.delete(item) }
+        try await waitUntil { controller.cardPanels.isEmpty }
+        #expect(controller.boxPanel?.isVisible == false && !contents.isVisible)
+    }
+
     @Test("Fan capacity excludes boxed history: ten or fewer never show a pager, twenty pages only twenty")
     func fanCapacityLifecycle() async throws {
         _ = NSApplication.shared
@@ -353,8 +415,9 @@ struct MagneticDesktopTests {
         defaults.set(100, forKey: MagneticDesktopSettings.maximumVisibleKey)
         defaults.set(250, forKey: HistorySettings.maximumItemsDefaultsKey)
         let store = HistoryStore(fileManager: MagneticFileManager(root: root), defaults: defaults)
-        for index in 0..<100 { _ = try store.add(syntheticImage(index)) }
-        let ids = store.items.map(\.id)
+        for index in 0..<102 { _ = try store.add(syntheticImage(index)) }
+        // Keep two screenshots in the box while browsing the hundred-card fan.
+        let ids = store.items.prefix(100).map(\.id)
         try #require(ids.count == 100)
         var reducedMotion = true
         let controller = MagneticDesktopController(historyStore: store, defaults: defaults,
@@ -378,7 +441,7 @@ struct MagneticDesktopTests {
         controller.toggleBox()
         let contents = try #require(controller.contentsPanel)
         let hosting = try #require(contents.contentView as? MagneticBoxContentsHostingView)
-        try #require(hosting.rootView.items.count == 100 && hosting.rootView.page == 0)
+        try #require(hosting.rootView.items.count == 102 && hosting.rootView.page == 0)
         try snapshot(contents, to: "/private/tmp/PinboardShot-progressive-collection-first.png")
         hosting.rootView.onPageChange(4)
         try #require(controller.collectionPageIndex == 4 && hosting.rootView.page == 4)
@@ -1045,11 +1108,11 @@ struct MagneticDesktopTests {
             reduceMotion: { true }, pointerLocation: { CGPoint(x: -10000, y: -10000) }, idleTimeout: 0.15)
         defer { controller.stop() }
         controller.start()
-        try await waitUntil { controller.boxPanel?.isVisible == true }
-        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible == false }
+        try await waitUntil { controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
+        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible != true }
         controller.setCollapsed(false)
-        try await waitUntil { controller.boxPanel?.isVisible == true }
-        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible == false }
+        try await waitUntil { controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
+        try await waitUntil { controller.foldedPanel?.isVisible == true && controller.boxPanel?.isVisible != true }
     }
 
     @Test("Native panels respect cap changes, retrieval, capture suspension and history deletion")
@@ -1178,8 +1241,12 @@ struct MagneticDesktopTests {
 
         controller.extract(id)
         try await Task.sleep(for: .milliseconds(40))
-        #expect(panel.frame.width > originalFrame.width)
-        #expect(panel.frame.width < 420)
+        // Dock motion draws cached pixels while the hidden window already has its final size.
+        let flight = try #require(controller.trailPanel)
+        let visual = try #require(flight.contentView?.layer?.sublayers?.first?.presentation())
+        let visibleWidth = visual.bounds.width * visual.transform.m11
+        #expect(flight.isVisible && !panel.isVisible)
+        #expect(visibleWidth > originalFrame.width && visibleWidth < 420)
         try await waitUntil { controller.desktopPins[id] != nil }
         let pinPanel = try #require(controller.cardPanels[id])
         #expect(pinPanel.contentView is PinImageView)
@@ -1192,12 +1259,17 @@ struct MagneticDesktopTests {
         #expect(edited == [id])
         #expect(try Data(contentsOf: store.fileURL(for: store.items[0])) == originalPNG)
         controller.returnToEdge(id)
-        try await waitUntil { controller.cardPanels[id]?.frame == originalFrame && controller.desktopPins[id] == nil }
+        try await waitUntil {
+            controller.cardPanels[id]?.frame == originalFrame && controller.cardPanels[id]?.isVisible == true
+                && controller.desktopPins[id] == nil && controller.activeFlightCount == 0
+        }
         let returnedPanel = try #require(controller.cardPanels[id])
 
         reduceMotion = true
+        pointer = CGPoint(x: returnedPanel.frame.midX, y: returnedPanel.frame.midY)
         controller.setHover(id, entered: true)
-        try await waitUntil { preview.frame.width == 210 && preview.isVisible }
+        try await waitUntil { controller.hoverPanel?.frame.width == 210 && controller.hoverPanel?.isVisible == true }
+        pointer = CGPoint(x: -10000, y: -10000)
         controller.suspendForCapture()
         #expect(!returnedPanel.isVisible)
         controller.setHover(id, entered: true)
@@ -1226,8 +1298,14 @@ struct MagneticDesktopTests {
             reduceMotion: { false }, pointerLocation: { pointer })
         defer { controller.stop() }
         controller.start()
-        try await waitUntil { controller.cardPanels.count == 10 && controller.boxPanel?.isVisible == true }
+        try await waitUntil { controller.cardPanels.count == 10 && controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         let ids = store.items.map(\.id)
+        let first = try #require(controller.cardPanels[ids[0]]?.frame)
+        pointer = CGPoint(x: first.midX, y: first.maxY - 8)
+        try await waitUntil {
+            controller.updateHover(at: pointer)
+            return controller.hoverPanel?.isVisible == true
+        }
         let base = ids.map { controller.cardPanels[$0]!.frame }
         let event = try #require(NSEvent.enterExitEvent(with: .mouseEntered, location: .zero,
             modifierFlags: [], timestamp: ProcessInfo.processInfo.systemUptime, windowNumber: 0,
@@ -1513,7 +1591,7 @@ struct MagneticDesktopTests {
         start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
         try send(.leftMouseDown, at: start)
         try send(.leftMouseUp, at: start)
-        try await waitUntil { !panel.isVisible && controller.boxPanel?.isVisible == true }
+        try await waitUntil { !panel.isVisible && controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         #expect(!MagneticDesktopSettings(defaults: defaults).isCollapsed)
         controller.setCollapsed(true)
         try await waitUntil { panel.isVisible }
@@ -1611,13 +1689,20 @@ struct MagneticDesktopTests {
             reduceMotion: { reduced }, pointerLocation: { CGPoint(x: -10000, y: -10000) })
         defer { controller.stop() }
         controller.start()
-        try await waitUntil { controller.cardPanels.count == 5 && controller.boxPanel?.isVisible == true }
+        try await waitUntil { controller.cardPanels.count == 5 && controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         let originals = controller.cardPanels.mapValues(\.frame)
+        let visualCount = originals.count + (controller.boxPanel?.isVisible == true ? 1 : 0)
         let frontmostPID = NSWorkspace.shared.frontmostApplication?.processIdentifier
         let keyWindow = NSApplication.shared.keyWindow
         controller.setCollapsed(true)
         try await waitUntil { controller.fanAnimationPanel?.isVisible == true && controller.fanAnimationProgress < 0.85 }
         let overlay = try #require(controller.fanAnimationPanel)
+        let dock = try #require(overlay.contentView as? MagneticDockMotionView)
+        let layers = try #require(dock.layer?.sublayers)
+        #expect(layers.count == visualCount)
+        #expect(layers.allSatisfy { $0.contents != nil && $0.animation(forKey: "dockShrink") != nil })
+        let presented = try #require(layers.first?.presentation())
+        #expect(presented.transform.m11 > 0.02 && presented.transform.m11 < 1)
         #expect(overlay.ignoresMouseEvents && !overlay.canBecomeKey && !overlay.canBecomeMain)
         #expect(controller.cardPanels.values.allSatisfy { !$0.isVisible })
         #expect(controller.cardPanels.mapValues(\.frame) == originals)
@@ -1627,6 +1712,7 @@ struct MagneticDesktopTests {
         let reversingAt = controller.fanAnimationProgress
         controller.setCollapsed(false)
         try await waitUntil { overlay.isVisible && controller.fanAnimationProgress > reversingAt }
+        #expect(overlay.contentView is MagneticDockMotionView)
         try snapshot(overlay, to: "/private/tmp/PinboardShot-fan-opening.png")
         try await waitUntil { !overlay.isVisible && controller.cardPanels.values.allSatisfy(\.isVisible) }
         #expect(controller.foldedPanel?.isVisible == false)
@@ -1644,19 +1730,20 @@ struct MagneticDesktopTests {
                 try await waitUntil { overlay.isVisible && controller.fanAnimationProgress >= progress }
                 try snapshot(overlay, to: "/private/tmp/PinboardShot-fan-open-\(index).png")
             }
-            try await waitUntil { !overlay.isVisible && controller.boxPanel?.isVisible == true }
+            try await waitUntil { !overlay.isVisible && controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         }
 
         controller.setCollapsed(true)
         try await waitUntil { overlay.isVisible && controller.fanAnimationProgress < 0.8 }
         controller.suspendForCapture()
         #expect(!overlay.isVisible && controller.foldedPanel?.isVisible == false)
+        #expect(overlay.contentView == nil)
         controller.resumeAfterCapture()
         try await waitUntil { controller.foldedPanel?.isVisible == true && !overlay.isVisible }
         #expect(controller.cardPanels.values.allSatisfy { !$0.isVisible })
         reduced = true
         controller.setCollapsed(false)
-        try await waitUntil { controller.boxPanel?.isVisible == true && controller.cardPanels.values.allSatisfy(\.isVisible) }
+        try await waitUntil { controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true && controller.cardPanels.values.allSatisfy(\.isVisible) }
         #expect(!overlay.isVisible && controller.foldedPanel?.isVisible == false)
         #expect(controller.cardPanels.mapValues(\.frame) == originals)
         reduced = false
@@ -1843,7 +1930,7 @@ struct MagneticDesktopTests {
             pointerLocation: { CGPoint(x: -10000, y: -10000) }, pinManager: manager, screenFrames: { screens })
         defer { controller.stop(); manager.closeAll() }
         controller.start()
-        try await waitUntil { controller.cardPanels.count == 4 && controller.boxPanel?.isVisible == true }
+        try await waitUntil { controller.cardPanels.count == 4 && controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         func drag(_ pin: PinWindowController, to point: CGPoint, time: TimeInterval) throws {
             let panel = try #require(pin.window)
             let start = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
@@ -1894,7 +1981,7 @@ struct MagneticDesktopTests {
         #expect(controller.cardPanels[ids[0]]?.level == .floating)
     }
 
-    @Test("Multiple desktop cards stay at normal levels, preserve positions and return with synchronized light trails")
+    @Test("Multiple desktop cards stay at normal levels, preserve positions and return with Dock scaling")
     func multipleDesktopCards() async throws {
         _ = NSApplication.shared
         let root = FileManager.default.temporaryDirectory.appendingPathComponent("MagneticMotion-\(UUID())")
@@ -1927,9 +2014,16 @@ struct MagneticDesktopTests {
             try await Task.sleep(for: .milliseconds(40))
             let hosting = try #require(panel.contentView as? MagneticCardHostingView)
             #expect(hosting.rootView.motion.direction == .outward)
-            #expect(hosting.rootView.motion.progress > 0 && hosting.rootView.motion.progress < 1)
+            let dock = try #require(controller.trailPanel?.contentView as? MagneticDockMotionView)
+            #expect(dock.progress > 0 && dock.progress < 1)
+            #expect(!panel.isVisible)
+            let layers = try #require(dock.layer?.sublayers)
+            let presented = try #require(layers.first?.presentation())
+            #expect(presented.transform.m11 > 0 && presented.transform.m22 > 0)
+            #expect(presented.transform.m12 == 0 && presented.transform.m21 == 0
+                && presented.transform.m13 == 0 && presented.transform.m31 == 0)
             #expect(panel.level == .normal)
-            try snapshot(panel, to: "/private/tmp/PinboardShot-magnetic-flip-smoke.png")
+            try snapshot(controller.trailPanel, to: "/private/tmp/PinboardShot-magnetic-dock-smoke.png")
             try await waitUntil { controller.desktopPins[id] != nil && controller.activeFlightCount == 0 }
         }
         let first = try #require(controller.cardPanels[ids[0]])
@@ -1972,9 +2066,11 @@ struct MagneticDesktopTests {
         #expect(controller.trailPanel?.isVisible == true)
         #expect(controller.trailPanel?.level == .normal)
         #expect(controller.trailPanel?.ignoresMouseEvents == true)
+        #expect(controller.trailPanel?.contentView is MagneticDockMotionView)
         try snapshot(controller.trailPanel, to: "/private/tmp/PinboardShot-magnetic-trails-smoke.png")
         controller.suspendForCapture()
         #expect(controller.trailPanel?.isVisible == false)
+        #expect(controller.trailPanel?.contentView == nil)
         #expect(controller.activeFlightCount == 0)
         #expect(controller.cardPanels.values.allSatisfy { !$0.isVisible })
         controller.resumeAfterCapture()
@@ -2013,7 +2109,7 @@ struct MagneticDesktopTests {
             reduceMotion: { true }, pointerLocation: { CGPoint(x: -10000, y: -10000) })
         defer { controller.stop() }
         controller.start()
-        try await waitUntil { controller.cardPanels.count == 3 && controller.boxPanel?.isVisible == true }
+        try await waitUntil { controller.cardPanels.count == 3 && controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         let id = try #require(store.items.first?.id)
         var panel = try #require(controller.cardPanels[id])
         func event(_ type: NSEvent.EventType, at point: CGPoint, time: TimeInterval) throws -> NSEvent {
@@ -2132,7 +2228,7 @@ struct MagneticDesktopTests {
         let screen = try #require(NSScreen.screens.first?.visibleFrame)
         let centerX = screen.minX + 16 + (screen.width - MagneticDesktopGeometry.cardSize.width - 40) / 2
         controller.start()
-        try await waitUntil { controller.boxPanel?.isVisible == true }
+        try await waitUntil { controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         controller.extract(item.id)
         try await waitUntil {
             guard let panel = controller.desktopPins[item.id]?.window else { return false }
@@ -2456,7 +2552,7 @@ struct MagneticDesktopTests {
         try send(.leftMouseDown, at: start)
         try send(.leftMouseDragged, at: CGPoint(x: start.x - 1, y: start.y + 1))
         try send(.leftMouseUp, at: CGPoint(x: start.x - 1, y: start.y + 1))
-        try await waitUntil { !panel.isVisible && controller.boxPanel?.isVisible == true }
+        try await waitUntil { !panel.isVisible && controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         #expect(!MagneticDesktopSettings(defaults: defaults).isCollapsed)
         controller.setCollapsed(true)
         try await waitUntil { panel.isVisible }
@@ -2550,7 +2646,7 @@ struct MagneticDesktopTests {
         point = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
         try send(.leftMouseDown, at: point)
         try send(.leftMouseUp, at: point)
-        try await waitUntil { !panel.isVisible && controller.boxPanel?.isVisible == true }
+        try await waitUntil { !panel.isVisible && controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true }
         controller.setCollapsed(true)
         try await waitUntil { panel.isVisible }
         #expect(panel.frame == moved && controller.foldedIsDetached)
@@ -2679,7 +2775,7 @@ struct MagneticDesktopTests {
         #expect(panel.frame == docked && controller.foldedDockEdge == edge)
         try send(.leftMouseDown, at: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
         try send(.leftMouseUp, at: CGPoint(x: panel.frame.midX, y: panel.frame.midY))
-        try await waitUntil { controller.boxPanel?.isVisible == true && !panel.isVisible }
+        try await waitUntil { controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true && !panel.isVisible }
         controller.setCollapsed(true)
         try await waitUntil { panel.isVisible }
         #expect(controller.foldedDockEdge == edge && panel.frame == docked)
@@ -2820,9 +2916,8 @@ struct MagneticDesktopTests {
         let click = CGPoint(x: panel.frame.midX, y: panel.frame.midY)
         try send(.leftMouseDown, at: click, timestamp: 40)
         try send(.leftMouseUp, at: click, timestamp: 40.5)
-        try await waitUntil { controller.boxPanel?.isVisible == true && !panel.isVisible && controller.cardPanels.count == 2 }
-        let boxFrame = try #require(controller.boxPanel?.frame)
-        #expect(targetScreen.contains(boxFrame), "Box frame: \(boxFrame), target: \(targetScreen)")
+        try await waitUntil { controller.cardPanels.values.contains { $0.isVisible } && controller.foldedPanel?.isVisible != true && !panel.isVisible && controller.cardPanels.count == 2 }
+        #expect(controller.boxPanel?.isVisible != true)
         #expect(controller.cardPanels.values.allSatisfy { targetScreen.contains($0.frame) })
         controller.setCollapsed(true)
         try await waitUntil { panel.isVisible }
@@ -3083,7 +3178,14 @@ struct MagneticDesktopTests {
         let view = try #require(panel?.contentView)
         view.layoutSubtreeIfNeeded()
         let bitmap = try #require(view.bitmapImageRepForCachingDisplay(in: view.bounds))
-        view.cacheDisplay(in: view.bounds, to: bitmap)
+        if view is MagneticDockMotionView {
+            let context = try #require(NSGraphicsContext(bitmapImageRep: bitmap))
+            // cacheDisplay captures model-layer endpoints; inspect the visible compositor pose instead.
+            let presentation = try #require(view.layer?.presentation())
+            presentation.render(in: context.cgContext)
+        } else {
+            view.cacheDisplay(in: view.bounds, to: bitmap)
+        }
         let png = try #require(bitmap.representation(using: .png, properties: [:]))
         try png.write(to: URL(fileURLWithPath: path))
     }

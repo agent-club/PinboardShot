@@ -69,6 +69,88 @@ final class MagneticFanMotion: ObservableObject {
     var leaves: [MagneticFanLeaf] = []
 }
 
+@MainActor
+final class MagneticDockMotionView: NSView {
+    private let start: CGFloat
+    private let end: CGFloat
+    private let duration: TimeInterval
+    private var startedAt: CFTimeInterval = 0
+
+    var progress: CGFloat {
+        let elapsed = min(1, max(0, (CACurrentMediaTime() - startedAt) / duration))
+        return start + (end - start) * CGFloat(elapsed)
+    }
+
+    convenience init(leaves: [MagneticFanLeaf], screen: CGRect, pivot: CGPoint,
+                     start: CGFloat, end: CGFloat, duration: TimeInterval) {
+        let frames = leaves.map { leaf in
+            (start: CGRect(x: pivot.x - leaf.frame.width * 0.01, y: pivot.y - leaf.frame.height * 0.01,
+                           width: leaf.frame.width * 0.02, height: leaf.frame.height * 0.02), end: leaf.frame)
+        }
+        self.init(leaves: leaves, screen: screen, frames: frames, start: start, end: end,
+                  duration: duration, fades: true)
+    }
+
+    init(leaves: [MagneticFanLeaf], screen: CGRect, frames: [(start: CGRect, end: CGRect)],
+         start: CGFloat = 0, end: CGFloat = 1, duration: TimeInterval, fades: Bool = false) {
+        self.start = start
+        self.end = end
+        self.duration = duration
+        super.init(frame: CGRect(origin: .zero, size: screen.size))
+        wantsLayer = true
+        let root = CALayer()
+        root.frame = bounds
+        layer = root
+
+        // Cache each card once; the compositor interpolates these poses without main-thread redraws.
+        let samples = (0...30).map { start + (end - start) * CGFloat($0) / 30 }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        for (leaf, frames) in zip(leaves, frames).reversed() {
+            let card = CALayer()
+            card.bounds = CGRect(origin: .zero, size: leaf.frame.size)
+            card.contents = leaf.image.cgImage(forProposedRect: nil, context: nil, hints: nil)
+            card.contentsGravity = .resize
+            card.contentsScale = leaf.image.representations.first.map {
+                CGFloat($0.pixelsWide) / leaf.frame.width
+            } ?? 1
+            let eased = samples.map { $0 * $0 * (3 - 2 * $0) }
+            let positions = eased.map { NSValue(point: CGPoint(
+                x: frames.start.midX + (frames.end.midX - frames.start.midX) * $0 - screen.minX,
+                y: frames.start.midY + (frames.end.midY - frames.start.midY) * $0 - screen.minY)) }
+            let transforms = eased.map { NSValue(caTransform3D: CATransform3DMakeScale(
+                (frames.start.width + (frames.end.width - frames.start.width) * $0) / leaf.frame.width,
+                (frames.start.height + (frames.end.height - frames.start.height) * $0) / leaf.frame.height, 1)) }
+            let opacities = samples.map { fades ? min(1, $0 * 8) : 1 }
+            let finalProgress = end * end * (3 - 2 * end)
+            card.position = CGPoint(x: frames.start.midX + (frames.end.midX - frames.start.midX) * finalProgress - screen.minX,
+                                    y: frames.start.midY + (frames.end.midY - frames.start.midY) * finalProgress - screen.minY)
+            card.transform = CATransform3DMakeScale(
+                (frames.start.width + (frames.end.width - frames.start.width) * finalProgress) / leaf.frame.width,
+                (frames.start.height + (frames.end.height - frames.start.height) * finalProgress) / leaf.frame.height, 1)
+            card.opacity = Float(fades ? min(1, end * 8) : 1)
+            root.addSublayer(card)
+
+            let position = CAKeyframeAnimation(keyPath: "position")
+            position.values = positions
+            let scale = CAKeyframeAnimation(keyPath: "transform")
+            scale.values = transforms
+            let opacity = CAKeyframeAnimation(keyPath: "opacity")
+            opacity.values = opacities
+            let group = CAAnimationGroup()
+            group.animations = [position, scale, opacity]
+            group.duration = duration
+            group.fillMode = .both
+            group.isRemovedOnCompletion = false
+            card.add(group, forKey: "dockShrink")
+        }
+        startedAt = CACurrentMediaTime()
+        CATransaction.commit()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+}
+
 struct MagneticFanMotionView: View {
     @ObservedObject var motion: MagneticFanMotion
     let screenFrame: CGRect
@@ -229,21 +311,6 @@ struct MagneticCardView: View {
                         .allowsHitTesting(false)
                 }
             }
-            .overlay {
-                if motion.style == .full && motion.progress > 0 && motion.progress < 1 {
-                    GeometryReader { geometry in
-                        LinearGradient(colors: [.clear, .cyan.opacity(0.25), .white.opacity(0.8), .clear],
-                                       startPoint: .leading, endPoint: .trailing)
-                            .frame(width: geometry.size.width * 0.45)
-                            .rotationEffect(.degrees(-18))
-                            .offset(x: geometry.size.width * (motion.progress * 1.6 - 0.5))
-                    }
-                    .clipShape(RoundedRectangle(cornerRadius: 9))
-                    .allowsHitTesting(false)
-                }
-            }
-            .rotation3DEffect(.degrees(motion.style != .full || motion.progress >= 1 ? 0 : Double(motion.progress) * 360 * (motion.direction == .outward ? -1 : 1)),
-                              axis: (x: 0, y: 1, z: 0), perspective: 0.35)
             .scaleEffect(flightScale)
             .rotationEffect(.degrees(motion.style == .arc ? Double(sin(motion.progress * .pi)) * -3 : 0))
             .rotationEffect(.degrees(isExpanded ? 0 : fanAngle))
