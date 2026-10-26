@@ -16,6 +16,15 @@ export default defineConfig(() => {
     server: isCodexSeatbeltSandbox
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
+    // vinext 1.1 emits relative imports to manifests in the server output root.
+    // Keep RSC chunks beside them when Cloudflare splits the Worker entry point.
+    environments: {
+      rsc: {
+        build: {
+          rolldownOptions: { output: { chunkFileNames: "[name]-[hash].js" } },
+        },
+      },
+    },
     plugins: [
       vinext(),
       sites(),
