@@ -16,8 +16,8 @@
     "test": "pnpm run build && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "check:cloudflare": "vinext check",
-    "deploy:dry-run": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext deploy --dry-run",
-    "deploy": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext deploy",
+    "deploy:dry-run": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext-cloudflare deploy --dry-run",
+    "deploy": "WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext-cloudflare deploy",
     "db:generate": "drizzle-kit generate",
     "generate:brand": "node scripts/generate-brand.mjs",
     "generate:spatial-art": "node scripts/generate-spatial-art.mjs"
@@ -53,19 +53,20 @@
     "@types/react": "19.3.0",
     "@types/react-dom": "19.3.0",
     "@types/three": "0.186.0",
+    "@vinext/cloudflare": "1.1.0",
     "@vitejs/plugin-react": "6.1.2",
     "@vitejs/plugin-rsc": "0.5.36",
     "drizzle-kit": "0.31.11",
     "eslint": "9.39.5",
     "eslint-config-next": "16.4.0",
+    "parse5": "8.0.1",
     "react-server-dom-webpack": "19.3.0",
     "sharp": "0.35.5",
     "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "vinext": "0.2.1",
+    "vinext": "1.1.0",
     "vite": "8.3.4",
-    "wrangler": "4.149.0",
-    "parse5": "8.0.1"
+    "wrangler": "4.149.0"
   },
   "type": "module"
 }
